@@ -25,11 +25,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val data: android.net.Uri? = intent?.data
+        val ip = data?.host ?: "192.168.1.100"
+        val port = data?.port?.takeIf { it != -1 }?.toString() ?: "6996"
+
         setContent {
             AirSyncTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     SocketTestScreen(
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        initialIp = ip,
+                        initialPort = port
                     )
                 }
             }
@@ -39,9 +46,13 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SocketTestScreen(modifier: Modifier = Modifier) {
-    var ipAddress by remember { mutableStateOf("192.168.1.100") }
-    var port by remember { mutableStateOf("6996") }
+fun SocketTestScreen(
+    modifier: Modifier = Modifier,
+    initialIp: String = "192.168.1.100",
+    initialPort: String = "6996"
+) {
+    var ipAddress by remember { mutableStateOf(initialIp) }
+    var port by remember { mutableStateOf(initialPort) }
     var message by remember { mutableStateOf("Hello from Android!") }
     var response by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -55,7 +66,7 @@ fun SocketTestScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Socket Test",
+            text = "AirSync",
             style = MaterialTheme.typography.headlineMedium
         )
 
