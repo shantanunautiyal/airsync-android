@@ -64,7 +64,8 @@ fun NotificationSyncCard(
     ipAddress: String,
     port: String,
     onToggleSync: (Boolean) -> Unit,
-    onGrantPermissions: () -> Unit
+    onGrantPermissions: () -> Unit,
+    onManageApps: () -> Unit = {}
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -110,6 +111,17 @@ fun NotificationSyncCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
+            }
+
+            // Manage Apps button
+            if (isNotificationEnabled) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onManageApps,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Manage Apps")
+                }
             }
         }
     }

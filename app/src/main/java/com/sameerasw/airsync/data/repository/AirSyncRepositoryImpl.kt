@@ -2,6 +2,7 @@ package com.sameerasw.airsync.data.repository
 
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.domain.model.NotificationApp
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import kotlinx.coroutines.flow.Flow
 
@@ -71,5 +72,13 @@ class AirSyncRepositoryImpl(
 
     override fun getLastConnectedDevice(): Flow<ConnectedDevice?> {
         return dataStoreManager.getLastConnectedDevice()
+    }
+
+    override suspend fun saveNotificationApps(apps: List<NotificationApp>) {
+        dataStoreManager.saveNotificationApps(apps)
+    }
+
+    override fun getNotificationApps(): Flow<List<NotificationApp>> {
+        return dataStoreManager.getNotificationApps()
     }
 }

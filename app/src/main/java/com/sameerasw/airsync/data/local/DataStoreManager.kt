@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -139,6 +140,67 @@ class DataStoreManager(private val context: Context) {
             } else {
                 null
             }
+        }
+    }
+
+    suspend fun saveNotificationApps(apps: List<NotificationApp>) {
+        context.dataStore.edit { preferences ->
+            // Clear existing app preferences
+            val keysToRemove = preferences.asMap().keys.filter { it.name.startsWith("app_") }
+            keysToRemove.forEach { preferences.remove(it) }
+
+            // Save new app preferences
+            apps.forEach { app ->
+                val enabledKey = booleanPreferencesKey("app_${app.packageName}_enabled")
+                val nameKey = stringPreferencesKey("app_${app.packageName}_name")
+                val systemKey = booleanPreferencesKey("app_${app.packageName}_system")
+                val updatedKey = stringPreferencesKey("app_${app.packageName}_updated")
+
+                preferences[enabledKey] = app.isEnabled
+                preferences[nameKey] = app.appName
+                preferences[systemKey] = app.isSystemApp
+                preferences[updatedKey] = app.lastUpdated.toString()
+            }
+        }
+    }
+
+    fun getNotificationApps(): Flow<List<NotificationApp>> {
+        return context.dataStore.data.map { preferences ->
+            val apps = mutableListOf<NotificationApp>()
+            val packageNames = mutableSetOf<String>()
+
+            // Extract package names from preference keys
+            preferences.asMap().keys.forEach { key ->
+                if (key.name.startsWith("app_") && key.name.endsWith("_enabled")) {
+                    val packageName = key.name.removePrefix("app_").removeSuffix("_enabled")
+                    packageNames.add(packageName)
+                }
+            }
+
+            // Build app objects from preferences
+            packageNames.forEach { packageName ->
+                val enabledKey = booleanPreferencesKey("app_${packageName}_enabled")
+                val nameKey = stringPreferencesKey("app_${packageName}_name")
+                val systemKey = booleanPreferencesKey("app_${packageName}_system")
+                val updatedKey = stringPreferencesKey("app_${packageName}_updated")
+
+                val isEnabled = preferences[enabledKey] ?: true
+                val appName = preferences[nameKey] ?: packageName
+                val isSystemApp = preferences[systemKey] ?: false
+                val lastUpdated = preferences[updatedKey]?.toLongOrNull() ?: 0L
+
+                apps.add(
+                    NotificationApp(
+                        packageName = packageName,
+                        appName = appName,
+                        isEnabled = isEnabled,
+                        isSystemApp = isSystemApp,
+                        lastUpdated = lastUpdated
+                    )
+                )
+            }
+
+            apps.sortedBy { it.appName }
         }
     }
 }

@@ -143,6 +143,16 @@ class MediaNotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
+                // Check if this specific app is enabled for notifications
+                val notificationApps = dataStoreManager.getNotificationApps().first()
+                val appSettings = notificationApps.find { it.packageName == sbn.packageName }
+
+                // If app settings exist and it's disabled, skip
+                if (appSettings != null && !appSettings.isEnabled) {
+                    Log.d(TAG, "App ${sbn.packageName} is disabled for notifications, skipping")
+                    return@launch
+                }
+
                 // Skip system notifications and media-only notifications
                 if (shouldSkipNotification(sbn)) {
                     Log.d(TAG, "Skipping notification from ${sbn.packageName}")
@@ -165,6 +175,13 @@ class MediaNotificationListener : NotificationListenerService() {
                 // Only sync if we have meaningful content
                 if (title.isNotEmpty() || body.isNotEmpty()) {
                     Log.d(TAG, "Syncing notification - App: $appName, Title: $title, Body: $body")
+
+                    // Save the app to our list if it's new (auto-enable new apps)
+                    if (appSettings == null) {
+                        Log.d(TAG, "New app detected: ${sbn.packageName}, adding to preferences")
+                        saveNewAppToPreferences(sbn.packageName, appName)
+                    }
+
                     sendNotificationToDesktop(title, body, appName)
                 } else {
                     Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
@@ -172,6 +189,38 @@ class MediaNotificationListener : NotificationListenerService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing notification: ${e.message}")
             }
+        }
+    }
+
+    private suspend fun saveNewAppToPreferences(packageName: String, appName: String) {
+        try {
+            val currentApps = dataStoreManager.getNotificationApps().first().toMutableList()
+
+            // Check if app doesn't already exist
+            if (currentApps.none { it.packageName == packageName }) {
+                val packageManager = packageManager
+                val isSystemApp = try {
+                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                    (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                    (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                } catch (e: Exception) {
+                    false
+                }
+
+                val newApp = com.sameerasw.airsync.domain.model.NotificationApp(
+                    packageName = packageName,
+                    appName = appName,
+                    isEnabled = true, // Auto-enable new apps
+                    isSystemApp = isSystemApp,
+                    lastUpdated = System.currentTimeMillis()
+                )
+
+                currentApps.add(newApp)
+                dataStoreManager.saveNotificationApps(currentApps)
+                Log.d(TAG, "Added new app to preferences: $appName ($packageName)")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving new app to preferences: ${e.message}")
         }
     }
 

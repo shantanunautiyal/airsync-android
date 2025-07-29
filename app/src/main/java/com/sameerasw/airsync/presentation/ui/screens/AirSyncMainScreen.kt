@@ -31,7 +31,8 @@ fun AirSyncMainScreen(
     initialIp: String? = null,
     initialPort: String? = null,
     showConnectionDialog: Boolean = false,
-    pcName: String? = null
+    pcName: String? = null,
+    onNavigateToApps: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: AirSyncViewModel = viewModel { AirSyncViewModel.create(context) }
@@ -85,7 +86,8 @@ fun AirSyncMainScreen(
             ipAddress = uiState.ipAddress,
             port = uiState.port,
             onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
-            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
+            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+            onManageApps = onNavigateToApps
         )
 
         // Device Info Section
