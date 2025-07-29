@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.text.font.FontWeight
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,6 +31,7 @@ class MainActivity : ComponentActivity() {
         val data: android.net.Uri? = intent?.data
         val ip = data?.host ?: "192.168.1.100"
         val port = data?.port?.takeIf { it != -1 }?.toString() ?: "6996"
+        val isFromQrScan = data != null
 
         setContent {
             AirSyncTheme {
@@ -36,7 +39,8 @@ class MainActivity : ComponentActivity() {
                     SocketTestScreen(
                         modifier = Modifier.padding(innerPadding),
                         initialIp = ip,
-                        initialPort = port
+                        initialPort = port,
+                        showConnectionDialog = isFromQrScan
                     )
                 }
             }
@@ -49,13 +53,15 @@ class MainActivity : ComponentActivity() {
 fun SocketTestScreen(
     modifier: Modifier = Modifier,
     initialIp: String = "192.168.1.100",
-    initialPort: String = "6996"
+    initialPort: String = "6996",
+    showConnectionDialog: Boolean = false
 ) {
     var ipAddress by remember { mutableStateOf(initialIp) }
     var port by remember { mutableStateOf(initialPort) }
     var customMessage by remember { mutableStateOf("{\"type\":\"notification\",\"data\":{\"title\":\"Test\",\"body\":\"Hello!\",\"app\":\"WhatsApp\"}}") }
     var response by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var isDialogVisible by remember { mutableStateOf(showConnectionDialog) }
     val scope = rememberCoroutineScope()
 
     fun send(message: String) {
@@ -92,21 +98,13 @@ fun SocketTestScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Divider()
+        HorizontalDivider()
 
         Button(
             onClick = {
-                val message = """
-                    {
-                      "type": "device",
-                      "data": {
-                        "name": "Pixel 8 Pro",
-                        "ipAddress": "$ipAddress",
-                        "port": ${port.toIntOrNull() ?: 6996}
-                      }
-                    }
-                """.trimIndent()
+                val message = """{"type":"device","data":{"name":"Pixel 8 Pro","ipAddress":"$ipAddress","port":${port.toIntOrNull() ?: 6996}}}"""
                 send(message)
+
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -115,17 +113,9 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = """
-                    {
-                      "type": "notification",
-                      "data": {
-                        "title": "Test Message",
-                        "body": "This is a simulated notification.",
-                        "app": "Telegram"
-                      }
-                    }
-                """.trimIndent()
+                val message = """{"type":"notification","data":{"title":"Test Message","body":"This is a simulated notification.","app":"Telegram"}}"""
                 send(message)
+
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -134,30 +124,16 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = """
-                    {
-                      "type": "status",
-                      "data": {
-                        "battery": { "level": 42, "isCharging": false },
-                        "isPaired": true,
-                        "music": {
-                          "isPlaying": true,
-                          "title": "Test Song",
-                          "artist": "Test Artist",
-                          "volume": 70,
-                          "isMuted": false
-                        }
-                      }
-                    }
-                """.trimIndent()
+                val message = """{"type":"status","data":{"battery":{"level":42,"isCharging":false},"isPaired":true,"music":{"isPlaying":true,"title":"Test Song","artist":"Test Artist","volume":70,"isMuted":false}}}"""
                 send(message)
+
             },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Send Device Status")
         }
 
-        Divider()
+        HorizontalDivider()
 
         OutlinedTextField(
             value = customMessage,
@@ -184,9 +160,72 @@ fun SocketTestScreen(
                 Text(response, modifier = Modifier.padding(16.dp))
             }
         }
+
+        if (isDialogVisible) {
+            ConnectionDialog(
+                ipAddress = ipAddress,
+                port = port,
+                onDismiss = { isDialogVisible = false },
+                onConnect = {
+                    isDialogVisible = false
+                    // Send device info automatically
+                    val message = """{"type":"device","data":{"name":"Pixel 8 Pro","ipAddress":"$ipAddress","port":${port.toIntOrNull() ?: 6996}}}"""
+                    send(message)
+                }
+            )
+        }
     }
 }
 
+@Composable
+fun ConnectionDialog(
+    ipAddress: String,
+    port: String,
+    onDismiss: () -> Unit,
+    onConnect: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 3.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .width(280.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Connect to Desktop?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Text("Do you want to connect to:")
+                Text("IP Address: $ipAddress")
+                Text("Port: $port")
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Button(
+                        onClick = onConnect,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Connect")
+                    }
+                }
+            }
+        }
+    }
+}
 
 private suspend fun testSocket(ipAddress: String, port: Int, message: String, onResult: (String) -> Unit) {
     withContext(Dispatchers.IO) {
