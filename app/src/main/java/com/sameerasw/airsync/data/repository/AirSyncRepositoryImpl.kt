@@ -81,4 +81,12 @@ class AirSyncRepositoryImpl(
     override fun getNotificationApps(): Flow<List<NotificationApp>> {
         return dataStoreManager.getNotificationApps()
     }
+
+    override suspend fun updateLastSyncTime(timestamp: Long) {
+        dataStoreManager.updateLastSyncTime(timestamp)
+    }
+
+    override fun getLastSyncTime(): Flow<Long?> {
+        return dataStoreManager.getLastSyncTime()
+    }
 }

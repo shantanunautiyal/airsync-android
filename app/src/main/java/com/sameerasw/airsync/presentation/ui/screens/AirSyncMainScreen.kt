@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +18,7 @@ import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -55,7 +57,7 @@ fun AirSyncMainScreen(
         scope.launch {
             viewModel.setLoading(true)
             viewModel.setResponse("")
-            testSocket(uiState.ipAddress, uiState.port.toIntOrNull() ?: 6996, message) { result ->
+            testSocket(context, uiState.ipAddress, uiState.port.toIntOrNull() ?: 6996, message) { result ->
                 viewModel.setResponse(result)
                 viewModel.setLoading(false)
             }
@@ -222,7 +224,13 @@ fun AirSyncMainScreen(
     }
 }
 
-private suspend fun testSocket(ipAddress: String, port: Int, message: String, onResult: (String) -> Unit) {
+private suspend fun testSocket(
+    context: Context,
+    ipAddress: String,
+    port: Int,
+    message: String,
+    onResult: (String) -> Unit
+) {
     withContext(Dispatchers.IO) {
         try {
             val socket = Socket(ipAddress, port)
@@ -235,11 +243,41 @@ private suspend fun testSocket(ipAddress: String, port: Int, message: String, on
 
             socket.close()
 
+            // Update last sync time on successful connection
+            val currentTime = System.currentTimeMillis()
+            val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager(context)
+            dataStoreManager.updateLastSyncTime(currentTime)
+
+            // Update persistent notification
+            val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
+            com.sameerasw.airsync.utils.NotificationUtil.updateLastSyncTime(
+                context = context,
+                connectedDevice = connectedDevice,
+                lastSyncTime = currentTime,
+                isConnected = true
+            )
+
             withContext(Dispatchers.Main) {
                 onResult("Success! Received: $response")
             }
         } catch (e: Exception) {
             Log.e("TCP", "Socket error: ${e.message}")
+
+            // Update persistent notification to show connection failed
+            try {
+                val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager(context)
+                val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
+                val lastSyncTime = dataStoreManager.getLastSyncTime().first()
+                com.sameerasw.airsync.utils.NotificationUtil.showConnectionStatusNotification(
+                    context = context,
+                    connectedDevice = connectedDevice,
+                    lastSyncTime = lastSyncTime,
+                    isConnected = false
+                )
+            } catch (notificationError: Exception) {
+                Log.e("TCP", "Failed to update notification: ${notificationError.message}")
+            }
+
             withContext(Dispatchers.Main) {
                 onResult("Error: ${e.message}")
             }

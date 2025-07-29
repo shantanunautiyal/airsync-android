@@ -27,6 +27,7 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_PC_IP = stringPreferencesKey("last_connected_pc_ip")
         private val LAST_CONNECTED_PC_PORT = stringPreferencesKey("last_connected_pc_port")
         private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
+        private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
     }
 
@@ -120,6 +121,9 @@ class DataStoreManager(private val context: Context) {
             preferences[LAST_CONNECTED_PC_IP] = device.ipAddress
             preferences[LAST_CONNECTED_PC_PORT] = device.port
             preferences[LAST_CONNECTED_TIMESTAMP] = device.lastConnected.toString()
+            device.lastSyncTime?.let {
+                preferences[LAST_SYNC_TIME] = it.toString()
+            }
         }
     }
 
@@ -129,17 +133,31 @@ class DataStoreManager(private val context: Context) {
             val ip = preferences[LAST_CONNECTED_PC_IP]
             val port = preferences[LAST_CONNECTED_PC_PORT]
             val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
+            val lastSyncTime = preferences[LAST_SYNC_TIME]?.toLongOrNull()
 
             if (name != null && ip != null && port != null && timestamp != null) {
                 ConnectedDevice(
                     name = name,
                     ipAddress = ip,
                     port = port,
-                    lastConnected = timestamp.toLongOrNull() ?: 0L
+                    lastConnected = timestamp.toLongOrNull() ?: 0L,
+                    lastSyncTime = lastSyncTime
                 )
             } else {
                 null
             }
+        }
+    }
+
+    suspend fun updateLastSyncTime(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_SYNC_TIME] = timestamp.toString()
+        }
+    }
+
+    fun getLastSyncTime(): Flow<Long?> {
+        return context.dataStore.data.map { preferences ->
+            preferences[LAST_SYNC_TIME]?.toLongOrNull()
         }
     }
 

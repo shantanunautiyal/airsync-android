@@ -12,6 +12,7 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
 import com.sameerasw.airsync.utils.JsonUtil
+import com.sameerasw.airsync.utils.NotificationUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -106,11 +107,19 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
         Log.d(TAG, "Notification listener connected - Ready to sync notifications")
         updateMediaInfo()
+
+        // Show initial persistent notification
+        serviceScope.launch {
+            updatePersistentNotification()
+        }
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         Log.d(TAG, "Notification listener disconnected")
+
+        // Hide persistent notification when service disconnects
+        NotificationUtil.hideConnectionStatusNotification(this)
         serviceJob.cancel()
     }
 
@@ -297,13 +306,47 @@ class MediaNotificationListener : NotificationListenerService() {
 
                     socket.close()
 
+                    // Update last sync time on successful send
+                    val currentTime = System.currentTimeMillis()
+                    dataStoreManager.updateLastSyncTime(currentTime)
+
+                    // Update persistent notification with latest sync time
+                    updatePersistentNotification(isConnected = true)
+
                     Log.d(TAG, "Notification sent successfully, response: $response")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to send notification: ${e.message}")
+                    // Update persistent notification to show connection failed
+                    updatePersistentNotification(isConnected = false)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in sendNotificationToDesktop: ${e.message}")
+            // Update persistent notification to show connection failed
+            updatePersistentNotification(isConnected = false)
+        }
+    }
+
+    private suspend fun updatePersistentNotification(isConnected: Boolean = false) {
+        try {
+            val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
+            if (!isSyncEnabled) {
+                // Hide notification if sync is disabled
+                NotificationUtil.hideConnectionStatusNotification(this)
+                return
+            }
+
+            val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
+            val lastSyncTime = dataStoreManager.getLastSyncTime().first()
+
+            NotificationUtil.showConnectionStatusNotification(
+                context = this,
+                connectedDevice = connectedDevice,
+                lastSyncTime = lastSyncTime,
+                isConnected = isConnected
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating persistent notification: ${e.message}")
         }
     }
 

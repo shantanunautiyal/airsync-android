@@ -32,4 +32,8 @@ interface AirSyncRepository {
     // App notification preferences
     suspend fun saveNotificationApps(apps: List<NotificationApp>)
     fun getNotificationApps(): Flow<List<NotificationApp>>
+
+    // Last sync time tracking
+    suspend fun updateLastSyncTime(timestamp: Long)
+    fun getLastSyncTime(): Flow<Long?>
 }
