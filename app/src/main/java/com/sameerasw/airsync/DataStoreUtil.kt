@@ -30,6 +30,7 @@ object DataStoreUtil {
     private val LAST_CONNECTED_PC_IP = stringPreferencesKey("last_connected_pc_ip")
     private val LAST_CONNECTED_PC_PORT = stringPreferencesKey("last_connected_pc_port")
     private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
+    private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
 
     suspend fun saveIpAddress(context: Context, ipAddress: String) {
         context.dataStore.edit { preferences ->
@@ -100,6 +101,18 @@ object DataStoreUtil {
     fun getPermissionsChecked(context: Context): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[PERMISSIONS_CHECKED] ?: false
+        }
+    }
+
+    suspend fun setNotificationSyncEnabled(context: Context, enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[NOTIFICATION_SYNC_ENABLED] = enabled
+        }
+    }
+
+    fun getNotificationSyncEnabled(context: Context): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[NOTIFICATION_SYNC_ENABLED] ?: true // Default to enabled
         }
     }
 

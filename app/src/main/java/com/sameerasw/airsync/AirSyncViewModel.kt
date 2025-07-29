@@ -17,7 +17,8 @@ data class UiState(
     val showPermissionDialog: Boolean = false,
     val missingPermissions: List<String> = emptyList(),
     val isNotificationEnabled: Boolean = false,
-    val lastConnectedDevice: ConnectedDevice? = null
+    val lastConnectedDevice: ConnectedDevice? = null,
+    val isNotificationSyncEnabled: Boolean = true
 )
 
 data class DeviceInfo(
@@ -46,6 +47,7 @@ class AirSyncViewModel : ViewModel() {
             val savedDeviceName = DataStoreUtil.getDeviceName(context).first()
             val savedCustomMessage = DataStoreUtil.getCustomMessage(context).first()
             val lastConnected = DataStoreUtil.getLastConnectedDevice(context).first()
+            val isNotificationSyncEnabled = DataStoreUtil.getNotificationSyncEnabled(context).first()
 
             // Get device info
             val deviceName = if (savedDeviceName.isEmpty()) {
@@ -70,7 +72,8 @@ class AirSyncViewModel : ViewModel() {
                 isDialogVisible = showConnectionDialog,
                 missingPermissions = missingPermissions,
                 isNotificationEnabled = isNotificationEnabled,
-                lastConnectedDevice = lastConnected
+                lastConnectedDevice = lastConnected,
+                isNotificationSyncEnabled = isNotificationSyncEnabled
             )
 
             // If we have PC name from QR code, store it temporarily for the dialog
@@ -157,6 +160,13 @@ class AirSyncViewModel : ViewModel() {
             )
             DataStoreUtil.saveLastConnectedDevice(context, connectedDevice)
             _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)
+        }
+    }
+
+    fun setNotificationSyncEnabled(context: Context, enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isNotificationSyncEnabled = enabled)
+        viewModelScope.launch {
+            DataStoreUtil.setNotificationSyncEnabled(context, enabled)
         }
     }
 }

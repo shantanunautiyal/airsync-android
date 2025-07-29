@@ -1,14 +1,24 @@
 package com.sameerasw.airsync
 
+import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
 import android.media.MediaMetadata
-import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.Socket
 
 class MediaNotificationListener : NotificationListenerService() {
 
@@ -17,11 +27,18 @@ class MediaNotificationListener : NotificationListenerService() {
         private var currentMediaInfo: MediaInfo? = null
         private const val TAG = "MediaNotificationListener"
 
-        fun getCurrentMediaInfo(): MediaInfo? = currentMediaInfo
+        // System packages to ignore
+        private val SYSTEM_PACKAGES = setOf(
+            "android",
+            "com.android.systemui",
+            "com.android.providers.downloads",
+            "com.google.android.gms",
+            "com.android.vending"
+        )
 
         fun getMediaInfo(context: Context): MediaInfo {
             return try {
-                val mediaSessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+                val mediaSessionManager = context.getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
 
                 val componentName = ComponentName(context, MediaNotificationListener::class.java)
 
@@ -73,22 +90,163 @@ class MediaNotificationListener : NotificationListenerService() {
         }
     }
 
+    private val serviceJob = Job()
+    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+
     override fun onListenerConnected() {
         super.onListenerConnected()
-        Log.d(TAG, "Notification listener connected")
+        Log.d(TAG, "Notification listener connected - Ready to sync notifications")
         updateMediaInfo()
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        Log.d(TAG, "Notification listener disconnected")
+        serviceJob.cancel()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
-        Log.d(TAG, "Notification posted: ${sbn?.packageName}")
-        updateMediaInfo()
+        sbn?.let { notification ->
+            Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getString(Notification.EXTRA_TITLE)}")
+
+            // Update media info first
+            updateMediaInfo()
+
+            // Process notification for sync
+            processNotificationForSync(notification)
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
         Log.d(TAG, "Notification removed: ${sbn?.packageName}")
         updateMediaInfo()
+    }
+
+    private fun processNotificationForSync(sbn: StatusBarNotification) {
+        serviceScope.launch {
+            try {
+                // Check if notification sync is enabled
+                val isSyncEnabled = DataStoreUtil.getNotificationSyncEnabled(this@MediaNotificationListener).first()
+                if (!isSyncEnabled) {
+                    Log.d(TAG, "Notification sync is disabled, skipping notification")
+                    return@launch
+                }
+
+                // Skip system notifications and media-only notifications
+                if (shouldSkipNotification(sbn)) {
+                    Log.d(TAG, "Skipping notification from ${sbn.packageName}")
+                    return@launch
+                }
+
+                val notification = sbn.notification
+                val extras = notification.extras
+
+                val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
+                val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+
+                // Use big text if available, otherwise use regular text
+                val body = bigText?.takeIf { it.isNotEmpty() } ?: text
+
+                // Get app name from package name
+                val appName = getAppNameFromPackage(sbn.packageName)
+
+                // Only sync if we have meaningful content
+                if (title.isNotEmpty() || body.isNotEmpty()) {
+                    Log.d(TAG, "Syncing notification - App: $appName, Title: $title, Body: $body")
+                    sendNotificationToDesktop(title, body, appName)
+                } else {
+                    Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing notification: ${e.message}")
+            }
+        }
+    }
+
+    private fun shouldSkipNotification(sbn: StatusBarNotification): Boolean {
+        // Skip system packages
+        if (SYSTEM_PACKAGES.contains(sbn.packageName)) {
+            return true
+        }
+
+        // Skip if notification is not clearable (usually system notifications)
+        if (!sbn.isClearable) {
+            return true
+        }
+
+        // Skip ongoing notifications (like music players, downloads, etc.)
+        if (sbn.notification.flags and Notification.FLAG_ONGOING_EVENT != 0) {
+            return true
+        }
+
+        // Skip notifications without meaningful content
+        val extras = sbn.notification.extras
+        val title = extras.getString(Notification.EXTRA_TITLE)
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+
+        if (title.isNullOrEmpty() && text.isNullOrEmpty()) {
+            return true
+        }
+
+        return false
+    }
+
+    private fun getAppNameFromPackage(packageName: String): String {
+        return try {
+            val packageManager = packageManager
+            val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+            packageManager.getApplicationLabel(applicationInfo).toString()
+        } catch (_: Exception) {
+            // Fallback to package name or friendly name
+            when (packageName) {
+                "com.whatsapp" -> "WhatsApp"
+                "com.telegram.messenger" -> "Telegram"
+                "com.discord" -> "Discord"
+                "com.slack" -> "Slack"
+                "com.microsoft.teams" -> "Microsoft Teams"
+                "com.google.android.gm" -> "Gmail"
+                "com.android.email" -> "Email"
+                "com.samsung.android.messaging" -> "Messages"
+                "com.google.android.apps.messaging" -> "Messages"
+                else -> packageName.split(".").lastOrNull()?.replaceFirstChar { it.uppercase() } ?: packageName
+            }
+        }
+    }
+
+    private suspend fun sendNotificationToDesktop(title: String, body: String, appName: String) {
+        try {
+            // Get connection settings from DataStore
+            val ipAddress = DataStoreUtil.getIpAddress(this).first()
+            val port = DataStoreUtil.getPort(this).first().toIntOrNull() ?: 6996
+
+            // Create notification JSON and ensure it's a single line
+            val notificationJson = JsonUtil.toSingleLine(JsonUtil.createNotificationJson(title, body, appName))
+
+            Log.d(TAG, "Sending notification to $ipAddress:$port - $notificationJson")
+
+            // Send via socket
+            withContext(Dispatchers.IO) {
+                try {
+                    val socket = Socket(ipAddress, port)
+                    val output = PrintWriter(socket.getOutputStream(), true)
+                    val input = BufferedReader(InputStreamReader(socket.getInputStream()))
+
+                    output.println(notificationJson)
+                    val response = input.readLine()
+
+                    socket.close()
+
+                    Log.d(TAG, "Notification sent successfully, response: $response")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to send notification: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in sendNotificationToDesktop: ${e.message}")
+        }
     }
 
     private fun updateMediaInfo() {

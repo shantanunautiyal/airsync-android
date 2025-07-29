@@ -17,6 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.Switch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import kotlinx.coroutines.Dispatchers
@@ -137,6 +138,55 @@ fun SocketTestScreen(
                             Text("Refresh")
                         }
                     }
+                }
+            }
+        }
+
+        // Notification Sync Settings Card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Notification Sync", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (uiState.isNotificationEnabled && uiState.isNotificationSyncEnabled)
+                                "Automatically sync notifications to desktop"
+                            else "Enable to sync notifications",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = uiState.isNotificationSyncEnabled && uiState.isNotificationEnabled,
+                        onCheckedChange = { enabled ->
+                            if (uiState.isNotificationEnabled) {
+                                viewModel.setNotificationSyncEnabled(context, enabled)
+                            } else {
+                                viewModel.setPermissionDialogVisible(true)
+                            }
+                        },
+                        enabled = uiState.isNotificationEnabled
+                    )
+                }
+
+                if (!uiState.isNotificationEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "❌ Notification access required",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else if (uiState.isNotificationSyncEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "✅ Notifications will be sent to ${uiState.ipAddress}:${uiState.port}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
