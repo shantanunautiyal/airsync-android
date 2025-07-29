@@ -1,4 +1,4 @@
-package com.sameerasw.airsync
+package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.content.Intent
@@ -9,6 +9,9 @@ import android.os.BatteryManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import com.sameerasw.airsync.domain.model.AudioInfo
+import com.sameerasw.airsync.domain.model.BatteryInfo
+import com.sameerasw.airsync.service.MediaNotificationListener
 import java.net.NetworkInterface
 import java.util.*
 
@@ -135,16 +138,3 @@ object DeviceInfoUtil {
         )
     }
 }
-
-data class BatteryInfo(
-    val level: Int,
-    val isCharging: Boolean
-)
-
-data class AudioInfo(
-    val isPlaying: Boolean,
-    val title: String,
-    val artist: String,
-    val volume: Int,
-    val isMuted: Boolean
-)

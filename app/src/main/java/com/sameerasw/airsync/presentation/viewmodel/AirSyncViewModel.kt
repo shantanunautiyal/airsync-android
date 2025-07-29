@@ -1,32 +1,31 @@
-package com.sameerasw.airsync
+package com.sameerasw.airsync.presentation.viewmodel
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
+import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.domain.model.DeviceInfo
+import com.sameerasw.airsync.domain.model.UiState
+import com.sameerasw.airsync.domain.repository.AirSyncRepository
+import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.PermissionUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class UiState(
-    val ipAddress: String = "",
-    val port: String = "",
-    val deviceNameInput: String = "",
-    val customMessage: String = "",
-    val isLoading: Boolean = false,
-    val response: String = "",
-    val isDialogVisible: Boolean = false,
-    val showPermissionDialog: Boolean = false,
-    val missingPermissions: List<String> = emptyList(),
-    val isNotificationEnabled: Boolean = false,
-    val lastConnectedDevice: ConnectedDevice? = null,
-    val isNotificationSyncEnabled: Boolean = true
-)
+class AirSyncViewModel(
+    private val repository: AirSyncRepository
+) : ViewModel() {
 
-data class DeviceInfo(
-    val name: String = "",
-    val localIp: String = ""
-)
+    companion object {
+        fun create(context: Context): AirSyncViewModel {
+            val dataStoreManager = DataStoreManager(context)
+            val repository = AirSyncRepositoryImpl(dataStoreManager)
+            return AirSyncViewModel(repository)
+        }
+    }
 
-class AirSyncViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
@@ -42,17 +41,17 @@ class AirSyncViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             // Load saved values
-            val savedIp = if (initialIp != null) initialIp else DataStoreUtil.getIpAddress(context).first()
-            val savedPort = if (initialPort != null) initialPort else DataStoreUtil.getPort(context).first()
-            val savedDeviceName = DataStoreUtil.getDeviceName(context).first()
-            val savedCustomMessage = DataStoreUtil.getCustomMessage(context).first()
-            val lastConnected = DataStoreUtil.getLastConnectedDevice(context).first()
-            val isNotificationSyncEnabled = DataStoreUtil.getNotificationSyncEnabled(context).first()
+            val savedIp = if (initialIp != null) initialIp else repository.getIpAddress().first()
+            val savedPort = if (initialPort != null) initialPort else repository.getPort().first()
+            val savedDeviceName = repository.getDeviceName().first()
+            val savedCustomMessage = repository.getCustomMessage().first()
+            val lastConnected = repository.getLastConnectedDevice().first()
+            val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
 
             // Get device info
             val deviceName = if (savedDeviceName.isEmpty()) {
                 val autoName = DeviceInfoUtil.getDeviceName(context)
-                DataStoreUtil.saveDeviceName(context, autoName)
+                repository.saveDeviceName(autoName)
                 autoName
             } else savedDeviceName
 
@@ -78,7 +77,6 @@ class AirSyncViewModel : ViewModel() {
 
             // If we have PC name from QR code, store it temporarily for the dialog
             if (pcName != null && showConnectionDialog) {
-                //  pass to the dialog through the UI state
                 _uiState.value = _uiState.value.copy(
                     lastConnectedDevice = ConnectedDevice(
                         name = pcName,
@@ -91,32 +89,32 @@ class AirSyncViewModel : ViewModel() {
         }
     }
 
-    fun updateIpAddress(context: Context, ip: String) {
-        _uiState.value = _uiState.value.copy(ipAddress = ip)
+    fun updateIpAddress(ipAddress: String) {
+        _uiState.value = _uiState.value.copy(ipAddress = ipAddress)
         viewModelScope.launch {
-            DataStoreUtil.saveIpAddress(context, ip)
+            repository.saveIpAddress(ipAddress)
         }
     }
 
-    fun updatePort(context: Context, port: String) {
+    fun updatePort(port: String) {
         _uiState.value = _uiState.value.copy(port = port)
         viewModelScope.launch {
-            DataStoreUtil.savePort(context, port)
+            repository.savePort(port)
         }
     }
 
-    fun updateDeviceName(context: Context, name: String) {
+    fun updateDeviceName(name: String) {
         _uiState.value = _uiState.value.copy(deviceNameInput = name)
         _deviceInfo.value = _deviceInfo.value.copy(name = name)
         viewModelScope.launch {
-            DataStoreUtil.saveDeviceName(context, name)
+            repository.saveDeviceName(name)
         }
     }
 
-    fun updateCustomMessage(context: Context, message: String) {
+    fun updateCustomMessage(message: String) {
         _uiState.value = _uiState.value.copy(customMessage = message)
         viewModelScope.launch {
-            DataStoreUtil.saveCustomMessage(context, message)
+            repository.saveCustomMessage(message)
         }
     }
 
@@ -150,7 +148,7 @@ class AirSyncViewModel : ViewModel() {
         _deviceInfo.value = _deviceInfo.value.copy(localIp = localIp)
     }
 
-    fun saveLastConnectedDevice(context: Context, pcName: String? = null) {
+    fun saveLastConnectedDevice(pcName: String? = null) {
         viewModelScope.launch {
             val connectedDevice = ConnectedDevice(
                 name = pcName ?: "Desktop PC",
@@ -158,15 +156,15 @@ class AirSyncViewModel : ViewModel() {
                 port = _uiState.value.port,
                 lastConnected = System.currentTimeMillis()
             )
-            DataStoreUtil.saveLastConnectedDevice(context, connectedDevice)
+            repository.saveLastConnectedDevice(connectedDevice)
             _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)
         }
     }
 
-    fun setNotificationSyncEnabled(context: Context, enabled: Boolean) {
+    fun setNotificationSyncEnabled(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isNotificationSyncEnabled = enabled)
         viewModelScope.launch {
-            DataStoreUtil.setNotificationSyncEnabled(context, enabled)
+            repository.setNotificationSyncEnabled(enabled)
         }
     }
 }

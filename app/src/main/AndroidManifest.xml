@@ -41,7 +41,7 @@
         </activity>
 
         <service
-            android:name=".MediaNotificationListener"
+            android:name=".service.MediaNotificationListener"
             android:exported="false"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>

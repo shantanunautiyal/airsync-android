@@ -1,4 +1,4 @@
-package com.sameerasw.airsync
+package com.sameerasw.airsync.utils
 
 object JsonUtil {
     /**

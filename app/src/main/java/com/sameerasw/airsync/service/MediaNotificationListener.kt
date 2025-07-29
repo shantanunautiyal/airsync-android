@@ -1,4 +1,4 @@
-package com.sameerasw.airsync
+package com.sameerasw.airsync.service
 
 import android.app.Notification
 import android.content.ComponentName
@@ -9,6 +9,9 @@ import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.domain.model.MediaInfo
+import com.sameerasw.airsync.utils.JsonUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -92,6 +95,12 @@ class MediaNotificationListener : NotificationListenerService() {
 
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private lateinit var dataStoreManager: DataStoreManager
+
+    override fun onCreate() {
+        super.onCreate()
+        dataStoreManager = DataStoreManager(this)
+    }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -128,7 +137,7 @@ class MediaNotificationListener : NotificationListenerService() {
         serviceScope.launch {
             try {
                 // Check if notification sync is enabled
-                val isSyncEnabled = DataStoreUtil.getNotificationSyncEnabled(this@MediaNotificationListener).first()
+                val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
                 if (!isSyncEnabled) {
                     Log.d(TAG, "Notification sync is disabled, skipping notification")
                     return@launch
@@ -219,8 +228,8 @@ class MediaNotificationListener : NotificationListenerService() {
     private suspend fun sendNotificationToDesktop(title: String, body: String, appName: String) {
         try {
             // Get connection settings from DataStore
-            val ipAddress = DataStoreUtil.getIpAddress(this).first()
-            val port = DataStoreUtil.getPort(this).first().toIntOrNull() ?: 6996
+            val ipAddress = dataStoreManager.getIpAddress().first()
+            val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
 
             // Create notification JSON and ensure it's a single line
             val notificationJson = JsonUtil.toSingleLine(JsonUtil.createNotificationJson(title, body, appName))
@@ -254,9 +263,3 @@ class MediaNotificationListener : NotificationListenerService() {
         Log.d(TAG, "Updated media info: $currentMediaInfo")
     }
 }
-
-data class MediaInfo(
-    val isPlaying: Boolean,
-    val title: String,
-    val artist: String
-)
