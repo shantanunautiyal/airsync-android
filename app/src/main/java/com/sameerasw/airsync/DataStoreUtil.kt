@@ -12,6 +12,13 @@ import kotlinx.coroutines.flow.map
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "airsync_settings")
 
+data class ConnectedDevice(
+    val name: String,
+    val ipAddress: String,
+    val port: String,
+    val lastConnected: Long
+)
+
 object DataStoreUtil {
     private val IP_ADDRESS = stringPreferencesKey("ip_address")
     private val PORT = stringPreferencesKey("port")
@@ -19,6 +26,10 @@ object DataStoreUtil {
     private val CUSTOM_MESSAGE = stringPreferencesKey("custom_message")
     private val FIRST_RUN = booleanPreferencesKey("first_run")
     private val PERMISSIONS_CHECKED = booleanPreferencesKey("permissions_checked")
+    private val LAST_CONNECTED_PC_NAME = stringPreferencesKey("last_connected_pc_name")
+    private val LAST_CONNECTED_PC_IP = stringPreferencesKey("last_connected_pc_ip")
+    private val LAST_CONNECTED_PC_PORT = stringPreferencesKey("last_connected_pc_port")
+    private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
 
     suspend fun saveIpAddress(context: Context, ipAddress: String) {
         context.dataStore.edit { preferences ->
@@ -89,6 +100,35 @@ object DataStoreUtil {
     fun getPermissionsChecked(context: Context): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[PERMISSIONS_CHECKED] ?: false
+        }
+    }
+
+    suspend fun saveLastConnectedDevice(context: Context, device: ConnectedDevice) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_CONNECTED_PC_NAME] = device.name
+            preferences[LAST_CONNECTED_PC_IP] = device.ipAddress
+            preferences[LAST_CONNECTED_PC_PORT] = device.port
+            preferences[LAST_CONNECTED_TIMESTAMP] = device.lastConnected.toString()
+        }
+    }
+
+    fun getLastConnectedDevice(context: Context): Flow<ConnectedDevice?> {
+        return context.dataStore.data.map { preferences ->
+            val name = preferences[LAST_CONNECTED_PC_NAME]
+            val ip = preferences[LAST_CONNECTED_PC_IP]
+            val port = preferences[LAST_CONNECTED_PC_PORT]
+            val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
+
+            if (name != null && ip != null && port != null && timestamp != null) {
+                ConnectedDevice(
+                    name = name,
+                    ipAddress = ip,
+                    port = port,
+                    lastConnected = timestamp.toLongOrNull() ?: 0L
+                )
+            } else {
+                null
+            }
         }
     }
 }

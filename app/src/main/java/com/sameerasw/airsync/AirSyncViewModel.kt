@@ -3,83 +3,86 @@ package com.sameerasw.airsync
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+data class UiState(
+    val ipAddress: String = "",
+    val port: String = "",
+    val deviceNameInput: String = "",
+    val customMessage: String = "",
+    val isLoading: Boolean = false,
+    val response: String = "",
+    val isDialogVisible: Boolean = false,
+    val showPermissionDialog: Boolean = false,
+    val missingPermissions: List<String> = emptyList(),
+    val isNotificationEnabled: Boolean = false,
+    val lastConnectedDevice: ConnectedDevice? = null
+)
+
+data class DeviceInfo(
+    val name: String = "",
+    val localIp: String = ""
+)
+
 class AirSyncViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-    // UI State
-    private val _uiState = MutableStateFlow(AirSyncUiState())
-    val uiState: StateFlow<AirSyncUiState> = _uiState.asStateFlow()
-
-    // Device info
     private val _deviceInfo = MutableStateFlow(DeviceInfo())
     val deviceInfo: StateFlow<DeviceInfo> = _deviceInfo.asStateFlow()
 
-    fun initializeState(context: Context, initialIp: String?, initialPort: String?, showConnectionDialog: Boolean) {
+    fun initializeState(
+        context: Context,
+        initialIp: String? = null,
+        initialPort: String? = null,
+        showConnectionDialog: Boolean = false,
+        pcName: String? = null
+    ) {
         viewModelScope.launch {
-            try {
-                // Load saved data from DataStore
-                val savedIp = DataStoreUtil.getIpAddress(context).first()
-                val savedPort = DataStoreUtil.getPort(context).first()
-                val savedDeviceName = DataStoreUtil.getDeviceName(context).first()
-                val savedCustomMessage = DataStoreUtil.getCustomMessage(context).first()
-                val isFirstRun = DataStoreUtil.getFirstRun(context).first()
-                val permissionsChecked = DataStoreUtil.getPermissionsChecked(context).first()
+            // Load saved values
+            val savedIp = if (initialIp != null) initialIp else DataStoreUtil.getIpAddress(context).first()
+            val savedPort = if (initialPort != null) initialPort else DataStoreUtil.getPort(context).first()
+            val savedDeviceName = DataStoreUtil.getDeviceName(context).first()
+            val savedCustomMessage = DataStoreUtil.getCustomMessage(context).first()
+            val lastConnected = DataStoreUtil.getLastConnectedDevice(context).first()
 
-                // Get device information
-                val deviceName = if (savedDeviceName.isEmpty()) {
-                    DeviceInfoUtil.getDeviceName(context)
-                } else {
-                    savedDeviceName
-                }
-                val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+            // Get device info
+            val deviceName = if (savedDeviceName.isEmpty()) {
+                val autoName = DeviceInfoUtil.getDeviceName(context)
+                DataStoreUtil.saveDeviceName(context, autoName)
+                autoName
+            } else savedDeviceName
 
-                // Update device info
-                _deviceInfo.value = DeviceInfo(
-                    name = deviceName,
-                    localIp = localIp
-                )
+            val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
 
-                // Use initial values from QR scan if provided, otherwise use saved values
-                val ipToUse = initialIp ?: savedIp
-                val portToUse = initialPort ?: savedPort
+            _deviceInfo.value = DeviceInfo(name = deviceName, localIp = localIp)
 
-                // Update UI state
+            // Check permissions
+            val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
+            val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
+
+            _uiState.value = _uiState.value.copy(
+                ipAddress = savedIp,
+                port = savedPort,
+                deviceNameInput = deviceName,
+                customMessage = savedCustomMessage,
+                isDialogVisible = showConnectionDialog,
+                missingPermissions = missingPermissions,
+                isNotificationEnabled = isNotificationEnabled,
+                lastConnectedDevice = lastConnected
+            )
+
+            // If we have PC name from QR code, store it temporarily for the dialog
+            if (pcName != null && showConnectionDialog) {
+                //  pass to the dialog through the UI state
                 _uiState.value = _uiState.value.copy(
-                    ipAddress = ipToUse,
-                    port = portToUse,
-                    deviceNameInput = deviceName,
-                    customMessage = savedCustomMessage,
-                    isDialogVisible = showConnectionDialog,
-                    showPermissionDialog = !permissionsChecked && isFirstRun,
-                    isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context),
-                    missingPermissions = PermissionUtil.getAllMissingPermissions(context)
-                )
-
-                // Save the current values if they came from QR scan
-                if (initialIp != null) {
-                    DataStoreUtil.saveIpAddress(context, ipToUse)
-                }
-                if (initialPort != null) {
-                    DataStoreUtil.savePort(context, portToUse)
-                }
-                if (savedDeviceName.isEmpty()) {
-                    DataStoreUtil.saveDeviceName(context, deviceName)
-                }
-
-                // Mark as not first run anymore
-                if (isFirstRun) {
-                    DataStoreUtil.setFirstRun(context, false)
-                }
-
-            } catch (e: Exception) {
-                // Handle initialization error
-                _uiState.value = _uiState.value.copy(
-                    response = "Error initializing app: ${e.message}"
+                    lastConnectedDevice = ConnectedDevice(
+                        name = pcName,
+                        ipAddress = savedIp,
+                        port = savedPort,
+                        lastConnected = System.currentTimeMillis()
+                    )
                 )
             }
         }
@@ -114,8 +117,8 @@ class AirSyncViewModel : ViewModel() {
         }
     }
 
-    fun setLoading(isLoading: Boolean) {
-        _uiState.value = _uiState.value.copy(isLoading = isLoading)
+    fun setLoading(loading: Boolean) {
+        _uiState.value = _uiState.value.copy(isLoading = loading)
     }
 
     fun setResponse(response: String) {
@@ -131,40 +134,29 @@ class AirSyncViewModel : ViewModel() {
     }
 
     fun refreshPermissions(context: Context) {
-        val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
         val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
-
+        val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
         _uiState.value = _uiState.value.copy(
-            isNotificationEnabled = isNotificationEnabled,
-            missingPermissions = missingPermissions
+            missingPermissions = missingPermissions,
+            isNotificationEnabled = isNotificationEnabled
         )
-
-        // Save that permissions have been checked
-        viewModelScope.launch {
-            DataStoreUtil.setPermissionsChecked(context, true)
-        }
     }
 
     fun refreshDeviceInfo(context: Context) {
         val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
         _deviceInfo.value = _deviceInfo.value.copy(localIp = localIp)
     }
+
+    fun saveLastConnectedDevice(context: Context, pcName: String? = null) {
+        viewModelScope.launch {
+            val connectedDevice = ConnectedDevice(
+                name = pcName ?: "Desktop PC",
+                ipAddress = _uiState.value.ipAddress,
+                port = _uiState.value.port,
+                lastConnected = System.currentTimeMillis()
+            )
+            DataStoreUtil.saveLastConnectedDevice(context, connectedDevice)
+            _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)
+        }
+    }
 }
-
-data class AirSyncUiState(
-    val ipAddress: String = "192.168.1.100",
-    val port: String = "6996",
-    val deviceNameInput: String = "",
-    val customMessage: String = """{"type":"notification","data":{"title":"Test","body":"Hello!","app":"WhatsApp"}}""",
-    val response: String = "",
-    val isLoading: Boolean = false,
-    val isDialogVisible: Boolean = false,
-    val showPermissionDialog: Boolean = false,
-    val isNotificationEnabled: Boolean = false,
-    val missingPermissions: List<String> = emptyList()
-)
-
-data class DeviceInfo(
-    val name: String = "",
-    val localIp: String = "Unknown"
-)

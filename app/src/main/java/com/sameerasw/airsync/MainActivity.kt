@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
         val data: android.net.Uri? = intent?.data
         val ip = data?.host
         val port = data?.port?.takeIf { it != -1 }?.toString()
+        val pcName = data?.getQueryParameter("name") // Extract PC name from QR code
         val isFromQrScan = data != null
 
         setContent {
@@ -44,7 +45,8 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         initialIp = ip,
                         initialPort = port,
-                        showConnectionDialog = isFromQrScan
+                        showConnectionDialog = isFromQrScan,
+                        pcName = pcName
                     )
                 }
             }
@@ -59,6 +61,7 @@ fun SocketTestScreen(
     initialIp: String? = null,
     initialPort: String? = null,
     showConnectionDialog: Boolean = false,
+    pcName: String? = null,
     viewModel: AirSyncViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -67,7 +70,7 @@ fun SocketTestScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog)
+        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog, pcName)
     }
 
     // Refresh permissions when returning from settings
@@ -191,6 +194,48 @@ fun SocketTestScreen(
             }
         }
 
+        // Last Connected Device Section
+        uiState.lastConnectedDevice?.let { device ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Last Connected Device", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("💻 ${device.name}", style = MaterialTheme.typography.bodyMedium)
+                    Text("🌐 ${device.ipAddress}:${device.port}", style = MaterialTheme.typography.bodyMedium)
+
+                    val lastConnectedTime = remember(device.lastConnected) {
+                        val currentTime = System.currentTimeMillis()
+                        val diffMinutes = (currentTime - device.lastConnected) / (1000 * 60)
+                        when {
+                            diffMinutes < 1 -> "Just now"
+                            diffMinutes < 60 -> "${diffMinutes}m ago"
+                            diffMinutes < 1440 -> "${diffMinutes / 60}h ago"
+                            else -> "${diffMinutes / 1440}d ago"
+                        }
+                    }
+                    Text("⏰ $lastConnectedTime", style = MaterialTheme.typography.bodyMedium)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.updateIpAddress(context, device.ipAddress)
+                                viewModel.updatePort(context, device.port)
+                                val message = JsonUtil.createDeviceInfoJson(deviceInfo.name, deviceInfo.localIp, device.port.toIntOrNull() ?: 6996)
+                                send(message)
+                                viewModel.saveLastConnectedDevice(context, device.name)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Quick Connect")
+                        }
+                    }
+                }
+            }
+        }
+
         // Connection Settings
         OutlinedTextField(
             value = uiState.ipAddress,
@@ -272,9 +317,12 @@ fun SocketTestScreen(
                 localIp = deviceInfo.localIp,
                 desktopIp = uiState.ipAddress,
                 port = uiState.port,
+                pcName = pcName ?: uiState.lastConnectedDevice?.name,
                 onDismiss = { viewModel.setDialogVisible(false) },
                 onConnect = {
                     viewModel.setDialogVisible(false)
+                    // Save the connected device info
+                    viewModel.saveLastConnectedDevice(context, pcName ?: uiState.lastConnectedDevice?.name)
                     // Send device info automatically
                     val message = JsonUtil.createDeviceInfoJson(deviceInfo.name, deviceInfo.localIp, uiState.port.toIntOrNull() ?: 6996)
                     send(message)
@@ -301,6 +349,7 @@ fun ConnectionDialog(
     localIp: String,
     desktopIp: String,
     port: String,
+    pcName: String?,
     onDismiss: () -> Unit,
     onConnect: () -> Unit
 ) {
@@ -328,6 +377,10 @@ fun ConnectionDialog(
                 Text("Connect to Desktop:")
                 Text("IP Address: $desktopIp")
                 Text("Port: $port")
+
+                pcName?.let {
+                    Text("PC Name: $it")
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
