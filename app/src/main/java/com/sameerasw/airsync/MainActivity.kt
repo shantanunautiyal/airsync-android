@@ -1,6 +1,9 @@
 package com.sameerasw.airsync
 
+import android.content.ComponentName
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -70,7 +73,29 @@ fun SocketTestScreen(
     var response by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var isDialogVisible by remember { mutableStateOf(showConnectionDialog) }
+    var showPermissionDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Use mutableState for permission checks so they can be updated
+    var isNotificationEnabled by remember { mutableStateOf(PermissionUtil.isNotificationListenerEnabled(context)) }
+    var missingPermissions by remember { mutableStateOf(PermissionUtil.getAllMissingPermissions(context)) }
+
+    // Update permission status when app resumes or composition recomposes
+    LaunchedEffect(Unit) {
+        // Initial check
+        isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
+        missingPermissions = PermissionUtil.getAllMissingPermissions(context)
+
+        if (missingPermissions.isNotEmpty()) {
+            showPermissionDialog = true
+        }
+    }
+
+    // Add a refresh function to check permissions again
+    fun refreshPermissions() {
+        isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
+        missingPermissions = PermissionUtil.getAllMissingPermissions(context)
+    }
 
     fun send(message: String) {
         scope.launch {
@@ -92,6 +117,46 @@ fun SocketTestScreen(
     ) {
         Text("AirSync", style = MaterialTheme.typography.headlineMedium)
 
+        // Permission Status Card
+        if (missingPermissions.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("⚠️ Permissions Required",
+                         style = MaterialTheme.typography.titleMedium,
+                         color = MaterialTheme.colorScheme.onErrorContainer)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Missing: ${missingPermissions.joinToString(", ")}",
+                         style = MaterialTheme.typography.bodyMedium,
+                         color = MaterialTheme.colorScheme.onErrorContainer)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showPermissionDialog = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Grant Permissions", color = MaterialTheme.colorScheme.onError)
+                        }
+
+                        OutlinedButton(
+                            onClick = { refreshPermissions() },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Refresh")
+                        }
+                    }
+                }
+            }
+        }
+
         // Device Info Section
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -99,12 +164,49 @@ fun SocketTestScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
 
+                val batteryInfo by rememberUpdatedState(DeviceInfoUtil.getBatteryInfo(context))
+                val audioInfo by rememberUpdatedState(DeviceInfoUtil.getAudioInfo(context))
+
+                Text("Battery: ${batteryInfo.level}% ${if (batteryInfo.isCharging) "⚡" else "🔋"}",
+                    style = MaterialTheme.typography.bodyMedium)
+                Text("Volume: ${audioInfo.volume}% ${if (audioInfo.isMuted) "🔇" else "🔊"}",
+                    style = MaterialTheme.typography.bodyMedium)
+
+                // Show media info status with refresh
+                if (isNotificationEnabled) {
+                    if (audioInfo.title.isNotEmpty()) {
+                        Text("🎵 ${audioInfo.title} - ${audioInfo.artist}",
+                             style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text("🎵 No media playing", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text("🎵 Media info unavailable (permission needed)",
+                         style = MaterialTheme.typography.bodyMedium,
+                         color = MaterialTheme.colorScheme.error)
+                }
+
                 OutlinedTextField(
                     value = deviceNameInput,
                     onValueChange = { deviceNameInput = it },
                     label = { Text("Device Name") },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            refreshPermissions()
+                            // Force recomposition to get fresh media info
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Refresh Media")
+                    }
+                }
             }
         }
 
@@ -127,7 +229,7 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = """{"type":"device","data":{"name":"$deviceNameInput","ipAddress":"$localIp","port":${port.toIntOrNull() ?: 6996}}}"""
+                val message = JsonUtil.createDeviceInfoJson(deviceNameInput, localIp, port.toIntOrNull() ?: 6996)
                 send(message)
             },
             modifier = Modifier.fillMaxWidth()
@@ -137,7 +239,7 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = """{"type":"notification","data":{"title":"Test Message","body":"This is a simulated notification.","app":"Telegram"}}"""
+                val message = JsonUtil.createNotificationJson("Test Message", "This is a simulated notification.", "Telegram")
                 send(message)
 
             },
@@ -148,7 +250,7 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = """{"type":"status","data":{"battery":{"level":42,"isCharging":false},"isPaired":true,"music":{"isPlaying":true,"title":"Test Song","artist":"Test Artist","volume":70,"isMuted":false}}}"""
+                val message = DeviceInfoUtil.generateDeviceStatusJson(context, port.toIntOrNull() ?: 6996)
                 send(message)
 
             },
@@ -194,9 +296,20 @@ fun SocketTestScreen(
                 onDismiss = { isDialogVisible = false },
                 onConnect = {
                     isDialogVisible = false
-                    // Send device info automatically with real device data
-                    val message = """{"type":"device","data":{"name":"$deviceNameInput","ipAddress":"$localIp","port":${port.toIntOrNull() ?: 6996}}}"""
+                    // Send device info automatically
+                    val message = JsonUtil.createDeviceInfoJson(deviceNameInput, localIp, port.toIntOrNull() ?: 6996)
                     send(message)
+                }
+            )
+        }
+
+        if (showPermissionDialog) {
+            PermissionDialog(
+                missingPermissions = missingPermissions,
+                onDismiss = { showPermissionDialog = false },
+                onGrantPermissions = {
+                    PermissionUtil.openNotificationListenerSettings(context)
+                    showPermissionDialog = false
                 }
             )
         }
@@ -248,6 +361,58 @@ fun ConnectionDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Connect")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PermissionDialog(
+    missingPermissions: List<String>,
+    onDismiss: () -> Unit,
+    onGrantPermissions: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = 3.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .width(300.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Permissions Required",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Text("The following permissions are needed for full functionality:")
+                missingPermissions.forEach { permission ->
+                    Text("• $permission")
+                }
+
+                Text("Please enable them in the settings.")
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Dismiss")
+                    }
+
+                    Button(
+                        onClick = onGrantPermissions,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Settings")
                     }
                 }
             }
