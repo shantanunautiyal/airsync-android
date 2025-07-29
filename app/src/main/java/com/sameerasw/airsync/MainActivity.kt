@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -56,8 +57,15 @@ fun SocketTestScreen(
     initialPort: String = "6996",
     showConnectionDialog: Boolean = false
 ) {
+    val context = LocalContext.current
+
+    // Get actual device information
+    val deviceName = remember { DeviceInfoUtil.getDeviceName(context) }
+    val localIp = remember { DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown" }
+
     var ipAddress by remember { mutableStateOf(initialIp) }
     var port by remember { mutableStateOf(initialPort) }
+    var deviceNameInput by remember { mutableStateOf(deviceName) }
     var customMessage by remember { mutableStateOf("{\"type\":\"notification\",\"data\":{\"title\":\"Test\",\"body\":\"Hello!\",\"app\":\"WhatsApp\"}}") }
     var response by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -82,19 +90,36 @@ fun SocketTestScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("AirSync Tester", style = MaterialTheme.typography.headlineMedium)
+        Text("AirSync", style = MaterialTheme.typography.headlineMedium)
 
+        // Device Info Section
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Device Information", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
+
+                OutlinedTextField(
+                    value = deviceNameInput,
+                    onValueChange = { deviceNameInput = it },
+                    label = { Text("Device Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        // Connection Settings
         OutlinedTextField(
             value = ipAddress,
             onValueChange = { ipAddress = it },
-            label = { Text("IP Address") },
+            label = { Text("Desktop IP Address") },
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedTextField(
             value = port,
             onValueChange = { port = it },
-            label = { Text("Port") },
+            label = { Text("Desktop Port") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -102,9 +127,8 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = """{"type":"device","data":{"name":"Pixel 8 Pro","ipAddress":"$ipAddress","port":${port.toIntOrNull() ?: 6996}}}"""
+                val message = """{"type":"device","data":{"name":"$deviceNameInput","ipAddress":"$localIp","port":${port.toIntOrNull() ?: 6996}}}"""
                 send(message)
-
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -163,13 +187,15 @@ fun SocketTestScreen(
 
         if (isDialogVisible) {
             ConnectionDialog(
-                ipAddress = ipAddress,
+                deviceName = deviceNameInput,
+                localIp = localIp,
+                desktopIp = ipAddress,
                 port = port,
                 onDismiss = { isDialogVisible = false },
                 onConnect = {
                     isDialogVisible = false
-                    // Send device info automatically
-                    val message = """{"type":"device","data":{"name":"Pixel 8 Pro","ipAddress":"$ipAddress","port":${port.toIntOrNull() ?: 6996}}}"""
+                    // Send device info automatically with real device data
+                    val message = """{"type":"device","data":{"name":"$deviceNameInput","ipAddress":"$localIp","port":${port.toIntOrNull() ?: 6996}}}"""
                     send(message)
                 }
             )
@@ -179,7 +205,9 @@ fun SocketTestScreen(
 
 @Composable
 fun ConnectionDialog(
-    ipAddress: String,
+    deviceName: String,
+    localIp: String,
+    desktopIp: String,
     port: String,
     onDismiss: () -> Unit,
     onConnect: () -> Unit
@@ -201,7 +229,7 @@ fun ConnectionDialog(
                 )
 
                 Text("Do you want to connect to:")
-                Text("IP Address: $ipAddress")
+                Text("IP Address: $desktopIp")
                 Text("Port: $port")
 
                 Row(
