@@ -1,14 +1,13 @@
 package com.sameerasw.airsync
 
-import android.content.ComponentName
-import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,8 +33,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val data: android.net.Uri? = intent?.data
-        val ip = data?.host ?: "192.168.1.100"
-        val port = data?.port?.takeIf { it != -1 }?.toString() ?: "6996"
+        val ip = data?.host
+        val port = data?.port?.takeIf { it != -1 }?.toString()
         val isFromQrScan = data != null
 
         setContent {
@@ -56,61 +56,42 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SocketTestScreen(
     modifier: Modifier = Modifier,
-    initialIp: String = "192.168.1.100",
-    initialPort: String = "6996",
-    showConnectionDialog: Boolean = false
+    initialIp: String? = null,
+    initialPort: String? = null,
+    showConnectionDialog: Boolean = false,
+    viewModel: AirSyncViewModel = viewModel()
 ) {
     val context = LocalContext.current
-
-    // Get actual device information
-    val deviceName = remember { DeviceInfoUtil.getDeviceName(context) }
-    val localIp = remember { DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown" }
-
-    var ipAddress by remember { mutableStateOf(initialIp) }
-    var port by remember { mutableStateOf(initialPort) }
-    var deviceNameInput by remember { mutableStateOf(deviceName) }
-    var customMessage by remember { mutableStateOf("{\"type\":\"notification\",\"data\":{\"title\":\"Test\",\"body\":\"Hello!\",\"app\":\"WhatsApp\"}}") }
-    var response by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var isDialogVisible by remember { mutableStateOf(showConnectionDialog) }
-    var showPermissionDialog by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
+    val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // Use mutableState for permission checks so they can be updated
-    var isNotificationEnabled by remember { mutableStateOf(PermissionUtil.isNotificationListenerEnabled(context)) }
-    var missingPermissions by remember { mutableStateOf(PermissionUtil.getAllMissingPermissions(context)) }
-
-    // Update permission status when app resumes or composition recomposes
     LaunchedEffect(Unit) {
-        // Initial check
-        isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
-        missingPermissions = PermissionUtil.getAllMissingPermissions(context)
-
-        if (missingPermissions.isNotEmpty()) {
-            showPermissionDialog = true
-        }
+        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog)
     }
 
-    // Add a refresh function to check permissions again
-    fun refreshPermissions() {
-        isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
-        missingPermissions = PermissionUtil.getAllMissingPermissions(context)
+    // Refresh permissions when returning from settings
+    LaunchedEffect(uiState.showPermissionDialog) {
+        if (!uiState.showPermissionDialog) {
+            viewModel.refreshPermissions(context)
+        }
     }
 
     fun send(message: String) {
         scope.launch {
-            testSocket(ipAddress, port.toIntOrNull() ?: 6996, message) { result ->
-                response = result
-                isLoading = false
+            viewModel.setLoading(true)
+            viewModel.setResponse("")
+            testSocket(uiState.ipAddress, uiState.port.toIntOrNull() ?: 6996, message) { result ->
+                viewModel.setResponse(result)
+                viewModel.setLoading(false)
             }
         }
-        isLoading = true
-        response = ""
     }
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -118,7 +99,7 @@ fun SocketTestScreen(
         Text("AirSync", style = MaterialTheme.typography.headlineMedium)
 
         // Permission Status Card
-        if (missingPermissions.isNotEmpty()) {
+        if (uiState.missingPermissions.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
@@ -128,7 +109,7 @@ fun SocketTestScreen(
                          style = MaterialTheme.typography.titleMedium,
                          color = MaterialTheme.colorScheme.onErrorContainer)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Missing: ${missingPermissions.joinToString(", ")}",
+                    Text("Missing: ${uiState.missingPermissions.joinToString(", ")}",
                          style = MaterialTheme.typography.bodyMedium,
                          color = MaterialTheme.colorScheme.onErrorContainer)
 
@@ -137,7 +118,7 @@ fun SocketTestScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { showPermissionDialog = true },
+                            onClick = { viewModel.setPermissionDialogVisible(true) },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error
@@ -147,7 +128,7 @@ fun SocketTestScreen(
                         }
 
                         OutlinedButton(
-                            onClick = { refreshPermissions() },
+                            onClick = { viewModel.refreshPermissions(context) },
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Refresh")
@@ -162,7 +143,7 @@ fun SocketTestScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Device Information", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
+                Text("Local IP: ${deviceInfo.localIp}", style = MaterialTheme.typography.bodyMedium)
 
                 val batteryInfo by rememberUpdatedState(DeviceInfoUtil.getBatteryInfo(context))
                 val audioInfo by rememberUpdatedState(DeviceInfoUtil.getAudioInfo(context))
@@ -173,7 +154,7 @@ fun SocketTestScreen(
                     style = MaterialTheme.typography.bodyMedium)
 
                 // Show media info status with refresh
-                if (isNotificationEnabled) {
+                if (uiState.isNotificationEnabled) {
                     if (audioInfo.title.isNotEmpty()) {
                         Text("🎵 ${audioInfo.title} - ${audioInfo.artist}",
                              style = MaterialTheme.typography.bodyMedium)
@@ -187,8 +168,8 @@ fun SocketTestScreen(
                 }
 
                 OutlinedTextField(
-                    value = deviceNameInput,
-                    onValueChange = { deviceNameInput = it },
+                    value = uiState.deviceNameInput,
+                    onValueChange = { viewModel.updateDeviceName(context, it) },
                     label = { Text("Device Name") },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -199,8 +180,8 @@ fun SocketTestScreen(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            refreshPermissions()
-                            // Force recomposition to get fresh media info
+                            viewModel.refreshPermissions(context)
+                            viewModel.refreshDeviceInfo(context)
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -212,15 +193,15 @@ fun SocketTestScreen(
 
         // Connection Settings
         OutlinedTextField(
-            value = ipAddress,
-            onValueChange = { ipAddress = it },
+            value = uiState.ipAddress,
+            onValueChange = { viewModel.updateIpAddress(context, it) },
             label = { Text("Desktop IP Address") },
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedTextField(
-            value = port,
-            onValueChange = { port = it },
+            value = uiState.port,
+            onValueChange = { viewModel.updatePort(context, it) },
             label = { Text("Desktop Port") },
             modifier = Modifier.fillMaxWidth()
         )
@@ -229,7 +210,7 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = JsonUtil.createDeviceInfoJson(deviceNameInput, localIp, port.toIntOrNull() ?: 6996)
+                val message = JsonUtil.createDeviceInfoJson(deviceInfo.name, deviceInfo.localIp, uiState.port.toIntOrNull() ?: 6996)
                 send(message)
             },
             modifier = Modifier.fillMaxWidth()
@@ -241,7 +222,6 @@ fun SocketTestScreen(
             onClick = {
                 val message = JsonUtil.createNotificationJson("Test Message", "This is a simulated notification.", "Telegram")
                 send(message)
-
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -250,9 +230,8 @@ fun SocketTestScreen(
 
         Button(
             onClick = {
-                val message = DeviceInfoUtil.generateDeviceStatusJson(context, port.toIntOrNull() ?: 6996)
+                val message = DeviceInfoUtil.generateDeviceStatusJson(context, uiState.port.toIntOrNull() ?: 6996)
                 send(message)
-
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -262,54 +241,54 @@ fun SocketTestScreen(
         HorizontalDivider()
 
         OutlinedTextField(
-            value = customMessage,
-            onValueChange = { customMessage = it },
+            value = uiState.customMessage,
+            onValueChange = { viewModel.updateCustomMessage(context, it) },
             label = { Text("Custom Raw JSON") },
             modifier = Modifier.fillMaxWidth(),
             maxLines = 4
         )
 
         Button(
-            onClick = { send(customMessage) },
-            enabled = !isLoading && ipAddress.isNotBlank() && port.isNotBlank() && customMessage.isNotBlank(),
+            onClick = { send(uiState.customMessage) },
+            enabled = !uiState.isLoading && uiState.ipAddress.isNotBlank() && uiState.port.isNotBlank() && uiState.customMessage.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (isLoading) {
+            if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(modifier = Modifier.width(8.dp))
             }
-            Text(if (isLoading) "Sending..." else "Send Custom Message")
+            Text(if (uiState.isLoading) "Sending..." else "Send Custom Message")
         }
 
-        if (response.isNotEmpty()) {
+        if (uiState.response.isNotEmpty()) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Text(response, modifier = Modifier.padding(16.dp))
+                Text(uiState.response, modifier = Modifier.padding(16.dp))
             }
         }
 
-        if (isDialogVisible) {
+        if (uiState.isDialogVisible) {
             ConnectionDialog(
-                deviceName = deviceNameInput,
-                localIp = localIp,
-                desktopIp = ipAddress,
-                port = port,
-                onDismiss = { isDialogVisible = false },
+                deviceName = deviceInfo.name,
+                localIp = deviceInfo.localIp,
+                desktopIp = uiState.ipAddress,
+                port = uiState.port,
+                onDismiss = { viewModel.setDialogVisible(false) },
                 onConnect = {
-                    isDialogVisible = false
+                    viewModel.setDialogVisible(false)
                     // Send device info automatically
-                    val message = JsonUtil.createDeviceInfoJson(deviceNameInput, localIp, port.toIntOrNull() ?: 6996)
+                    val message = JsonUtil.createDeviceInfoJson(deviceInfo.name, deviceInfo.localIp, uiState.port.toIntOrNull() ?: 6996)
                     send(message)
                 }
             )
         }
 
-        if (showPermissionDialog) {
+        if (uiState.showPermissionDialog) {
             PermissionDialog(
-                missingPermissions = missingPermissions,
-                onDismiss = { showPermissionDialog = false },
+                missingPermissions = uiState.missingPermissions,
+                onDismiss = { viewModel.setPermissionDialogVisible(false) },
                 onGrantPermissions = {
                     PermissionUtil.openNotificationListenerSettings(context)
-                    showPermissionDialog = false
+                    viewModel.setPermissionDialogVisible(false)
                 }
             )
         }
@@ -333,7 +312,7 @@ fun ConnectionDialog(
             Column(
                 modifier = Modifier
                     .padding(24.dp)
-                    .width(280.dp),
+                    .width(300.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -341,7 +320,12 @@ fun ConnectionDialog(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
 
-                Text("Do you want to connect to:")
+                Text("Device: $deviceName")
+                Text("Local IP: $localIp")
+
+                HorizontalDivider()
+
+                Text("Connect to Desktop:")
                 Text("IP Address: $desktopIp")
                 Text("Port: $port")
 
