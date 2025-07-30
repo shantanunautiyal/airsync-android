@@ -14,7 +14,6 @@ object WebSocketUtil {
     private const val TAG = "WebSocketUtil"
     private var webSocket: WebSocket? = null
     private var client: OkHttpClient? = null
-    private var currentContext: Context? = null
     private var currentIpAddress: String? = null
     private var currentPort: Int? = null
     private var isConnected = AtomicBoolean(false)
@@ -56,7 +55,6 @@ object WebSocketUtil {
         }
 
         isConnecting.set(true)
-        currentContext = context
         currentIpAddress = ipAddress
         currentPort = port
         onConnectionStatusChanged = onConnectionStatus
@@ -130,15 +128,6 @@ object WebSocketUtil {
 
                     // Notify all registered listeners about the connection status
                     notifyConnectionStatusListeners(false)
-
-                    // Attempt to reconnect after a delay for local connections
-                    CoroutineScope(Dispatchers.IO).launch {
-                        kotlinx.coroutines.delay(5000) // Wait 5 seconds before retry
-                        if (!isConnected.get() && currentIpAddress != null && currentPort != null) {
-                            Log.d(TAG, "Attempting to reconnect...")
-                            connect(context, currentIpAddress!!, currentPort!!, onConnectionStatus, onMessage)
-                        }
-                    }
                 }
             }
 
@@ -201,7 +190,6 @@ object WebSocketUtil {
 
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
-        currentContext?.let { updatePersistentNotification(it, false) }
         onConnectionStatusChanged?.invoke(false)
 
         // Notify all registered listeners about the disconnection
@@ -216,7 +204,6 @@ object WebSocketUtil {
 
         client?.dispatcher?.executorService?.shutdown()
         client = null
-        currentContext = null
         currentIpAddress = null
         currentPort = null
         onConnectionStatusChanged = null
