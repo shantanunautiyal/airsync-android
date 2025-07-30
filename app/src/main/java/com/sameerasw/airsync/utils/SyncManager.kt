@@ -5,6 +5,7 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.domain.model.BatteryInfo
+import com.sameerasw.airsync.utils.AppIconUtil
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
@@ -148,7 +149,12 @@ object SyncManager {
 
                 delay(1000)
 
-                // 3. Send existing notifications (recent ones)
+                // 3. Send app icons
+                sendAppIcons(context)
+
+                delay(1000)
+
+                // 4. Send existing notifications (recent ones)
                 sendRecentNotifications(context)
 
                 Log.d(TAG, "Initial sync sequence completed")
@@ -181,6 +187,50 @@ object SyncManager {
 
         } catch (e: Exception) {
             Log.e(TAG, "Error sending recent notifications: ${e.message}")
+        }
+    }
+
+    private suspend fun sendAppIcons(context: Context) {
+        try {
+            Log.d(TAG, "Starting app icons sync")
+
+            // Get enabled notification apps from DataStore
+            val dataStoreManager = DataStoreManager(context)
+            val notificationApps = dataStoreManager.getNotificationApps().first()
+
+            if (notificationApps.isEmpty()) {
+                Log.d(TAG, "No notification apps found, skipping app icons sync")
+                return
+            }
+
+            // Get package names of enabled apps
+            val enabledPackages = notificationApps.filter { it.isEnabled }.map { it.packageName }
+
+            if (enabledPackages.isEmpty()) {
+                Log.d(TAG, "No enabled notification apps found, skipping app icons sync")
+                return
+            }
+
+            Log.d(TAG, "Collecting icons for ${enabledPackages.size} enabled apps")
+
+            // Get app icons as base64
+            val iconMap = AppIconUtil.getAppIconsAsBase64(context, enabledPackages)
+
+            if (iconMap.isNotEmpty()) {
+                // Create and send app icons JSON
+                val appIconsJson = JsonUtil.createAppIconsJson(iconMap)
+
+                if (WebSocketUtil.sendMessage(appIconsJson)) {
+                    Log.d(TAG, "✅ App icons sent successfully (${iconMap.size} icons)")
+                } else {
+                    Log.e(TAG, "❌ Failed to send app icons")
+                }
+            } else {
+                Log.w(TAG, "No app icons could be collected")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending app icons: ${e.message}")
         }
     }
 

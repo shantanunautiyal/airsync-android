@@ -60,4 +60,14 @@ object JsonUtil {
     fun createVolumeControlResponse(action: String, success: Boolean, message: String = ""): String {
         return """{"type":"volumeControlResponse","data":{"action":"$action","success":$success,"message":"$message"}}"""
     }
+
+    /**
+     * Creates a JSON string for app icons with package name to base64 mapping
+     */
+    fun createAppIconsJson(iconMap: Map<String, String>): String {
+        val iconEntries = iconMap.entries.joinToString(",") { (packageName, base64Icon) ->
+            """"$packageName":"$base64Icon""""
+        }
+        return """{"type":"appIcons","data":{ $iconEntries }}"""
+    }
 }
