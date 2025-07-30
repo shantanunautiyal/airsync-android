@@ -196,9 +196,11 @@ fun AirSyncMainScreen(
             },
             onSendNotification = {
                 val message = JsonUtil.createNotificationJson(
+                    "121212",
                     "Test Message",
                     "This is a simulated notification from AirSync.",
-                    "AirSync"
+                    "AirSync",
+                    "sameerasw.airsync"
                 )
                 sendMessage(message)
             },

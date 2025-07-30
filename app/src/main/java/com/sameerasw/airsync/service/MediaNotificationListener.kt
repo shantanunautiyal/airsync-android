@@ -12,6 +12,7 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
 import com.sameerasw.airsync.utils.JsonUtil
+import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
@@ -26,6 +27,8 @@ class MediaNotificationListener : NotificationListenerService() {
     companion object {
         @Volatile
         private var currentMediaInfo: MediaInfo? = null
+        @Volatile
+        private var serviceInstance: MediaNotificationListener? = null
         private const val TAG = "MediaNotificationListener"
 
         // System packages to ignore
@@ -36,6 +39,10 @@ class MediaNotificationListener : NotificationListenerService() {
             "com.google.android.gms",
             "com.android.vending"
         )
+
+        fun getInstance(): MediaNotificationListener? {
+            return serviceInstance
+        }
 
         fun getMediaInfo(context: Context): MediaInfo {
             return try {
@@ -98,6 +105,7 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         dataStoreManager = DataStoreManager(this)
+        serviceInstance = this
     }
 
     override fun onListenerConnected() {
@@ -205,7 +213,7 @@ class MediaNotificationListener : NotificationListenerService() {
                         saveNewAppToPreferences(sbn.packageName, appName)
                     }
 
-                    sendNotificationToDesktop(title, body, appName)
+                    sendNotificationToDesktop(title, body, appName, sbn)
                 } else {
                     Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
                 }
@@ -297,14 +305,32 @@ class MediaNotificationListener : NotificationListenerService() {
         }
     }
 
-    private suspend fun sendNotificationToDesktop(title: String, body: String, appName: String) {
+    private suspend fun sendNotificationToDesktop(title: String, body: String, appName: String, sbn: StatusBarNotification) {
         try {
             // Get connection settings from DataStore
             val ipAddress = dataStoreManager.getIpAddress().first()
             val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
 
-            // Create notification JSON and ensure it's a single line
-            val notificationJson = JsonUtil.toSingleLine(JsonUtil.createNotificationJson(title, body, appName))
+            // Generate unique notification ID
+            val notificationId = NotificationDismissalUtil.generateNotificationId(
+                sbn.packageName,
+                title,
+                sbn.postTime
+            )
+
+            // Store notification for potential dismissal
+            NotificationDismissalUtil.storeNotification(notificationId, sbn)
+
+            // Create notification JSON with unique ID
+            val notificationJson = JsonUtil.toSingleLine(
+                JsonUtil.createNotificationJson(
+                    id = notificationId,
+                    title = title,
+                    body = body,
+                    app = appName,
+                    packageName = sbn.packageName
+                )
+            )
 
             Log.d(TAG, "Sending notification to $ipAddress:$port via WebSocket - $notificationJson")
 

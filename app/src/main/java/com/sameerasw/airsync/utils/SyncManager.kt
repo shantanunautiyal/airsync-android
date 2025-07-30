@@ -163,9 +163,11 @@ object SyncManager {
         try {
             // Send a sample notification to indicate sync is active
             val sampleNotificationJson = JsonUtil.createNotificationJson(
-                "AirSync Connected",
-                "Notification sync is now active. You'll see your Android notifications here.",
-                "AirSync"
+                id = "airsync_welcome_${System.currentTimeMillis()}",
+                title = "AirSync Connected",
+                body = "Notification sync is now active. You'll see your Android notifications here.",
+                app = "AirSync",
+                packageName = "com.sameerasw.airsync"
             )
 
             if (WebSocketUtil.sendMessage(sampleNotificationJson)) {

@@ -130,6 +130,7 @@ object DeviceInfoUtil {
         return JsonUtil.createDeviceStatusJson(
             batteryLevel = batteryInfo.level,
             isCharging = batteryInfo.isCharging,
+            isPaired = true,
             isPlaying = audioInfo.isPlaying,
             title = audioInfo.title,
             artist = audioInfo.artist,
