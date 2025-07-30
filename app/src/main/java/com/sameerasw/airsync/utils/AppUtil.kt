@@ -3,6 +3,7 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.util.Log
 import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ object AppUtil {
                     val icon = try {
                         packageManager.getApplicationIcon(appInfo)
                     } catch (e: Exception) {
-                        null
+                        Log.w(TAG, "Error processing app ${appInfo.packageName}: ${e.message}")
                     }
                     
                     notificationApps.add(
@@ -40,7 +41,7 @@ object AppUtil {
                             packageName = packageName,
                             appName = appName,
                             isEnabled = true, // Default to enabled
-                            icon = icon,
+                            icon = icon as Drawable?,
                             isSystemApp = isSystemApp,
                             lastUpdated = System.currentTimeMillis()
                         )
@@ -69,17 +70,14 @@ object AppUtil {
         
         return installedApps.map { installedApp ->
             val savedApp = savedAppsMap[installedApp.packageName]
-            if (savedApp != null) {
-                // Use saved preferences but update app info
-                savedApp.copy(
-                    appName = installedApp.appName,
-                    icon = installedApp.icon,
-                    isSystemApp = installedApp.isSystemApp
-                )
-            } else {
-                // New app, use defaults (enabled)
+            savedApp?.// Use saved preferences but update app info
+            copy(
+                appName = installedApp.appName,
+                icon = installedApp.icon,
+                isSystemApp = installedApp.isSystemApp
+            )
+                ?: // New app, use defaults (enabled)
                 installedApp
-            }
         }.sortedBy { it.appName.lowercase() }
     }
 
@@ -120,37 +118,5 @@ object AppUtil {
     private fun isSystemApp(appInfo: ApplicationInfo): Boolean {
         return (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
                (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-    }
-
-    /**
-     * Get friendly app name with fallback
-     */
-    fun getAppNameFromPackage(context: Context, packageName: String): String {
-        return try {
-            val packageManager = context.packageManager
-            val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
-            packageManager.getApplicationLabel(applicationInfo).toString()
-        } catch (_: Exception) {
-            // Fallback to friendly names for common apps
-            when (packageName) {
-                "com.whatsapp" -> "WhatsApp"
-                "com.telegram.messenger" -> "Telegram"
-                "com.discord" -> "Discord"
-                "com.slack" -> "Slack"
-                "com.microsoft.teams" -> "Microsoft Teams"
-                "com.google.android.gm" -> "Gmail"
-                "com.android.email" -> "Email"
-                "com.samsung.android.messaging" -> "Messages"
-                "com.google.android.apps.messaging" -> "Messages"
-                "com.spotify.music" -> "Spotify"
-                "com.netflix.mediaclient" -> "Netflix"
-                "com.instagram.android" -> "Instagram"
-                "com.facebook.katana" -> "Facebook"
-                "com.twitter.android" -> "Twitter"
-                else -> packageName.split(".").lastOrNull()?.replaceFirstChar { 
-                    if (it.isLowerCase()) it.titlecase() else it.toString() 
-                } ?: packageName
-            }
-        }
     }
 }

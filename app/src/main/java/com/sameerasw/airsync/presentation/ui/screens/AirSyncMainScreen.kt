@@ -1,7 +1,5 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
-import android.content.Context
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -208,8 +206,7 @@ fun AirSyncMainScreen(
             },
             onSendDeviceStatus = {
                 val message = DeviceInfoUtil.generateDeviceStatusJson(
-                    context,
-                    uiState.port.toIntOrNull() ?: 6996
+                    context
                 )
                 sendMessage(message)
             }

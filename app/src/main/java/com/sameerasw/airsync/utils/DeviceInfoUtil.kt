@@ -123,7 +123,7 @@ object DeviceInfoUtil {
         }
     }
 
-    fun generateDeviceStatusJson(context: Context, port: Int): String {
+    fun generateDeviceStatusJson(context: Context): String {
         val batteryInfo = getBatteryInfo(context)
         val audioInfo = getAudioInfo(context)
 

@@ -235,6 +235,7 @@ class MediaNotificationListener : NotificationListenerService() {
                     (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
                     (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
                 } catch (e: Exception) {
+                    Log.e(TAG, "Error checking app: ${e.message}")
                     false
                 }
 
@@ -276,11 +277,7 @@ class MediaNotificationListener : NotificationListenerService() {
         val title = extras.getString(Notification.EXTRA_TITLE)
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
 
-        if (title.isNullOrEmpty() && text.isNullOrEmpty()) {
-            return true
-        }
-
-        return false
+        return title.isNullOrEmpty() && text.isNullOrEmpty()
     }
 
     private fun getAppNameFromPackage(packageName: String): String {

@@ -64,8 +64,8 @@ class AirSyncViewModel(
     ) {
         viewModelScope.launch {
             // Load saved values
-            val savedIp = if (initialIp != null) initialIp else repository.getIpAddress().first()
-            val savedPort = if (initialPort != null) initialPort else repository.getPort().first()
+            val savedIp = initialIp ?: repository.getIpAddress().first()
+            val savedPort = initialPort ?: repository.getPort().first()
             val savedDeviceName = repository.getDeviceName().first()
             val lastConnected = repository.getLastConnectedDevice().first()
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()

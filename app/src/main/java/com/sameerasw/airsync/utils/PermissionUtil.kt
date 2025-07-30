@@ -46,17 +46,6 @@ object PermissionUtil {
         context.startActivity(intent)
     }
 
-    /**
-     * Open app settings page where user can grant notification permission
-     */
-    fun openAppSettings(context: Context) {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = android.net.Uri.fromParts("package", context.packageName, null)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        context.startActivity(intent)
-    }
-
     fun getAllMissingPermissions(context: Context): List<String> {
         val missing = mutableListOf<String>()
 

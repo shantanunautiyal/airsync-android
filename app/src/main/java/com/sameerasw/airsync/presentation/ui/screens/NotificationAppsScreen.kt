@@ -15,8 +15,7 @@ import com.sameerasw.airsync.presentation.viewmodel.NotificationAppsViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationAppsScreen(
-    onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
     val viewModel: NotificationAppsViewModel = viewModel {

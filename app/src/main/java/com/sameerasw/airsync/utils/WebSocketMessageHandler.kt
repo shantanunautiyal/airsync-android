@@ -2,9 +2,6 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.util.Log
-import com.sameerasw.airsync.utils.MediaControlUtil
-import com.sameerasw.airsync.utils.NotificationDismissalUtil
-import com.sameerasw.airsync.utils.VolumeControlUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,8 +24,8 @@ object WebSocketMessageHandler {
             when (type) {
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
-                "dismissNotification" -> handleNotificationDismissal(context, data)
-                "disconnectRequest" -> handleDisconnectRequest(context)
+                "dismissNotification" -> handleNotificationDismissal(data)
+                "disconnectRequest" -> handleDisconnectRequest()
                 "ping" -> handlePing(context)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
@@ -43,7 +40,7 @@ object WebSocketMessageHandler {
         try {
             if (data == null) {
                 Log.e(TAG, "Volume control data is null")
-                sendVolumeControlResponse(context, "setVolume", false, "No data provided")
+                sendVolumeControlResponse("setVolume", false, "No data provided")
                 return
             }
 
@@ -53,20 +50,20 @@ object WebSocketMessageHandler {
                     val volume = data.optInt("volume", -1)
                     if (volume in 0..100) {
                         val success = VolumeControlUtil.setVolume(context, volume)
-                        sendVolumeControlResponse(context, action, success, if (success) "Volume set to $volume%" else "Failed to set volume")
+                        sendVolumeControlResponse(action, success, if (success) "Volume set to $volume%" else "Failed to set volume")
 
                         // Send updated device status after volume change
                         if (success) {
                             SyncManager.onVolumeChanged(context)
                         }
                     } else {
-                        sendVolumeControlResponse(context, action, false, "Invalid volume value: $volume")
+                        sendVolumeControlResponse(action, false, "Invalid volume value: $volume")
                     }
                 }
                 "increaseVolume" -> {
                     val increment = data.optInt("increment", 10)
                     val success = VolumeControlUtil.increaseVolume(context, increment)
-                    sendVolumeControlResponse(context, action, success, if (success) "Volume increased by $increment%" else "Failed to increase volume")
+                    sendVolumeControlResponse(action, success, if (success) "Volume increased by $increment%" else "Failed to increase volume")
 
                     if (success) {
                         SyncManager.onVolumeChanged(context)
@@ -75,7 +72,7 @@ object WebSocketMessageHandler {
                 "decreaseVolume" -> {
                     val decrement = data.optInt("decrement", 10)
                     val success = VolumeControlUtil.decreaseVolume(context, decrement)
-                    sendVolumeControlResponse(context, action, success, if (success) "Volume decreased by $decrement%" else "Failed to decrease volume")
+                    sendVolumeControlResponse(action, success, if (success) "Volume decreased by $decrement%" else "Failed to decrease volume")
 
                     if (success) {
                         SyncManager.onVolumeChanged(context)
@@ -83,7 +80,7 @@ object WebSocketMessageHandler {
                 }
                 "toggleMute" -> {
                     val success = VolumeControlUtil.toggleMute(context)
-                    sendVolumeControlResponse(context, action, success, if (success) "Mute toggled" else "Failed to toggle mute")
+                    sendVolumeControlResponse(action, success, if (success) "Mute toggled" else "Failed to toggle mute")
 
                     if (success) {
                         SyncManager.onVolumeChanged(context)
@@ -91,12 +88,12 @@ object WebSocketMessageHandler {
                 }
                 else -> {
                     Log.w(TAG, "Unknown volume control action: $action")
-                    sendVolumeControlResponse(context, action, false, "Unknown action")
+                    sendVolumeControlResponse(action, false, "Unknown action")
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling volume control: ${e.message}")
-            sendVolumeControlResponse(context, "unknown", false, "Error: ${e.message}")
+            sendVolumeControlResponse("unknown", false, "Error: ${e.message}")
         }
     }
 
@@ -104,7 +101,7 @@ object WebSocketMessageHandler {
         try {
             if (data == null) {
                 Log.e(TAG, "Media control data is null")
-                sendMediaControlResponse(context, "unknown", false, "No data provided")
+                sendMediaControlResponse("unknown", false, "No data provided")
                 return
             }
 
@@ -143,7 +140,7 @@ object WebSocketMessageHandler {
                 }
             }
 
-            sendMediaControlResponse(context, action, success, message)
+            sendMediaControlResponse(action, success, message)
 
             // Send updated media state after successful control
             if (success) {
@@ -151,31 +148,31 @@ object WebSocketMessageHandler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling media control: ${e.message}")
-            sendMediaControlResponse(context, "unknown", false, "Error: ${e.message}")
+            sendMediaControlResponse("unknown", false, "Error: ${e.message}")
         }
     }
 
-    private fun handleNotificationDismissal(context: Context, data: JSONObject?) {
+    private fun handleNotificationDismissal(data: JSONObject?) {
         try {
             if (data == null) {
                 Log.e(TAG, "Notification dismissal data is null")
-                sendNotificationDismissalResponse(context, "unknown", false, "No data provided")
+                sendNotificationDismissalResponse("unknown", false, "No data provided")
                 return
             }
 
             val notificationId = data.optString("id")
             if (notificationId.isEmpty()) {
-                sendNotificationDismissalResponse(context, notificationId, false, "No notification ID provided")
+                sendNotificationDismissalResponse(notificationId, false, "No notification ID provided")
                 return
             }
 
-            val success = NotificationDismissalUtil.dismissNotification(context, notificationId)
+            val success = NotificationDismissalUtil.dismissNotification(notificationId)
             val message = if (success) "Notification dismissed" else "Failed to dismiss notification or notification not found"
 
-            sendNotificationDismissalResponse(context, notificationId, success, message)
+            sendNotificationDismissalResponse(notificationId, success, message)
         } catch (e: Exception) {
             Log.e(TAG, "Error handling notification dismissal: ${e.message}")
-            sendNotificationDismissalResponse(context, "unknown", false, "Error: ${e.message}")
+            sendNotificationDismissalResponse("unknown", false, "Error: ${e.message}")
         }
     }
 
@@ -188,7 +185,7 @@ object WebSocketMessageHandler {
         }
     }
 
-    private fun handleDisconnectRequest(context: Context) {
+    private fun handleDisconnectRequest() {
         try {
             // Immediately disconnect the WebSocket
             WebSocketUtil.disconnect()
@@ -198,21 +195,21 @@ object WebSocketMessageHandler {
         }
     }
 
-    private fun sendVolumeControlResponse(context: Context, action: String, success: Boolean, message: String) {
+    private fun sendVolumeControlResponse(action: String, success: Boolean, message: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val response = JsonUtil.createVolumeControlResponse(action, success, message)
             WebSocketUtil.sendMessage(response)
         }
     }
 
-    private fun sendMediaControlResponse(context: Context, action: String, success: Boolean, message: String) {
+    private fun sendMediaControlResponse(action: String, success: Boolean, message: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val response = JsonUtil.createMediaControlResponse(action, success, message)
             WebSocketUtil.sendMessage(response)
         }
     }
 
-    private fun sendNotificationDismissalResponse(context: Context, id: String, success: Boolean, message: String) {
+    private fun sendNotificationDismissalResponse(id: String, success: Boolean, message: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val response = JsonUtil.createNotificationDismissalResponse(id, success, message)
             WebSocketUtil.sendMessage(response)

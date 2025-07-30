@@ -9,7 +9,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.utils.PermissionUtil
-import com.sameerasw.airsync.utils.WebSocketUtil
 
 @Composable
 fun LastConnectedDeviceCard(

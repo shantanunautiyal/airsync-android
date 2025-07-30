@@ -1,6 +1,5 @@
 package com.sameerasw.airsync.utils
 
-import android.content.Context
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.sameerasw.airsync.service.MediaNotificationListener
@@ -36,7 +35,7 @@ object NotificationDismissalUtil {
     /**
      * Dismiss a notification by its ID
      */
-    fun dismissNotification(context: Context, notificationId: String): Boolean {
+    fun dismissNotification(notificationId: String): Boolean {
         return try {
             val notification = activeNotifications[notificationId]
             if (notification != null) {
@@ -66,39 +65,5 @@ object NotificationDismissalUtil {
      */
     private fun getNotificationListenerService(): MediaNotificationListener? {
         return MediaNotificationListener.getInstance()
-    }
-    
-    /**
-     * Clean up dismissed or expired notifications
-     */
-    fun cleanupNotifications() {
-        // Remove notifications older than 1 hour
-        val oneHourAgo = System.currentTimeMillis() - (60 * 60 * 1000)
-        val keysToRemove = activeNotifications.entries
-            .filter { (key, _) -> 
-                val timestamp = key.split("_").lastOrNull()?.toLongOrNull() ?: 0L
-                timestamp < oneHourAgo
-            }
-            .map { it.key }
-        
-        keysToRemove.forEach { 
-            activeNotifications.remove(it)
-            Log.d(TAG, "Cleaned up old notification: $it")
-        }
-    }
-    
-    /**
-     * Get all active notification IDs
-     */
-    fun getActiveNotificationIds(): List<String> {
-        return activeNotifications.keys.toList()
-    }
-    
-    /**
-     * Clear all stored notifications
-     */
-    fun clearAllNotifications() {
-        activeNotifications.clear()
-        Log.d(TAG, "Cleared all stored notifications")
     }
 }

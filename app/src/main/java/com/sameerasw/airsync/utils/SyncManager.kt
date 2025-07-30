@@ -5,7 +5,6 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.domain.model.BatteryInfo
-import com.sameerasw.airsync.utils.AppIconUtil
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
@@ -95,7 +94,7 @@ object SyncManager {
                 }
 
                 if (shouldSync && WebSocketUtil.isConnected()) {
-                    val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context, 6996)
+                    val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
                     val success = WebSocketUtil.sendMessage(statusJson)
 
                     if (success) {
@@ -137,7 +136,7 @@ object SyncManager {
                 delay(1000)
 
                 // 2. Send device status
-                val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context, port)
+                val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
                 if (WebSocketUtil.sendMessage(statusJson)) {
                     Log.d(TAG, "✅ Device status sent")
                     // Update our cached values
@@ -155,7 +154,7 @@ object SyncManager {
                 delay(1000)
 
                 // 4. Send existing notifications (recent ones)
-                sendRecentNotifications(context)
+                sendRecentNotifications()
 
                 Log.d(TAG, "Initial sync sequence completed")
 
@@ -165,7 +164,7 @@ object SyncManager {
         }
     }
 
-    private suspend fun sendRecentNotifications(context: Context) {
+    private fun sendRecentNotifications() {
         try {
             // Send a sample notification to indicate sync is active
             val sampleNotificationJson = JsonUtil.createNotificationJson(

@@ -75,7 +75,7 @@ class DataStoreManager(private val context: Context) {
 
     fun getFirstRun(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
-            preferences[FIRST_RUN] ?: true
+            preferences[FIRST_RUN] != false
         }
     }
 
@@ -87,7 +87,7 @@ class DataStoreManager(private val context: Context) {
 
     fun getPermissionsChecked(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
-            preferences[PERMISSIONS_CHECKED] ?: false
+            preferences[PERMISSIONS_CHECKED] == true
         }
     }
 
@@ -99,7 +99,7 @@ class DataStoreManager(private val context: Context) {
 
     fun getNotificationSyncEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
-            preferences[NOTIFICATION_SYNC_ENABLED] ?: true // Default to enabled
+            preferences[NOTIFICATION_SYNC_ENABLED] != false // Default to enabled
         }
     }
 
@@ -190,9 +190,9 @@ class DataStoreManager(private val context: Context) {
                 val systemKey = booleanPreferencesKey("app_${packageName}_system")
                 val updatedKey = stringPreferencesKey("app_${packageName}_updated")
 
-                val isEnabled = preferences[enabledKey] ?: true
+                val isEnabled = preferences[enabledKey] != false
                 val appName = preferences[nameKey] ?: packageName
-                val isSystemApp = preferences[systemKey] ?: false
+                val isSystemApp = preferences[systemKey] == true
                 val lastUpdated = preferences[updatedKey]?.toLongOrNull() ?: 0L
 
                 apps.add(
@@ -218,7 +218,7 @@ class DataStoreManager(private val context: Context) {
 
     fun getDeveloperMode(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
-            preferences[DEVELOPER_MODE] ?: false // Default to disabled
+            preferences[DEVELOPER_MODE] == true // Default to disabled
         }
     }
 }

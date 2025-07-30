@@ -10,6 +10,8 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import androidx.core.graphics.scale
+import androidx.core.graphics.createBitmap
 
 object AppIconUtil {
     private const val TAG = "AppIconUtil"
@@ -71,30 +73,15 @@ object AppIconUtil {
     private fun drawableToBitmap(drawable: Drawable): Bitmap {
         if (drawable is BitmapDrawable && drawable.bitmap != null) {
             // If it's already a bitmap, scale it to our standard size
-            return Bitmap.createScaledBitmap(drawable.bitmap, ICON_SIZE, ICON_SIZE, true)
+            return drawable.bitmap.scale(ICON_SIZE, ICON_SIZE)
         }
 
         // Create bitmap from drawable
-        val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(ICON_SIZE, ICON_SIZE)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
 
         return bitmap
-    }
-
-    /**
-     * Get icon for a single package
-     */
-    suspend fun getSingleAppIconAsBase64(context: Context, packageName: String): String? = withContext(Dispatchers.IO) {
-        try {
-            val packageManager = context.packageManager
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            val icon = packageManager.getApplicationIcon(appInfo)
-            return@withContext drawableToBase64(icon)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting icon for $packageName: ${e.message}")
-            null
-        }
     }
 }

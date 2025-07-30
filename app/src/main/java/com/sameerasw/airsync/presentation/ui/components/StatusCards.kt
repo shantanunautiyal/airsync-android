@@ -8,56 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun PermissionStatusCard(
-    missingPermissions: List<String>,
-    onGrantPermissions: () -> Unit,
-    onRefreshPermissions: () -> Unit
-) {
-    if (missingPermissions.isNotEmpty()) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    "⚠️ Permissions Required",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Missing: ${missingPermissions.joinToString(", ")}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = onGrantPermissions,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Grant Permissions", color = MaterialTheme.colorScheme.onError)
-                    }
-
-                    OutlinedButton(
-                        onClick = onRefreshPermissions,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Refresh")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun NotificationSyncCard(
     isNotificationEnabled: Boolean,
     isNotificationSyncEnabled: Boolean,

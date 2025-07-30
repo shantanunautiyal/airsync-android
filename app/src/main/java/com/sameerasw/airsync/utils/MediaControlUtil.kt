@@ -142,43 +142,4 @@ object MediaControlUtil {
             false
         }
     }
-
-    /**
-     * Check if media controls are available
-     */
-    fun hasMediaControls(context: Context): Boolean {
-        return getActiveMediaController(context) != null
-    }
-
-    /**
-     * Get available actions for the current media session
-     */
-    fun getAvailableActions(context: Context): List<String> {
-        return try {
-            val controller = getActiveMediaController(context)
-            val actions = controller?.playbackState?.actions ?: 0L
-            val availableActions = mutableListOf<String>()
-
-            if (actions and PlaybackState.ACTION_PLAY != 0L) {
-                availableActions.add("play")
-            }
-            if (actions and PlaybackState.ACTION_PAUSE != 0L) {
-                availableActions.add("pause")
-            }
-            if (actions and PlaybackState.ACTION_SKIP_TO_NEXT != 0L) {
-                availableActions.add("next")
-            }
-            if (actions and PlaybackState.ACTION_SKIP_TO_PREVIOUS != 0L) {
-                availableActions.add("previous")
-            }
-            if (actions and PlaybackState.ACTION_STOP != 0L) {
-                availableActions.add("stop")
-            }
-
-            availableActions
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting available actions: ${e.message}")
-            emptyList()
-        }
-    }
 }

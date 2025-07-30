@@ -153,23 +153,6 @@ object WebSocketUtil {
                 ipAddress == "localhost"
     }
 
-    private fun sendDeviceInfo(context: Context) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager(context)
-                val deviceName = dataStoreManager.getDeviceName().first()
-                val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
-                val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-
-                val message = JsonUtil.createDeviceInfoJson(deviceName, localIp, port)
-                sendMessage(message)
-                Log.d(TAG, "Device info sent automatically")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to send device info: ${e.message}")
-            }
-        }
-    }
-
     fun sendMessage(message: String): Boolean {
         return if (isConnected.get() && webSocket != null) {
             Log.d(TAG, "Sending message: $message")
@@ -212,10 +195,6 @@ object WebSocketUtil {
 
     fun isConnected(): Boolean {
         return isConnected.get()
-    }
-
-    fun isConnecting(): Boolean {
-        return isConnecting.get()
     }
 
     private fun updatePersistentNotification(context: Context, isConnected: Boolean) {
