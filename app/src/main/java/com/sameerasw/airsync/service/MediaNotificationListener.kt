@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.LinkedList
 
 class MediaNotificationListener : NotificationListenerService() {
 
@@ -101,6 +102,10 @@ class MediaNotificationListener : NotificationListenerService() {
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private lateinit var dataStoreManager: DataStoreManager
+
+    // Cache to store last 5 notifications
+    private val notificationCache = LinkedList<Pair<String, String>>()
+    private val maxCache = 2
 
     override fun onCreate() {
         super.onCreate()
@@ -211,6 +216,12 @@ class MediaNotificationListener : NotificationListenerService() {
                     if (appSettings == null) {
                         Log.d(TAG, "New app detected: ${sbn.packageName}, adding to preferences")
                         saveNewAppToPreferences(sbn.packageName, appName)
+                    }
+
+                    // Check for duplicate notifications
+                    if (isDuplicateNotification(sbn.packageName, body)) {
+                        Log.d(TAG, "Duplicate notification detected, skipping sync: $title")
+                        return@launch
                     }
 
                     sendNotificationToDesktop(title, body, appName, sbn)
@@ -406,5 +417,22 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun updateMediaInfo() {
         currentMediaInfo = getMediaInfo(this)
         Log.d(TAG, "Updated media info: $currentMediaInfo")
+    }
+
+    private fun isDuplicateNotification(packageName: String, body: String?): Boolean {
+        if (body == null) return false
+
+        // Check if the notification is already in the cache
+        val isDuplicate = notificationCache.any { it.first == packageName && it.second == body }
+
+        // If not a duplicate, add it to the cache
+        if (!isDuplicate) {
+            if (notificationCache.size >= maxCache) {
+                notificationCache.removeFirst() // Remove the oldest notification
+            }
+            notificationCache.add(Pair(packageName, body))
+        }
+
+        return isDuplicate
     }
 }
