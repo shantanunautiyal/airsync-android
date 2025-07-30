@@ -2,11 +2,11 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.util.Log
-import okhttp3.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import okhttp3.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -23,6 +23,9 @@ object WebSocketUtil {
     // Callback for connection status changes
     private var onConnectionStatusChanged: ((Boolean) -> Unit)? = null
     private var onMessageReceived: ((String) -> Unit)? = null
+
+    // Global connection status listeners for UI updates
+    private val connectionStatusListeners = mutableSetOf<(Boolean) -> Unit>()
 
     private fun createClient(): OkHttpClient {
         return OkHttpClient.Builder()
@@ -88,6 +91,9 @@ object WebSocketUtil {
                     // Update connection status
                     onConnectionStatusChanged?.invoke(true)
                     updatePersistentNotification(context, true)
+
+                    // Notify all registered listeners about the connection status
+                    notifyConnectionStatusListeners(true)
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -108,6 +114,9 @@ object WebSocketUtil {
                     isConnected.set(false)
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, false)
+
+                    // Notify all registered listeners about the connection status
+                    notifyConnectionStatusListeners(false)
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -118,6 +127,9 @@ object WebSocketUtil {
                     // Update connection status
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, false)
+
+                    // Notify all registered listeners about the connection status
+                    notifyConnectionStatusListeners(false)
 
                     // Attempt to reconnect after a delay for local connections
                     CoroutineScope(Dispatchers.IO).launch {
@@ -191,6 +203,9 @@ object WebSocketUtil {
         webSocket = null
         currentContext?.let { updatePersistentNotification(it, false) }
         onConnectionStatusChanged?.invoke(false)
+
+        // Notify all registered listeners about the disconnection
+        notifyConnectionStatusListeners(false)
     }
 
     fun cleanup() {
@@ -250,6 +265,23 @@ object WebSocketUtil {
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating last sync time: ${e.message}")
             }
+        }
+    }
+
+    // Register a global connection status listener
+    fun registerConnectionStatusListener(listener: (Boolean) -> Unit) {
+        connectionStatusListeners.add(listener)
+    }
+
+    // Unregister a global connection status listener
+    fun unregisterConnectionStatusListener(listener: (Boolean) -> Unit) {
+        connectionStatusListeners.remove(listener)
+    }
+
+    // Notify all registered listeners about the connection status
+    private fun notifyConnectionStatusListeners(isConnected: Boolean) {
+        connectionStatusListeners.forEach { listener ->
+            listener(isConnected)
         }
     }
 }

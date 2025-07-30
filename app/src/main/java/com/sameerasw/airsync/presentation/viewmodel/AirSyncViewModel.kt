@@ -33,6 +33,28 @@ class AirSyncViewModel(
     private val _deviceInfo = MutableStateFlow(DeviceInfo())
     val deviceInfo: StateFlow<DeviceInfo> = _deviceInfo.asStateFlow()
 
+    // Connection status listener for WebSocket updates
+    private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isConnected = isConnected,
+                isConnecting = false,
+                response = if (isConnected) "Connected successfully!" else "Disconnected"
+            )
+        }
+    }
+
+    init {
+        // Register for WebSocket connection status updates
+        WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Unregister the connection status listener when ViewModel is cleared
+        WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
+    }
+
     fun initializeState(
         context: Context,
         initialIp: String? = null,

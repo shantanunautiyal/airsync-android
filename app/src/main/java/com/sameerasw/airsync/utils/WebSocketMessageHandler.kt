@@ -28,6 +28,7 @@ object WebSocketMessageHandler {
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(context, data)
+                "disconnectRequest" -> handleDisconnectRequest(context)
                 "ping" -> handlePing(context)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
@@ -184,6 +185,16 @@ object WebSocketMessageHandler {
             SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
         } catch (e: Exception) {
             Log.e(TAG, "Error handling ping: ${e.message}")
+        }
+    }
+
+    private fun handleDisconnectRequest(context: Context) {
+        try {
+            // Immediately disconnect the WebSocket
+            WebSocketUtil.disconnect()
+            Log.d(TAG, "WebSocket disconnected as per request")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling disconnect request: ${e.message}")
         }
     }
 
