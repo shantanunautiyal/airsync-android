@@ -22,6 +22,7 @@ object WebSocketMessageHandler {
             Log.d(TAG, "Handling message type: $type")
 
             when (type) {
+                "clipboardUpdate" -> handleClipboardUpdate(context, data)
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
@@ -33,6 +34,25 @@ object WebSocketMessageHandler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling incoming message: ${e.message}")
+        }
+    }
+
+    private fun handleClipboardUpdate(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Clipboard update data is null")
+                return
+            }
+
+            val text = data.optString("text")
+            if (!text.isNullOrEmpty()) {
+                ClipboardSyncManager.handleClipboardUpdate(context, text)
+                Log.d(TAG, "Clipboard updated from desktop: ${text.take(50)}...")
+            } else {
+                Log.w(TAG, "Clipboard update received but text is empty")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling clipboard update: ${e.message}")
         }
     }
 

@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.ui.components.*
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
+import com.sameerasw.airsync.utils.ClipboardSyncManager
+import com.sameerasw.airsync.utils.ClipboardUtil
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.PermissionUtil
@@ -47,6 +49,15 @@ fun AirSyncMainScreen(
         }
     }
 
+    // Start/stop clipboard sync based on connection status and settings
+    LaunchedEffect(uiState.isConnected, uiState.isClipboardSyncEnabled) {
+        if (uiState.isConnected && uiState.isClipboardSyncEnabled) {
+            ClipboardSyncManager.startSync(context)
+        } else {
+            ClipboardSyncManager.stopSync(context)
+        }
+    }
+
     // Connection management functions
     fun connect() {
         viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
@@ -68,6 +79,19 @@ fun AirSyncMainScreen(
             onMessage = { response ->
                 scope.launch(Dispatchers.Main) {
                     viewModel.setResponse("Received: $response")
+                    // Handle clipboard updates from desktop
+                    try {
+                        val json = org.json.JSONObject(response)
+                        if (json.optString("type") == "clipboardUpdate") {
+                            val data = json.optJSONObject("data")
+                            val text = data?.optString("text")
+                            if (!text.isNullOrEmpty()) {
+                                ClipboardSyncManager.handleClipboardUpdate(context, text)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Not a clipboard update, ignore
+                    }
                 }
             }
         )
@@ -103,6 +127,7 @@ fun AirSyncMainScreen(
     // Cleanup WebSocket when screen is disposed
     DisposableEffect(Unit) {
         onDispose {
+            ClipboardSyncManager.stopSync(context)
             WebSocketUtil.cleanup()
         }
     }
@@ -134,6 +159,18 @@ fun AirSyncMainScreen(
             onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
             onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
             onManageApps = onNavigateToApps
+        )
+
+        // Clipboard Sync Card
+        ClipboardSyncCard(
+            isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+            onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
+            onTestClipboard = {
+                val testText = "Test clipboard sync - ${System.currentTimeMillis()}"
+                ClipboardUtil.setClipboardText(context, testText)
+                viewModel.setResponse("Test text copied to clipboard")
+            },
+            isConnected = uiState.isConnected
         )
 
         // Device Info Section

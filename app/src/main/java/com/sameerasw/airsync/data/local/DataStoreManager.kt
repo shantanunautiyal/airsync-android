@@ -29,6 +29,7 @@ class DataStoreManager(private val context: Context) {
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
+        private val CLIPBOARD_SYNC_ENABLED = booleanPreferencesKey("clipboard_sync_enabled")
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -100,6 +101,18 @@ class DataStoreManager(private val context: Context) {
     fun getNotificationSyncEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[NOTIFICATION_SYNC_ENABLED] != false // Default to enabled
+        }
+    }
+
+    suspend fun setClipboardSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CLIPBOARD_SYNC_ENABLED] = enabled
+        }
+    }
+
+    fun getClipboardSyncEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[CLIPBOARD_SYNC_ENABLED] != false // Default to enabled
         }
     }
 

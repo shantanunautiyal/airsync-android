@@ -70,4 +70,13 @@ object JsonUtil {
         }
         return """{"type":"appIcons","data":{ $iconEntries }}"""
     }
+
+    /**
+     * Creates a JSON string for clipboard updates
+     */
+    fun createClipboardUpdateJson(text: String): String {
+        // Escape quotes and newlines in the text
+        val escapedText = text.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
+        return """{"type":"clipboardUpdate","data":{"text":"$escapedText"}}"""
+    }
 }

@@ -25,8 +25,6 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         // Handle permission result if needed
-        // This is mainly for logging/analytics, the UI will update automatically
-        // when the user returns to the app since we check permissions in onResume
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -322,3 +322,65 @@ fun PermissionStatusCard(
         }
     }
 }
+
+@Composable
+fun ClipboardSyncCard(
+    isClipboardSyncEnabled: Boolean,
+    onToggleClipboardSync: (Boolean) -> Unit,
+    onTestClipboard: () -> Unit,
+    isConnected: Boolean
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Clipboard Sync", style = MaterialTheme.typography.titleMedium)
+                Switch(
+                    checked = isClipboardSyncEnabled,
+                    onCheckedChange = onToggleClipboardSync
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (isClipboardSyncEnabled) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (isConnected) "🔄 Clipboard sync active" else "⏸️ Waiting for connection",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (isConnected) {
+                        OutlinedButton(
+                            onClick = onTestClipboard,
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text("Test")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Automatically syncs copied text between your device and PC",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "Enable to automatically sync clipboard content with your PC",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}

@@ -70,6 +70,7 @@ class AirSyncViewModel(
             val lastConnected = repository.getLastConnectedDevice().first()
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
             val isDeveloperMode = repository.getDeveloperMode().first()
+            val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
 
             // Get device info
             val deviceName = if (savedDeviceName.isEmpty()) {
@@ -96,6 +97,7 @@ class AirSyncViewModel(
                 lastConnectedDevice = lastConnected,
                 isNotificationSyncEnabled = isNotificationSyncEnabled,
                 isDeveloperMode = isDeveloperMode,
+                isClipboardSyncEnabled = isClipboardSyncEnabled,
                 isConnected = WebSocketUtil.isConnected()
             )
 
@@ -196,6 +198,13 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isDeveloperMode = enabled)
         viewModelScope.launch {
             repository.setDeveloperMode(enabled)
+        }
+    }
+
+    fun setClipboardSyncEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isClipboardSyncEnabled = enabled)
+        viewModelScope.launch {
+            repository.setClipboardSyncEnabled(enabled)
         }
     }
 }

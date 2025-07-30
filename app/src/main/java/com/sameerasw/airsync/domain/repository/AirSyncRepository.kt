@@ -36,4 +36,8 @@ interface AirSyncRepository {
     // Last sync time tracking
     suspend fun updateLastSyncTime(timestamp: Long)
     fun getLastSyncTime(): Flow<Long?>
+
+    // Clipboard sync settings
+    suspend fun setClipboardSyncEnabled(enabled: Boolean)
+    fun getClipboardSyncEnabled(): Flow<Boolean>
 }

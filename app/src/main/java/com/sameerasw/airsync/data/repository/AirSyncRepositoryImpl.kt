@@ -89,4 +89,12 @@ class AirSyncRepositoryImpl(
     override fun getLastSyncTime(): Flow<Long?> {
         return dataStoreManager.getLastSyncTime()
     }
+
+    override suspend fun setClipboardSyncEnabled(enabled: Boolean) {
+        dataStoreManager.setClipboardSyncEnabled(enabled)
+    }
+
+    override fun getClipboardSyncEnabled(): Flow<Boolean> {
+        return dataStoreManager.getClipboardSyncEnabled()
+    }
 }
