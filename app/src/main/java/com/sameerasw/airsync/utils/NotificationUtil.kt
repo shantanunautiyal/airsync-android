@@ -121,3 +121,27 @@ object NotificationUtil {
         context: Context,
         connectedDevice: ConnectedDevice?,
         lastSyncTime: Long,
+        isConnected: Boolean = true
+    ) {
+        showConnectionStatusNotification(context, connectedDevice, lastSyncTime, isConnected)
+    }
+
+    private fun formatLastSeen(timestamp: Long): String {
+        val now = System.currentTimeMillis()
+        val diffMs = now - timestamp
+        val diffMinutes = diffMs / (1000 * 60)
+        val diffHours = diffMinutes / 60
+        val diffDays = diffHours / 24
+
+        return when {
+            diffMinutes < 1 -> "Just now"
+            diffMinutes < 60 -> "${diffMinutes}m ago"
+            diffHours < 24 -> "${diffHours}h ago"
+            diffDays < 7 -> "${diffDays}d ago"
+            else -> {
+                val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+                dateFormat.format(Date(timestamp))
+            }
+        }
+    }
+}
