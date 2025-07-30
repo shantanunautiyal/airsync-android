@@ -21,7 +21,7 @@ object JsonUtil {
      * Creates a single-line JSON string for notifications with unique ID
      */
     fun createNotificationJson(id: String, title: String, body: String, app: String, packageName: String): String {
-        return """{"type":"notification","data":{"id":"$id","title":"$title","body":"$body","app":"$app","packageName":"$packageName"}}"""
+        return """{"type":"notification","data":{"id":"$id","title":"$title","body":"$body","app":"$app","package":"$packageName"}}"""
     }
 
     /**

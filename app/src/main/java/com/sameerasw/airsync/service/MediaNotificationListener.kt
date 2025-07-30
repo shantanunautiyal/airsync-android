@@ -205,7 +205,7 @@ class MediaNotificationListener : NotificationListenerService() {
 
                 // Only sync if we have meaningful content
                 if (title.isNotEmpty() || body.isNotEmpty()) {
-                    Log.d(TAG, "Syncing notification - App: $appName, Title: $title, Body: $body")
+                    Log.d(TAG, "Syncing notification - App: $appName, Package: ${sbn.packageName}, Title: $title, Body: $body")
 
                     // Save the app to our list if it's new (auto-enable new apps)
                     if (appSettings == null) {

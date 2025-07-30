@@ -202,7 +202,7 @@ fun AirSyncMainScreen(
                     "Test Message",
                     "This is a simulated notification from AirSync.",
                     "AirSync",
-                    "sameerasw.airsync"
+                    "com.sameerasw.airsync"
                 )
                 sendMessage(message)
             },
