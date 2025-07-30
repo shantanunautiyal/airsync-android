@@ -105,7 +105,7 @@ class MediaNotificationListener : NotificationListenerService() {
 
     // Cache to store last 5 notifications
     private val notificationCache = LinkedList<Pair<String, String>>()
-    private val maxCache = 2
+    private val maxCache = 1
 
     override fun onCreate() {
         super.onCreate()
