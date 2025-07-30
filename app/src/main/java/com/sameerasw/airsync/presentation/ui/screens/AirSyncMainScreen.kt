@@ -17,14 +17,9 @@ import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
-import java.net.Socket
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,14 +48,63 @@ fun AirSyncMainScreen(
         }
     }
 
-    fun send(message: String) {
+    // Connection management functions
+    fun connect() {
+        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
+        WebSocketUtil.connect(
+            context = context,
+            ipAddress = uiState.ipAddress,
+            port = uiState.port.toIntOrNull() ?: 6996,
+            onConnectionStatus = { connected ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
+                    if (connected) {
+                        viewModel.setResponse("Connected successfully!")
+                        viewModel.saveLastConnectedDevice(pcName)
+                    } else {
+                        viewModel.setResponse("Failed to connect")
+                    }
+                }
+            },
+            onMessage = { response ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setResponse("Received: $response")
+                }
+            }
+        )
+    }
+
+    fun disconnect() {
+        WebSocketUtil.disconnect()
+        viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+        viewModel.setResponse("Disconnected")
+    }
+
+    fun sendMessage(message: String) {
         scope.launch {
             viewModel.setLoading(true)
             viewModel.setResponse("")
-            testSocket(context, uiState.ipAddress, uiState.port.toIntOrNull() ?: 6996, message) { result ->
-                viewModel.setResponse(result)
-                viewModel.setLoading(false)
+
+            if (!WebSocketUtil.isConnected()) {
+                connect()
+                // Wait a moment for connection, then send
+                kotlinx.coroutines.delay(1000)
             }
+
+            val success = WebSocketUtil.sendMessage(message)
+            if (success) {
+                viewModel.setResponse("Message sent: $message")
+            } else {
+                viewModel.setResponse("Failed to send message")
+            }
+            viewModel.setLoading(false)
+        }
+    }
+
+    // Cleanup WebSocket when screen is disposed
+    DisposableEffect(Unit) {
+        onDispose {
+            WebSocketUtil.cleanup()
         }
     }
 
@@ -120,29 +164,27 @@ fun AirSyncMainScreen(
                 onQuickConnect = {
                     viewModel.updateIpAddress(device.ipAddress)
                     viewModel.updatePort(device.port)
-                    val message = JsonUtil.createDeviceInfoJson(
-                        deviceInfo.name,
-                        deviceInfo.localIp,
-                        device.port.toIntOrNull() ?: 6996
-                    )
-                    send(message)
-                    viewModel.saveLastConnectedDevice(device.name)
+                    connect()
                 }
             )
         }
 
-        // Connection Settings
-        ConnectionSettingsCard(
+        // Connection Status Card - New main connection interface
+        ConnectionStatusCard(
             ipAddress = uiState.ipAddress,
             port = uiState.port,
+            isConnected = uiState.isConnected,
+            isConnecting = uiState.isConnecting,
+            onConnect = { connect() },
+            onDisconnect = { disconnect() },
             onIpAddressChange = { viewModel.updateIpAddress(it) },
             onPortChange = { viewModel.updatePort(it) }
         )
 
-        HorizontalDivider()
-
-        // Action Buttons
-        ActionButtonsCard(
+        // Developer Mode Card - Contains test functions
+        DeveloperModeCard(
+            isDeveloperMode = uiState.isDeveloperMode,
+            onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
             isLoading = uiState.isLoading,
             onSendDeviceInfo = {
                 val message = JsonUtil.createDeviceInfoJson(
@@ -150,40 +192,42 @@ fun AirSyncMainScreen(
                     deviceInfo.localIp,
                     uiState.port.toIntOrNull() ?: 6996
                 )
-                send(message)
+                sendMessage(message)
             },
             onSendNotification = {
                 val message = JsonUtil.createNotificationJson(
                     "Test Message",
-                    "This is a simulated notification.",
-                    "Telegram"
+                    "This is a simulated notification from AirSync.",
+                    "AirSync"
                 )
-                send(message)
+                sendMessage(message)
             },
             onSendDeviceStatus = {
                 val message = DeviceInfoUtil.generateDeviceStatusJson(
                     context,
                     uiState.port.toIntOrNull() ?: 6996
                 )
-                send(message)
+                sendMessage(message)
             }
-        )
-
-        HorizontalDivider()
-
-        // Custom Message
-        CustomMessageCard(
-            customMessage = uiState.customMessage,
-            isLoading = uiState.isLoading,
-            isEnabled = uiState.ipAddress.isNotBlank() && uiState.port.isNotBlank() && uiState.customMessage.isNotBlank(),
-            onCustomMessageChange = { viewModel.updateCustomMessage(it) },
-            onSendCustomMessage = { send(uiState.customMessage) }
         )
 
         // Response Display
         if (uiState.response.isNotEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Text(uiState.response, modifier = Modifier.padding(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
+                        MaterialTheme.colorScheme.errorContainer
+                    else MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Text(
+                    text = uiState.response,
+                    modifier = Modifier.padding(16.dp),
+                    color = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
+                        MaterialTheme.colorScheme.onErrorContainer
+                    else MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
 
@@ -198,15 +242,7 @@ fun AirSyncMainScreen(
                 onDismiss = { viewModel.setDialogVisible(false) },
                 onConnect = {
                     viewModel.setDialogVisible(false)
-                    // Save the connected device info
-                    viewModel.saveLastConnectedDevice(pcName ?: uiState.lastConnectedDevice?.name)
-                    // Send device info automatically
-                    val message = JsonUtil.createDeviceInfoJson(
-                        deviceInfo.name,
-                        deviceInfo.localIp,
-                        uiState.port.toIntOrNull() ?: 6996
-                    )
-                    send(message)
+                    connect()
                 }
             )
         }
@@ -220,67 +256,6 @@ fun AirSyncMainScreen(
                     viewModel.setPermissionDialogVisible(false)
                 }
             )
-        }
-    }
-}
-
-private suspend fun testSocket(
-    context: Context,
-    ipAddress: String,
-    port: Int,
-    message: String,
-    onResult: (String) -> Unit
-) {
-    withContext(Dispatchers.IO) {
-        try {
-            val socket = Socket(ipAddress, port)
-            val output = PrintWriter(socket.getOutputStream(), true)
-            val input = BufferedReader(InputStreamReader(socket.getInputStream()))
-
-            output.println(message)
-            val response = input.readLine()
-            Log.d("TCP", "Received: $response")
-
-            socket.close()
-
-            // Update last sync time on successful connection
-            val currentTime = System.currentTimeMillis()
-            val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager(context)
-            dataStoreManager.updateLastSyncTime(currentTime)
-
-            // Update persistent notification
-            val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
-            com.sameerasw.airsync.utils.NotificationUtil.updateLastSyncTime(
-                context = context,
-                connectedDevice = connectedDevice,
-                lastSyncTime = currentTime,
-                isConnected = true
-            )
-
-            withContext(Dispatchers.Main) {
-                onResult("Success! Received: $response")
-            }
-        } catch (e: Exception) {
-            Log.e("TCP", "Socket error: ${e.message}")
-
-            // Update persistent notification to show connection failed
-            try {
-                val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager(context)
-                val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
-                val lastSyncTime = dataStoreManager.getLastSyncTime().first()
-                com.sameerasw.airsync.utils.NotificationUtil.showConnectionStatusNotification(
-                    context = context,
-                    connectedDevice = connectedDevice,
-                    lastSyncTime = lastSyncTime,
-                    isConnected = false
-                )
-            } catch (notificationError: Exception) {
-                Log.e("TCP", "Failed to update notification: ${notificationError.message}")
-            }
-
-            withContext(Dispatchers.Main) {
-                onResult("Error: ${e.message}")
-            }
         }
     }
 }

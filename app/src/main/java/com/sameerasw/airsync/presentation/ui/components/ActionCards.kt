@@ -3,9 +3,11 @@ package com.sameerasw.airsync.presentation.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.utils.WebSocketUtil
 
 @Composable
 fun LastConnectedDeviceCard(
@@ -42,113 +44,152 @@ fun LastConnectedDeviceCard(
 }
 
 @Composable
-fun ConnectionSettingsCard(
+fun ConnectionStatusCard(
     ipAddress: String,
     port: String,
+    isConnected: Boolean,
+    isConnecting: Boolean,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
     onIpAddressChange: (String) -> Unit,
     onPortChange: (String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Connection Settings", style = MaterialTheme.typography.titleMedium)
+            Text("Connection", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(
-                value = ipAddress,
-                onValueChange = onIpAddressChange,
-                label = { Text("Desktop IP Address") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Connection status
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val statusText = when {
+                    isConnecting -> "🟡 Connecting..."
+                    isConnected -> "🟢 Connected"
+                    else -> "🔴 Disconnected"
+                }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
 
-            OutlinedTextField(
-                value = port,
-                onValueChange = onPortChange,
-                label = { Text("Desktop Port") },
-                modifier = Modifier.fillMaxWidth()
-            )
+                if (isConnected) {
+                    OutlinedButton(onClick = onDisconnect) {
+                        Text("Disconnect")
+                    }
+                } else {
+                    Button(
+                        onClick = onConnect,
+                        enabled = !isConnecting && ipAddress.isNotBlank() && port.isNotBlank()
+                    ) {
+                        Text("Connect")
+                    }
+                }
+            }
+
+            if (isConnected) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "📡 Connected to $ipAddress:$port",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Connection settings (only show when not connected)
+            if (!isConnected) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = ipAddress,
+                    onValueChange = onIpAddressChange,
+                    label = { Text("Desktop IP Address") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isConnecting
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = port,
+                    onValueChange = onPortChange,
+                    label = { Text("Desktop Port") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isConnecting
+                )
+            }
         }
     }
 }
 
 @Composable
-fun ActionButtonsCard(
+fun DeveloperModeCard(
+    isDeveloperMode: Boolean,
+    onToggleDeveloperMode: (Boolean) -> Unit,
     isLoading: Boolean,
     onSendDeviceInfo: () -> Unit,
     onSendNotification: () -> Unit,
     onSendDeviceStatus: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Quick Actions", style = MaterialTheme.typography.titleMedium)
-
-            Button(
-                onClick = onSendDeviceInfo,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
-            ) {
-                Text("Send Device Info")
-            }
-
-            Button(
-                onClick = onSendNotification,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
-            ) {
-                Text("Send Test Notification")
-            }
-
-            Button(
-                onClick = onSendDeviceStatus,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
-            ) {
-                Text("Send Device Status")
-            }
-        }
-    }
-}
-
-@Composable
-fun CustomMessageCard(
-    customMessage: String,
-    isLoading: Boolean,
-    isEnabled: Boolean,
-    onCustomMessageChange: (String) -> Unit,
-    onSendCustomMessage: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Custom Message", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = customMessage,
-                onValueChange = onCustomMessageChange,
-                label = { Text("Custom Raw JSON") },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                maxLines = 4
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = onSendCustomMessage,
-                enabled = isEnabled && !isLoading,
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                Text("Developer Mode", style = MaterialTheme.typography.titleMedium)
+                Switch(
+                    checked = isDeveloperMode,
+                    onCheckedChange = onToggleDeveloperMode
+                )
+            }
+
+            if (isDeveloperMode) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Test Functions",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onSendDeviceInfo,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
+                    ) {
+                        Text("Send Device Info")
+                    }
+
+                    Button(
+                        onClick = onSendNotification,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
+                    ) {
+                        Text("Send Test Notification")
+                    }
+
+                    Button(
+                        onClick = onSendDeviceStatus,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
+                    ) {
+                        Text("Send Device Status")
+                    }
                 }
-                Text(if (isLoading) "Sending..." else "Send Custom Message")
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Enable to access testing functions",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

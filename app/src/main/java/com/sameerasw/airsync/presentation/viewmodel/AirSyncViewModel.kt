@@ -11,6 +11,7 @@ import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -44,9 +45,9 @@ class AirSyncViewModel(
             val savedIp = if (initialIp != null) initialIp else repository.getIpAddress().first()
             val savedPort = if (initialPort != null) initialPort else repository.getPort().first()
             val savedDeviceName = repository.getDeviceName().first()
-            val savedCustomMessage = repository.getCustomMessage().first()
             val lastConnected = repository.getLastConnectedDevice().first()
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
+            val isDeveloperMode = repository.getDeveloperMode().first()
 
             // Get device info
             val deviceName = if (savedDeviceName.isEmpty()) {
@@ -67,12 +68,13 @@ class AirSyncViewModel(
                 ipAddress = savedIp,
                 port = savedPort,
                 deviceNameInput = deviceName,
-                customMessage = savedCustomMessage,
                 isDialogVisible = showConnectionDialog,
                 missingPermissions = missingPermissions,
                 isNotificationEnabled = isNotificationEnabled,
                 lastConnectedDevice = lastConnected,
-                isNotificationSyncEnabled = isNotificationSyncEnabled
+                isNotificationSyncEnabled = isNotificationSyncEnabled,
+                isDeveloperMode = isDeveloperMode,
+                isConnected = WebSocketUtil.isConnected()
             )
 
             // If we have PC name from QR code, store it temporarily for the dialog
@@ -111,13 +113,6 @@ class AirSyncViewModel(
         }
     }
 
-    fun updateCustomMessage(message: String) {
-        _uiState.value = _uiState.value.copy(customMessage = message)
-        viewModelScope.launch {
-            repository.saveCustomMessage(message)
-        }
-    }
-
     fun setLoading(loading: Boolean) {
         _uiState.value = _uiState.value.copy(isLoading = loading)
     }
@@ -132,6 +127,13 @@ class AirSyncViewModel(
 
     fun setPermissionDialogVisible(visible: Boolean) {
         _uiState.value = _uiState.value.copy(showPermissionDialog = visible)
+    }
+
+    fun setConnectionStatus(isConnected: Boolean, isConnecting: Boolean = false) {
+        _uiState.value = _uiState.value.copy(
+            isConnected = isConnected,
+            isConnecting = isConnecting
+        )
     }
 
     fun refreshPermissions(context: Context) {
@@ -165,6 +167,13 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isNotificationSyncEnabled = enabled)
         viewModelScope.launch {
             repository.setNotificationSyncEnabled(enabled)
+        }
+    }
+
+    fun setDeveloperMode(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isDeveloperMode = enabled)
+        viewModelScope.launch {
+            repository.setDeveloperMode(enabled)
         }
     }
 }

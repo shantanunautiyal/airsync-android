@@ -34,14 +34,6 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getDeviceName()
     }
 
-    override suspend fun saveCustomMessage(message: String) {
-        dataStoreManager.saveCustomMessage(message)
-    }
-
-    override fun getCustomMessage(): Flow<String> {
-        return dataStoreManager.getCustomMessage()
-    }
-
     override suspend fun setFirstRun(isFirstRun: Boolean) {
         dataStoreManager.setFirstRun(isFirstRun)
     }
@@ -64,6 +56,14 @@ class AirSyncRepositoryImpl(
 
     override fun getNotificationSyncEnabled(): Flow<Boolean> {
         return dataStoreManager.getNotificationSyncEnabled()
+    }
+
+    override suspend fun setDeveloperMode(enabled: Boolean) {
+        dataStoreManager.setDeveloperMode(enabled)
+    }
+
+    override fun getDeveloperMode(): Flow<Boolean> {
+        return dataStoreManager.getDeveloperMode()
     }
 
     override suspend fun saveLastConnectedDevice(device: ConnectedDevice) {

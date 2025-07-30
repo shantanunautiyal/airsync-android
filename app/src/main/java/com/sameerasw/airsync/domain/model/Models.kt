@@ -6,7 +6,6 @@ data class UiState(
     val ipAddress: String = "",
     val port: String = "",
     val deviceNameInput: String = "",
-    val customMessage: String = "",
     val isLoading: Boolean = false,
     val response: String = "",
     val isDialogVisible: Boolean = false,
@@ -14,7 +13,10 @@ data class UiState(
     val missingPermissions: List<String> = emptyList(),
     val isNotificationEnabled: Boolean = false,
     val lastConnectedDevice: ConnectedDevice? = null,
-    val isNotificationSyncEnabled: Boolean = true
+    val isNotificationSyncEnabled: Boolean = true,
+    val isDeveloperMode: Boolean = false,
+    val isConnected: Boolean = false,
+    val isConnecting: Boolean = false
 )
 
 data class DeviceInfo(

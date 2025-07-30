@@ -20,7 +20,6 @@ class DataStoreManager(private val context: Context) {
         private val IP_ADDRESS = stringPreferencesKey("ip_address")
         private val PORT = stringPreferencesKey("port")
         private val DEVICE_NAME = stringPreferencesKey("device_name")
-        private val CUSTOM_MESSAGE = stringPreferencesKey("custom_message")
         private val FIRST_RUN = booleanPreferencesKey("first_run")
         private val PERMISSIONS_CHECKED = booleanPreferencesKey("permissions_checked")
         private val LAST_CONNECTED_PC_NAME = stringPreferencesKey("last_connected_pc_name")
@@ -29,6 +28,7 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
+        private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -64,18 +64,6 @@ class DataStoreManager(private val context: Context) {
     fun getDeviceName(): Flow<String> {
         return context.dataStore.data.map { preferences ->
             preferences[DEVICE_NAME] ?: ""
-        }
-    }
-
-    suspend fun saveCustomMessage(message: String) {
-        context.dataStore.edit { preferences ->
-            preferences[CUSTOM_MESSAGE] = message
-        }
-    }
-
-    fun getCustomMessage(): Flow<String> {
-        return context.dataStore.data.map { preferences ->
-            preferences[CUSTOM_MESSAGE] ?: """{"type":"notification","data":{"title":"Test","body":"Hello!","app":"WhatsApp"}}"""
         }
     }
 
@@ -219,6 +207,18 @@ class DataStoreManager(private val context: Context) {
             }
 
             apps.sortedBy { it.appName }
+        }
+    }
+
+    suspend fun setDeveloperMode(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DEVELOPER_MODE] = enabled
+        }
+    }
+
+    fun getDeveloperMode(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[DEVELOPER_MODE] ?: false // Default to disabled
         }
     }
 }

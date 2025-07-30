@@ -13,16 +13,12 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationUtil
+import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
-import java.net.Socket
 
 class MediaNotificationListener : NotificationListenerService() {
 
@@ -121,6 +117,7 @@ class MediaNotificationListener : NotificationListenerService() {
         // Hide persistent notification when service disconnects
         NotificationUtil.hideConnectionStatusNotification(this)
         serviceJob.cancel()
+        WebSocketUtil.cleanup()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -292,37 +289,53 @@ class MediaNotificationListener : NotificationListenerService() {
             // Create notification JSON and ensure it's a single line
             val notificationJson = JsonUtil.toSingleLine(JsonUtil.createNotificationJson(title, body, appName))
 
-            Log.d(TAG, "Sending notification to $ipAddress:$port - $notificationJson")
+            Log.d(TAG, "Sending notification to $ipAddress:$port via WebSocket - $notificationJson")
 
-            // Send via socket
-            withContext(Dispatchers.IO) {
-                try {
-                    val socket = Socket(ipAddress, port)
-                    val output = PrintWriter(socket.getOutputStream(), true)
-                    val input = BufferedReader(InputStreamReader(socket.getInputStream()))
-
-                    output.println(notificationJson)
-                    val response = input.readLine()
-
-                    socket.close()
-
-                    // Update last sync time on successful send
-                    val currentTime = System.currentTimeMillis()
-                    dataStoreManager.updateLastSyncTime(currentTime)
-
-                    // Update persistent notification with latest sync time
+            // Check if WebSocket is connected, if not establish connection
+            if (!WebSocketUtil.isConnected()) {
+                WebSocketUtil.connect(
+                    context = this@MediaNotificationListener,
+                    ipAddress = ipAddress,
+                    port = port,
+                    onConnectionStatus = { connected ->
+                        if (connected) {
+                            // Send the notification after connection is established
+                            val success = WebSocketUtil.sendMessage(notificationJson)
+                            if (success) {
+                                Log.d(TAG, "Notification sent successfully via WebSocket")
+                                serviceScope.launch {
+                                    updatePersistentNotification(isConnected = true)
+                                }
+                            } else {
+                                Log.e(TAG, "Failed to send notification via WebSocket")
+                                serviceScope.launch {
+                                    updatePersistentNotification(isConnected = false)
+                                }
+                            }
+                        } else {
+                            Log.e(TAG, "Failed to connect to WebSocket server")
+                            serviceScope.launch {
+                                updatePersistentNotification(isConnected = false)
+                            }
+                        }
+                    },
+                    onMessage = { response ->
+                        Log.d(TAG, "Received response for notification: $response")
+                    }
+                )
+            } else {
+                // Already connected, just send the notification
+                val success = WebSocketUtil.sendMessage(notificationJson)
+                if (success) {
+                    Log.d(TAG, "Notification sent successfully via existing WebSocket connection")
                     updatePersistentNotification(isConnected = true)
-
-                    Log.d(TAG, "Notification sent successfully, response: $response")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to send notification: ${e.message}")
-                    // Update persistent notification to show connection failed
+                } else {
+                    Log.e(TAG, "Failed to send notification via WebSocket")
                     updatePersistentNotification(isConnected = false)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in sendNotificationToDesktop: ${e.message}")
-            // Update persistent notification to show connection failed
             updatePersistentNotification(isConnected = false)
         }
     }

@@ -14,9 +14,6 @@ interface AirSyncRepository {
     suspend fun saveDeviceName(deviceName: String)
     fun getDeviceName(): Flow<String>
 
-    suspend fun saveCustomMessage(message: String)
-    fun getCustomMessage(): Flow<String>
-
     suspend fun setFirstRun(isFirstRun: Boolean)
     fun getFirstRun(): Flow<Boolean>
 
@@ -25,6 +22,9 @@ interface AirSyncRepository {
 
     suspend fun setNotificationSyncEnabled(enabled: Boolean)
     fun getNotificationSyncEnabled(): Flow<Boolean>
+
+    suspend fun setDeveloperMode(enabled: Boolean)
+    fun getDeveloperMode(): Flow<Boolean>
 
     suspend fun saveLastConnectedDevice(device: ConnectedDevice)
     fun getLastConnectedDevice(): Flow<ConnectedDevice?>
