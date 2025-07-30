@@ -79,8 +79,11 @@ object WebSocketUtil {
                     isConnected.set(true)
                     isConnecting.set(false)
 
-                    // Send device info immediately after connection
-                    sendDeviceInfo(context)
+                    // Perform initial sync sequence
+                    SyncManager.performInitialSync(context)
+
+                    // Start periodic sync for battery and status updates
+                    SyncManager.startPeriodicSync(context)
 
                     // Update connection status
                     onConnectionStatusChanged?.invoke(true)
@@ -177,6 +180,10 @@ object WebSocketUtil {
         Log.d(TAG, "Disconnecting WebSocket")
         isConnected.set(false)
         isConnecting.set(false)
+
+        // Stop periodic sync when disconnecting
+        SyncManager.stopPeriodicSync()
+
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
         currentContext?.let { updatePersistentNotification(it, false) }
@@ -185,6 +192,10 @@ object WebSocketUtil {
 
     fun cleanup() {
         disconnect()
+
+        // Reset sync manager state
+        SyncManager.reset()
+
         client?.dispatcher?.executorService?.shutdown()
         client = null
         currentContext = null

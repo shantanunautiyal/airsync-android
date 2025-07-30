@@ -13,6 +13,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationUtil
+import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -125,8 +126,15 @@ class MediaNotificationListener : NotificationListenerService() {
         sbn?.let { notification ->
             Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getString(Notification.EXTRA_TITLE)}")
 
-            // Update media info first
+            // Update media info and check for changes
+            val previousMediaInfo = currentMediaInfo
             updateMediaInfo()
+
+            // If media info changed, trigger sync
+            if (previousMediaInfo != currentMediaInfo) {
+                Log.d(TAG, "Media info changed, triggering sync")
+                SyncManager.onMediaStateChanged(this)
+            }
 
             // Process notification for sync
             processNotificationForSync(notification)
@@ -136,7 +144,16 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
         Log.d(TAG, "Notification removed: ${sbn?.packageName}")
+
+        // Update media info and check for changes
+        val previousMediaInfo = currentMediaInfo
         updateMediaInfo()
+
+        // If media info changed, trigger sync
+        if (previousMediaInfo != currentMediaInfo) {
+            Log.d(TAG, "Media info changed after notification removal, triggering sync")
+            SyncManager.onMediaStateChanged(this)
+        }
     }
 
     private fun processNotificationForSync(sbn: StatusBarNotification) {
