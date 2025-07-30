@@ -12,14 +12,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class NotificationActionReceiver : BroadcastReceiver() {
-
+    
     companion object {
         const val ACTION_STOP_SYNC = "com.sameerasw.airsync.STOP_SYNC"
         private const val TAG = "NotificationActionReceiver"
     }
-
+    
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
+    
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_STOP_SYNC -> {
@@ -29,10 +29,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         val dataStoreManager = DataStoreManager(context)
                         // Disable notification sync
                         dataStoreManager.setNotificationSyncEnabled(false)
-
+                        
                         // Hide the persistent notification
                         NotificationUtil.hideConnectionStatusNotification(context)
-
+                        
                         Log.d(TAG, "Notification sync disabled and notification hidden")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error stopping sync: ${e.message}")

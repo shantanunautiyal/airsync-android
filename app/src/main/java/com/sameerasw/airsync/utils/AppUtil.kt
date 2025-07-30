@@ -18,14 +18,14 @@ object AppUtil {
         try {
             val packageManager = context.packageManager
             val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-
+            
             val notificationApps = mutableListOf<NotificationApp>()
-
+            
             for (appInfo in installedApps) {
                 try {
                     // Skip system apps that don't typically send user notifications
                     if (shouldSkipApp(appInfo)) continue
-
+                    
                     val appName = packageManager.getApplicationLabel(appInfo).toString()
                     val packageName = appInfo.packageName
                     val isSystemApp = isSystemApp(appInfo)
@@ -34,7 +34,7 @@ object AppUtil {
                     } catch (e: Exception) {
                         null
                     }
-
+                    
                     notificationApps.add(
                         NotificationApp(
                             packageName = packageName,
@@ -49,7 +49,7 @@ object AppUtil {
                     Log.w(TAG, "Error processing app ${appInfo.packageName}: ${e.message}")
                 }
             }
-
+            
             // Sort by app name
             notificationApps.sortedBy { it.appName.lowercase() }
         } catch (e: Exception) {
@@ -66,7 +66,7 @@ object AppUtil {
         savedApps: List<NotificationApp>
     ): List<NotificationApp> {
         val savedAppsMap = savedApps.associateBy { it.packageName }
-
+        
         return installedApps.map { installedApp ->
             val savedApp = savedAppsMap[installedApp.packageName]
             if (savedApp != null) {
@@ -85,10 +85,10 @@ object AppUtil {
 
     private fun shouldSkipApp(appInfo: ApplicationInfo): Boolean {
         val packageName = appInfo.packageName
-
+        
         // Skip our own app
         if (packageName.contains("airsync")) return true
-
+        
         // Skip common system packages that don't send user notifications
         val systemPackagesToSkip = setOf(
             "com.android.systemui",
@@ -109,10 +109,10 @@ object AppUtil {
             "com.android.server.telecom",
             "com.android.cellbroadcastreceiver"
         )
-
+        
         // Skip if it's a known system package that shouldn't send notifications
         if (systemPackagesToSkip.any { packageName.contains(it) }) return true
-
+        
         // Skip if it doesn't have a launch intent (likely a service-only app)
         return false
     }
@@ -147,8 +147,8 @@ object AppUtil {
                 "com.instagram.android" -> "Instagram"
                 "com.facebook.katana" -> "Facebook"
                 "com.twitter.android" -> "Twitter"
-                else -> packageName.split(".").lastOrNull()?.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase() else it.toString()
+                else -> packageName.split(".").lastOrNull()?.replaceFirstChar { 
+                    if (it.isLowerCase()) it.titlecase() else it.toString() 
                 } ?: packageName
             }
         }

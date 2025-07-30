@@ -105,7 +105,7 @@ object MediaControlUtil {
         return try {
             val mediaSessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
             val componentName = ComponentName(context, MediaNotificationListener::class.java)
-
+            
             val activeSessions = try {
                 mediaSessionManager.getActiveSessions(componentName)
             } catch (e: SecurityException) {
@@ -131,10 +131,10 @@ object MediaControlUtil {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
             val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
             val upEvent = KeyEvent(KeyEvent.ACTION_UP, keyCode)
-
+            
             audioManager.dispatchMediaKeyEvent(downEvent)
             audioManager.dispatchMediaKeyEvent(upEvent)
-
+            
             Log.d(TAG, "Sent media button event: $keyCode")
             true
         } catch (e: Exception) {

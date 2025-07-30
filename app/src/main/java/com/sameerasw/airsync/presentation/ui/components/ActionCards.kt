@@ -5,8 +5,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 
 @Composable
@@ -190,6 +192,133 @@ fun DeveloperModeCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun PermissionStatusCard(
+    missingPermissions: List<String>,
+    onGrantPermissions: () -> Unit,
+    onRefreshPermissions: () -> Unit,
+    onRequestNotificationPermission: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val criticalPermissions = PermissionUtil.getCriticalMissingPermissions(context)
+    val optionalPermissions = PermissionUtil.getOptionalMissingPermissions(context)
+
+    if (missingPermissions.isNotEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (criticalPermissions.isNotEmpty())
+                    MaterialTheme.colorScheme.errorContainer
+                else MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (criticalPermissions.isNotEmpty()) "❌ Missing Critical Permissions" else "⚠️ Optional Permissions",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                        color = if (criticalPermissions.isNotEmpty())
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+
+                    TextButton(onClick = onRefreshPermissions) {
+                        Text("Refresh")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Show critical permissions first
+                if (criticalPermissions.isNotEmpty()) {
+                    Text(
+                        "Critical permissions (required for core functionality):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    criticalPermissions.forEach { permission ->
+                        Text(
+                            "• $permission",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+
+                    Button(
+                        onClick = onGrantPermissions,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Grant Critical Permissions", color = MaterialTheme.colorScheme.onError)
+                    }
+                }
+
+                // Show optional permissions
+                if (optionalPermissions.isNotEmpty()) {
+                    if (criticalPermissions.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Text(
+                        "Optional permissions (recommended for better experience):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    optionalPermissions.forEach { permission ->
+                        Text(
+                            "• $permission",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+
+                    // Show Android 14+ notification permission button if applicable
+                    if (PermissionUtil.isNotificationPermissionRequired() &&
+                        !PermissionUtil.isPostNotificationPermissionGranted(context) &&
+                        onRequestNotificationPermission != null) {
+
+                        OutlinedButton(
+                            onClick = onRequestNotificationPermission,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        ) {
+                            Text("Grant Notification Permission")
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "✅ All Permissions Granted",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+
+                TextButton(onClick = onRefreshPermissions) {
+                    Text("Refresh")
+                }
             }
         }
     }

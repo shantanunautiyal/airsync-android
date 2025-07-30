@@ -29,7 +29,8 @@ fun AirSyncMainScreen(
     initialPort: String? = null,
     showConnectionDialog: Boolean = false,
     pcName: String? = null,
-    onNavigateToApps: () -> Unit = {}
+    onNavigateToApps: () -> Unit = {},
+    onRequestNotificationPermission: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: AirSyncViewModel = viewModel { AirSyncViewModel.create(context) }
@@ -122,7 +123,8 @@ fun AirSyncMainScreen(
         PermissionStatusCard(
             missingPermissions = uiState.missingPermissions,
             onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-            onRefreshPermissions = { viewModel.refreshPermissions(context) }
+            onRefreshPermissions = { viewModel.refreshPermissions(context) },
+            onRequestNotificationPermission = onRequestNotificationPermission
         )
 
         // Notification Sync Settings Card

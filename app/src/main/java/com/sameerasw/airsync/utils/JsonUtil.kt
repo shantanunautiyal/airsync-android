@@ -53,4 +53,11 @@ object JsonUtil {
     fun createMediaControlResponse(action: String, success: Boolean, message: String = ""): String {
         return """{"type":"mediaControlResponse","data":{"action":"$action","success":$success,"message":"$message"}}"""
     }
+
+    /**
+     * Creates a response JSON for volume control result
+     */
+    fun createVolumeControlResponse(action: String, success: Boolean, message: String = ""): String {
+        return """{"type":"volumeControlResponse","data":{"action":"$action","success":$success,"message":"$message"}}"""
+    }
 }

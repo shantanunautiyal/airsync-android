@@ -93,9 +93,6 @@ object WebSocketUtil {
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     Log.d(TAG, "Received: $text")
 
-                    // Handle incoming commands from Mac
-                    WebSocketMessageHandler.handleIncomingMessage(context, text)
-
                     // Update last sync time on successful response
                     updateLastSyncTime(context)
 
