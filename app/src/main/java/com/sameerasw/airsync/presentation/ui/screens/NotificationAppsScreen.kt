@@ -52,7 +52,7 @@ fun NotificationAppsScreen(
         }
     ) { paddingValues ->
         NotificationAppsContent(
-            apps = filteredApps,
+            apps = if (searchQuery.length >= 5) filteredApps else emptyList(),
             searchQuery = searchQuery,
             showSystemApps = uiState.showSystemApps,
             isLoading = uiState.isLoading,

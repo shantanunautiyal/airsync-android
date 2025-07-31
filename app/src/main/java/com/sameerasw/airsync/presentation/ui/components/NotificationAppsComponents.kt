@@ -57,7 +57,9 @@ fun NotificationAppsContent(
         }
 
         // Apps list
-        if (isLoading) {
+        if (searchQuery.length < 5) {
+            PromptSearchMessage()
+        } else if (isLoading) {
             LoadingSection()
         } else {
             AppsListSection(
@@ -379,6 +381,31 @@ private fun ErrorCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PromptSearchMessage() {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Enter at least 5 characters to search",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
