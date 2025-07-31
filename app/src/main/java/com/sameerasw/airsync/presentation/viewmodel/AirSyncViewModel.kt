@@ -60,7 +60,8 @@ class AirSyncViewModel(
         initialIp: String? = null,
         initialPort: String? = null,
         showConnectionDialog: Boolean = false,
-        pcName: String? = null
+        pcName: String? = null,
+        isPlus: Boolean = false
     ) {
         viewModelScope.launch {
             // Load saved values
@@ -108,7 +109,8 @@ class AirSyncViewModel(
                         name = pcName,
                         ipAddress = savedIp,
                         port = savedPort,
-                        lastConnected = System.currentTimeMillis()
+                        lastConnected = System.currentTimeMillis(),
+                        isPlus = isPlus
                     )
                 )
             }
@@ -174,13 +176,14 @@ class AirSyncViewModel(
         _deviceInfo.value = _deviceInfo.value.copy(localIp = localIp)
     }
 
-    fun saveLastConnectedDevice(pcName: String? = null) {
+    fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false) {
         viewModelScope.launch {
             val connectedDevice = ConnectedDevice(
                 name = pcName ?: "Desktop PC",
                 ipAddress = _uiState.value.ipAddress,
                 port = _uiState.value.port,
-                lastConnected = System.currentTimeMillis()
+                lastConnected = System.currentTimeMillis(),
+                isPlus = isPlus
             )
             repository.saveLastConnectedDevice(connectedDevice)
             _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)

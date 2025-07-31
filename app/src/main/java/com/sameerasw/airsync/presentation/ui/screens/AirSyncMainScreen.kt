@@ -29,6 +29,7 @@ fun AirSyncMainScreen(
     initialPort: String? = null,
     showConnectionDialog: Boolean = false,
     pcName: String? = null,
+    isPlus: Boolean = false,
     onNavigateToApps: () -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {}
 ) {
@@ -39,7 +40,7 @@ fun AirSyncMainScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog, pcName)
+        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog, pcName, isPlus)
     }
 
     // Refresh permissions when returning from settings
@@ -70,7 +71,9 @@ fun AirSyncMainScreen(
                     viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
                     if (connected) {
                         viewModel.setResponse("Connected successfully!")
-                        viewModel.saveLastConnectedDevice(pcName)
+                        // Get plus status from current temporary device or use QR code value
+                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
+                        viewModel.saveLastConnectedDevice(pcName, plusStatus)
                     } else {
                         viewModel.setResponse("Failed to connect")
                     }
@@ -215,7 +218,8 @@ fun AirSyncMainScreen(
             onConnect = { connect() },
             onDisconnect = { disconnect() },
             onIpAddressChange = { viewModel.updateIpAddress(it) },
-            onPortChange = { viewModel.updatePort(it) }
+            onPortChange = { viewModel.updatePort(it) },
+            connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
         )
 
         // Developer Mode Card - Contains test functions
@@ -277,6 +281,7 @@ fun AirSyncMainScreen(
                 desktopIp = uiState.ipAddress,
                 port = uiState.port,
                 pcName = pcName ?: uiState.lastConnectedDevice?.name,
+                isPlus = uiState.lastConnectedDevice?.isPlus ?: isPlus,
                 onDismiss = { viewModel.setDialogVisible(false) },
                 onConnect = {
                     viewModel.setDialogVisible(false)

@@ -19,7 +19,36 @@ fun LastConnectedDeviceCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Last Connected Device", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("💻 ${device.name}", style = MaterialTheme.typography.bodyMedium)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("💻 ${device.name}", style = MaterialTheme.typography.bodyMedium)
+
+                // Display status badge - PLUS or FREE
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (device.isPlus)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(
+                        text = if (device.isPlus) "PLUS" else "FREE",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (device.isPlus)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             Text("🌐 ${device.ipAddress}:${device.port}", style = MaterialTheme.typography.bodyMedium)
 
             val lastConnectedTime = remember(device.lastConnected) {
@@ -53,7 +82,8 @@ fun ConnectionStatusCard(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onIpAddressChange: (String) -> Unit,
-    onPortChange: (String) -> Unit
+    onPortChange: (String) -> Unit,
+    connectedDevice: ConnectedDevice? = null
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -91,12 +121,46 @@ fun ConnectionStatusCard(
                 }
             }
 
-            if (isConnected) {
+            if (isConnected && connectedDevice != null) {
                 Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "📡 Connected to ${connectedDevice.name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Show status badge - PLUS or FREE
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (connectedDevice.isPlus)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = if (connectedDevice.isPlus) "PLUS" else "FREE",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (connectedDevice.isPlus)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 Text(
-                    "📡 Connected to $ipAddress:$port",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    "${connectedDevice.ipAddress}:${connectedDevice.port}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 

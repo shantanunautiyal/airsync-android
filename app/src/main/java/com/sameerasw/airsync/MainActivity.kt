@@ -17,6 +17,7 @@ import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
 import com.sameerasw.airsync.presentation.ui.screens.NotificationAppsScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import com.sameerasw.airsync.utils.PermissionUtil
+import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
     
@@ -34,7 +35,37 @@ class MainActivity : ComponentActivity() {
         val data: android.net.Uri? = intent?.data
         val ip = data?.host
         val port = data?.port?.takeIf { it != -1 }?.toString()
-        val pcName = data?.getQueryParameter("name") // Extract PC name from QR code
+
+        // Parse QR code parameters
+        var pcName: String? = null
+        var isPlus = false
+
+        data?.let { uri ->
+            val query = uri.query
+            if (query != null) {
+                // Split on first occurrence of "?plus="
+                if (query.contains("?plus=")) {
+                    val parts = query.split("?plus=", limit = 2)
+                    if (parts.size == 2) {
+                        // Extract name part
+                        val namePart = parts[0]
+                        if (namePart.startsWith("name=")) {
+                            pcName = URLDecoder.decode(namePart.substring(5), "UTF-8")
+                        }
+
+                        // Extract plus value
+                        isPlus = parts[1].toBooleanStrictOrNull() ?: false
+                    }
+                } else {
+                    // Fallback to standard parameter parsing
+                    pcName = uri.getQueryParameter("name")?.let {
+                        URLDecoder.decode(it, "UTF-8")
+                    }
+                    isPlus = uri.getQueryParameter("plus")?.toBooleanStrictOrNull() ?: false
+                }
+            }
+        }
+
         val isFromQrScan = data != null
 
         setContent {
@@ -53,6 +84,7 @@ class MainActivity : ComponentActivity() {
                                 initialPort = port,
                                 showConnectionDialog = isFromQrScan,
                                 pcName = pcName,
+                                isPlus = isPlus,
                                 onNavigateToApps = {
                                     navController.navigate("notification_apps")
                                 },

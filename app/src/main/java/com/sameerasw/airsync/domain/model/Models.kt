@@ -30,7 +30,8 @@ data class ConnectedDevice(
     val ipAddress: String,
     val port: String,
     val lastConnected: Long,
-    val lastSyncTime: Long? = null
+    val lastSyncTime: Long? = null,
+    val isPlus: Boolean = false
 )
 
 data class BatteryInfo(

@@ -3,6 +3,7 @@ package com.sameerasw.airsync.presentation.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -15,6 +16,7 @@ fun ConnectionDialog(
     desktopIp: String,
     port: String,
     pcName: String?,
+    isPlus: Boolean = false,
     onDismiss: () -> Unit,
     onConnect: () -> Unit
 ) {
@@ -44,7 +46,29 @@ fun ConnectionDialog(
                 Text("Port: $port")
 
                 pcName?.let {
-                    Text("PC Name: $it")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("PC Name: $it")
+                    }
+                    // Display Plus status badge in dialog
+                    if (isPlus) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(
+                                text = "PLUS",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
                 }
 
                 Row(

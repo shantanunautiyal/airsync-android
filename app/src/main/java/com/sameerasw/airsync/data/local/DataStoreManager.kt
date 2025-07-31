@@ -26,6 +26,7 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_PC_IP = stringPreferencesKey("last_connected_pc_ip")
         private val LAST_CONNECTED_PC_PORT = stringPreferencesKey("last_connected_pc_port")
         private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
+        private val LAST_CONNECTED_PC_PLUS = booleanPreferencesKey("last_connected_pc_plus")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
@@ -122,6 +123,7 @@ class DataStoreManager(private val context: Context) {
             preferences[LAST_CONNECTED_PC_IP] = device.ipAddress
             preferences[LAST_CONNECTED_PC_PORT] = device.port
             preferences[LAST_CONNECTED_TIMESTAMP] = device.lastConnected.toString()
+            preferences[LAST_CONNECTED_PC_PLUS] = device.isPlus
             device.lastSyncTime?.let {
                 preferences[LAST_SYNC_TIME] = it.toString()
             }
@@ -134,6 +136,7 @@ class DataStoreManager(private val context: Context) {
             val ip = preferences[LAST_CONNECTED_PC_IP]
             val port = preferences[LAST_CONNECTED_PC_PORT]
             val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
+            val isPlus = preferences[LAST_CONNECTED_PC_PLUS] ?: false
             val lastSyncTime = preferences[LAST_SYNC_TIME]?.toLongOrNull()
 
             if (name != null && ip != null && port != null && timestamp != null) {
@@ -142,7 +145,8 @@ class DataStoreManager(private val context: Context) {
                     ipAddress = ip,
                     port = port,
                     lastConnected = timestamp.toLongOrNull() ?: 0L,
-                    lastSyncTime = lastSyncTime
+                    lastSyncTime = lastSyncTime,
+                    isPlus = isPlus
                 )
             } else {
                 null
