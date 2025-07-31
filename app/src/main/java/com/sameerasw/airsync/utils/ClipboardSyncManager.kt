@@ -39,16 +39,22 @@ object ClipboardSyncManager {
                     return@launch
                 }
 
-                // Register clipboard listener
-                clipboardListener = ClipboardUtil.registerClipboardListener(context) { clipText ->
-                    // Avoid infinite loop
-                    if (clipText != lastReceivedText && clipText != lastSentText) {
-                        syncClipboardToDesktop(clipText)
+                // Register clipboard listener on Main thread
+                launch(Dispatchers.Main) {
+                    clipboardListener = ClipboardUtil.registerClipboardListener(context) { clipText ->
+                        Log.d(TAG, "Clipboard changed detected: ${clipText.take(50)}...")
+                        // Avoid infinite loop by checking both sent and received text
+                        if (clipText != lastReceivedText && clipText != lastSentText && clipText.isNotBlank()) {
+                            Log.d(TAG, "Syncing clipboard to desktop...")
+                            syncClipboardToDesktop(clipText)
+                        } else {
+                            Log.d(TAG, "Skipping clipboard sync - matches last sent/received text")
+                        }
                     }
-                }
 
-                isEnabled = true
-                Log.d(TAG, "Clipboard sync started")
+                    isEnabled = true
+                    Log.d(TAG, "Clipboard sync started successfully")
+                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting clipboard sync: ${e.message}")
@@ -78,18 +84,27 @@ object ClipboardSyncManager {
     private fun syncClipboardToDesktop(text: String) {
         if (text.isBlank()) return
 
-        try {
-            lastSentText = text
-            val clipboardJson = JsonUtil.createClipboardUpdateJson(text)
+        // Use IO scope for network operations
+        syncScope.launch(Dispatchers.IO) {
+            try {
+                lastSentText = text
+                val clipboardJson = JsonUtil.createClipboardUpdateJson(text)
 
-            val success = WebSocketUtil.sendMessage(clipboardJson)
-            if (success) {
-                Log.d(TAG, "Clipboard synced to desktop: ${text.take(50)}...")
-            } else {
-                Log.w(TAG, "Failed to sync clipboard to desktop")
+                Log.d(TAG, "Sending clipboard JSON: $clipboardJson")
+
+                val success = WebSocketUtil.sendMessage(clipboardJson)
+                if (success) {
+                    Log.d(TAG, "Clipboard synced to desktop: ${text.take(50)}...")
+                } else {
+                    Log.w(TAG, "Failed to sync clipboard to desktop")
+                    // Reset lastSentText if sending failed
+                    lastSentText = null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing clipboard to desktop: ${e.message}")
+                // Reset lastSentText if sending failed
+                lastSentText = null
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing clipboard to desktop: ${e.message}")
         }
     }
 

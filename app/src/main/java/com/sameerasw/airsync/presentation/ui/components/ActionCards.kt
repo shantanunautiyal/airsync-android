@@ -6,9 +6,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.utils.PermissionUtil
 
 @Composable
@@ -198,7 +198,8 @@ fun DeveloperModeCard(
     isLoading: Boolean,
     onSendDeviceInfo: () -> Unit,
     onSendNotification: () -> Unit,
-    onSendDeviceStatus: () -> Unit
+    onSendDeviceStatus: () -> Unit,
+    uiState: UiState
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -247,6 +248,29 @@ fun DeveloperModeCard(
                         enabled = !isLoading
                     ) {
                         Text("Send Device Status")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+
+                // Response Display
+                if (uiState.response.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
+                                MaterialTheme.colorScheme.errorContainer
+                            else MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = uiState.response,
+                            modifier = Modifier.padding(16.dp),
+                            color = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
+                                MaterialTheme.colorScheme.onErrorContainer
+                            else MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             }

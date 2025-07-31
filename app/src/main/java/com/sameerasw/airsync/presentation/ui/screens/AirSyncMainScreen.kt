@@ -17,13 +17,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.ui.components.*
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
-import com.sameerasw.airsync.utils.ClipboardUtil
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,7 +108,7 @@ fun AirSyncMainScreen(
                     viewModel.setResponse("Received: $response")
                     // Handle clipboard updates from desktop
                     try {
-                        val json = org.json.JSONObject(response)
+                        val json = JSONObject(response)
                         if (json.optString("type") == "clipboardUpdate") {
                             val data = json.optJSONObject("data")
                             val text = data?.optString("text")
@@ -137,7 +138,7 @@ fun AirSyncMainScreen(
             if (!WebSocketUtil.isConnected()) {
                 connect()
                 // Wait a moment for connection, then send
-                kotlinx.coroutines.delay(1000)
+                delay(1000)
             }
 
             val success = WebSocketUtil.sendMessage(message)
@@ -268,7 +269,8 @@ fun AirSyncMainScreen(
                         context
                     )
                     sendMessage(message)
-                }
+                },
+                uiState = uiState
             )
 
             OutlinedButton(
@@ -282,25 +284,6 @@ fun AirSyncMainScreen(
                 Text("Provide feedback")
             }
 
-            // Response Display
-            if (uiState.response.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
-                            MaterialTheme.colorScheme.errorContainer
-                        else MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Text(
-                        text = uiState.response,
-                        modifier = Modifier.padding(16.dp),
-                        color = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
-                            MaterialTheme.colorScheme.onErrorContainer
-                        else MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
 
             // Dialogs
             if (uiState.isDialogVisible) {
