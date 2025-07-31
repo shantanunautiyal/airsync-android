@@ -187,16 +187,18 @@ fun AirSyncMainScreen(
             isConnected = uiState.isConnected
         )
 
-        // Last Connected Device Section
-        uiState.lastConnectedDevice?.let { device ->
-            LastConnectedDeviceCard(
-                device = device,
-                onQuickConnect = {
-                    viewModel.updateIpAddress(device.ipAddress)
-                    viewModel.updatePort(device.port)
-                    connect()
-                }
-            )
+        // Last Connected Device Section - only show when not currently connected
+        if (!uiState.isConnected) {
+            uiState.lastConnectedDevice?.let { device ->
+                LastConnectedDeviceCard(
+                    device = device,
+                    onQuickConnect = {
+                        viewModel.updateIpAddress(device.ipAddress)
+                        viewModel.updatePort(device.port)
+                        connect()
+                    }
+                )
+            }
         }
 
         // Connection Status Card - New main connection interface
