@@ -168,33 +168,7 @@ fun AirSyncMainScreen(
         ClipboardSyncCard(
             isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
             onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
-            onTestClipboard = {
-                val testText = "Test clipboard sync - ${System.currentTimeMillis()}"
-                ClipboardUtil.setClipboardText(context, testText)
-                viewModel.setResponse("Test text copied to clipboard")
-            },
             isConnected = uiState.isConnected
-        )
-
-        // Device Info Section
-        val batteryInfo by rememberUpdatedState(DeviceInfoUtil.getBatteryInfo(context))
-        val audioInfo by rememberUpdatedState(DeviceInfoUtil.getAudioInfo(context))
-
-        DeviceInfoCard(
-            deviceName = uiState.deviceNameInput,
-            localIp = deviceInfo.localIp,
-            batteryLevel = batteryInfo.level,
-            isCharging = batteryInfo.isCharging,
-            volume = audioInfo.volume,
-            isMuted = audioInfo.isMuted,
-            mediaTitle = audioInfo.title,
-            mediaArtist = audioInfo.artist,
-            isNotificationEnabled = uiState.isNotificationEnabled,
-            onDeviceNameChange = { viewModel.updateDeviceName(it) },
-            onRefreshMedia = {
-                viewModel.refreshPermissions(context)
-                viewModel.refreshDeviceInfo(context)
-            }
         )
 
         // Last Connected Device Section
@@ -220,6 +194,12 @@ fun AirSyncMainScreen(
             onIpAddressChange = { viewModel.updateIpAddress(it) },
             onPortChange = { viewModel.updatePort(it) },
             connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
+        )
+
+        DeviceInfoCard(
+            deviceName = uiState.deviceNameInput,
+            localIp = deviceInfo.localIp,
+            onDeviceNameChange = { viewModel.updateDeviceName(it) }
         )
 
         // Developer Mode Card - Contains test functions
