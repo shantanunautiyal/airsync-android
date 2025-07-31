@@ -3,6 +3,8 @@ package com.sameerasw.airsync.presentation.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +43,9 @@ fun AirSyncMainScreen(
 
     // Track if we've already processed the QR code dialog to prevent re-showing
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
+
+    // State for About dialog
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus)
@@ -151,151 +156,171 @@ fun AirSyncMainScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("AirSync", style = MaterialTheme.typography.headlineMedium)
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("AirSync", style = MaterialTheme.typography.headlineMedium)
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = { showAboutDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "About"
+                    )
+                }
+            }
 
-        // Permission Status Card
-        PermissionStatusCard(
-            missingPermissions = uiState.missingPermissions,
-            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-            onRefreshPermissions = { viewModel.refreshPermissions(context) },
-            onRequestNotificationPermission = onRequestNotificationPermission
-        )
 
-        // Notification Sync Settings Card
-        NotificationSyncCard(
-            isNotificationEnabled = uiState.isNotificationEnabled,
-            isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
-            ipAddress = uiState.ipAddress,
-            port = uiState.port,
-            onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
-            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-            onManageApps = onNavigateToApps
-        )
+            // Permission Status Card
+            PermissionStatusCard(
+                missingPermissions = uiState.missingPermissions,
+                onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+                onRefreshPermissions = { viewModel.refreshPermissions(context) },
+                onRequestNotificationPermission = onRequestNotificationPermission
+            )
 
-        // Clipboard Sync Card
-        ClipboardSyncCard(
-            isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-            onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
-            isConnected = uiState.isConnected
-        )
+            // Notification Sync Settings Card
+            NotificationSyncCard(
+                isNotificationEnabled = uiState.isNotificationEnabled,
+                isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
+                ipAddress = uiState.ipAddress,
+                port = uiState.port,
+                onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
+                onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+                onManageApps = onNavigateToApps
+            )
 
-        // Last Connected Device Section - only show when not currently connected
-        if (!uiState.isConnected) {
-            uiState.lastConnectedDevice?.let { device ->
-                LastConnectedDeviceCard(
-                    device = device,
-                    onQuickConnect = {
-                        viewModel.updateIpAddress(device.ipAddress)
-                        viewModel.updatePort(device.port)
+            // Clipboard Sync Card
+            ClipboardSyncCard(
+                isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
+                isConnected = uiState.isConnected
+            )
+
+            // Last Connected Device Section - only show when not currently connected
+            if (!uiState.isConnected) {
+                uiState.lastConnectedDevice?.let { device ->
+                    LastConnectedDeviceCard(
+                        device = device,
+                        onQuickConnect = {
+                            viewModel.updateIpAddress(device.ipAddress)
+                            viewModel.updatePort(device.port)
+                            connect()
+                        }
+                    )
+                }
+            }
+
+            // Connection Status Card - New main connection interface
+            ConnectionStatusCard(
+                ipAddress = uiState.ipAddress,
+                port = uiState.port,
+                isConnected = uiState.isConnected,
+                isConnecting = uiState.isConnecting,
+                onConnect = { connect() },
+                onDisconnect = { disconnect() },
+                onIpAddressChange = { viewModel.updateIpAddress(it) },
+                onPortChange = { viewModel.updatePort(it) },
+                connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
+            )
+
+            DeviceInfoCard(
+                deviceName = uiState.deviceNameInput,
+                localIp = deviceInfo.localIp,
+                onDeviceNameChange = { viewModel.updateDeviceName(it) }
+            )
+
+            // Developer Mode Card - Contains test functions
+            DeveloperModeCard(
+                isDeveloperMode = uiState.isDeveloperMode,
+                onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
+                isLoading = uiState.isLoading,
+                onSendDeviceInfo = {
+                    val message = JsonUtil.createDeviceInfoJson(
+                        deviceInfo.name,
+                        deviceInfo.localIp,
+                        uiState.port.toIntOrNull() ?: 6996
+                    )
+                    sendMessage(message)
+                },
+                onSendNotification = {
+                    val message = JsonUtil.createNotificationJson(
+                        "121212",
+                        "Test Message",
+                        "This is a simulated notification from AirSync.",
+                        "AirSync",
+                        "com.sameerasw.airsync"
+                    )
+                    sendMessage(message)
+                },
+                onSendDeviceStatus = {
+                    val message = DeviceInfoUtil.generateDeviceStatusJson(
+                        context
+                    )
+                    sendMessage(message)
+                }
+            )
+
+            // Response Display
+            if (uiState.response.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
+                            MaterialTheme.colorScheme.errorContainer
+                        else MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Text(
+                        text = uiState.response,
+                        modifier = Modifier.padding(16.dp),
+                        color = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+
+            // Dialogs
+            if (uiState.isDialogVisible) {
+                ConnectionDialog(
+                    deviceName = deviceInfo.name,
+                    localIp = deviceInfo.localIp,
+                    desktopIp = uiState.ipAddress,
+                    port = uiState.port,
+                    pcName = pcName ?: uiState.lastConnectedDevice?.name,
+                    isPlus = uiState.lastConnectedDevice?.isPlus ?: isPlus,
+                    onDismiss = { viewModel.setDialogVisible(false) },
+                    onConnect = {
+                        viewModel.setDialogVisible(false)
                         connect()
                     }
                 )
             }
+
+            if (uiState.showPermissionDialog) {
+                PermissionDialog(
+                    missingPermissions = uiState.missingPermissions,
+                    onDismiss = { viewModel.setPermissionDialogVisible(false) },
+                    onGrantPermissions = {
+                        PermissionUtil.openNotificationListenerSettings(context)
+                        viewModel.setPermissionDialogVisible(false)
+                    }
+                )
         }
 
-        // Connection Status Card - New main connection interface
-        ConnectionStatusCard(
-            ipAddress = uiState.ipAddress,
-            port = uiState.port,
-            isConnected = uiState.isConnected,
-            isConnecting = uiState.isConnecting,
-            onConnect = { connect() },
-            onDisconnect = { disconnect() },
-            onIpAddressChange = { viewModel.updateIpAddress(it) },
-            onPortChange = { viewModel.updatePort(it) },
-            connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
-        )
-
-        DeviceInfoCard(
-            deviceName = uiState.deviceNameInput,
-            localIp = deviceInfo.localIp,
-            onDeviceNameChange = { viewModel.updateDeviceName(it) }
-        )
-
-        // Developer Mode Card - Contains test functions
-        DeveloperModeCard(
-            isDeveloperMode = uiState.isDeveloperMode,
-            onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
-            isLoading = uiState.isLoading,
-            onSendDeviceInfo = {
-                val message = JsonUtil.createDeviceInfoJson(
-                    deviceInfo.name,
-                    deviceInfo.localIp,
-                    uiState.port.toIntOrNull() ?: 6996
-                )
-                sendMessage(message)
-            },
-            onSendNotification = {
-                val message = JsonUtil.createNotificationJson(
-                    "121212",
-                    "Test Message",
-                    "This is a simulated notification from AirSync.",
-                    "AirSync",
-                    "com.sameerasw.airsync"
-                )
-                sendMessage(message)
-            },
-            onSendDeviceStatus = {
-                val message = DeviceInfoUtil.generateDeviceStatusJson(
-                    context
-                )
-                sendMessage(message)
-            }
-        )
-
-        // Response Display
-        if (uiState.response.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
-                        MaterialTheme.colorScheme.errorContainer
-                    else MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Text(
-                    text = uiState.response,
-                    modifier = Modifier.padding(16.dp),
-                    color = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
-                        MaterialTheme.colorScheme.onErrorContainer
-                    else MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-
-        // Dialogs
-        if (uiState.isDialogVisible) {
-            ConnectionDialog(
-                deviceName = deviceInfo.name,
-                localIp = deviceInfo.localIp,
-                desktopIp = uiState.ipAddress,
-                port = uiState.port,
-                pcName = pcName ?: uiState.lastConnectedDevice?.name,
-                isPlus = uiState.lastConnectedDevice?.isPlus ?: isPlus,
-                onDismiss = { viewModel.setDialogVisible(false) },
-                onConnect = {
-                    viewModel.setDialogVisible(false)
-                    connect()
-                }
-            )
-        }
-
-        if (uiState.showPermissionDialog) {
-            PermissionDialog(
-                missingPermissions = uiState.missingPermissions,
-                onDismiss = { viewModel.setPermissionDialogVisible(false) },
-                onGrantPermissions = {
-                    PermissionUtil.openNotificationListenerSettings(context)
-                    viewModel.setPermissionDialogVisible(false)
-                }
+        // About Dialog
+        if (showAboutDialog) {
+            AboutDialog(
+                onDismissRequest = { showAboutDialog = false }
             )
         }
     }
