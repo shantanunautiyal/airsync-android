@@ -88,22 +88,26 @@ class AirSyncViewModel(
             val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
             val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
 
+            // Check current WebSocket connection status
+            val currentlyConnected = WebSocketUtil.isConnected()
+
             _uiState.value = _uiState.value.copy(
                 ipAddress = savedIp,
                 port = savedPort,
                 deviceNameInput = deviceName,
-                isDialogVisible = showConnectionDialog,
+                // Only show dialog if not already connected and showConnectionDialog is true
+                isDialogVisible = showConnectionDialog && !currentlyConnected,
                 missingPermissions = missingPermissions,
                 isNotificationEnabled = isNotificationEnabled,
                 lastConnectedDevice = lastConnected,
                 isNotificationSyncEnabled = isNotificationSyncEnabled,
                 isDeveloperMode = isDeveloperMode,
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
-                isConnected = WebSocketUtil.isConnected()
+                isConnected = currentlyConnected
             )
 
-            // If we have PC name from QR code, store it temporarily for the dialog
-            if (pcName != null && showConnectionDialog) {
+            // If we have PC name from QR code and not already connected, store it temporarily for the dialog
+            if (pcName != null && showConnectionDialog && !currentlyConnected) {
                 _uiState.value = _uiState.value.copy(
                     lastConnectedDevice = ConnectedDevice(
                         name = pcName,

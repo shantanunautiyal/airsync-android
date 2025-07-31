@@ -39,8 +39,24 @@ fun AirSyncMainScreen(
     val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
 
+    // Track if we've already processed the QR code dialog to prevent re-showing
+    var hasProcessedQrDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
-        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog, pcName, isPlus)
+        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus)
+    }
+
+    // Mark QR dialog as processed when it's shown or when already connected
+    LaunchedEffect(showConnectionDialog, uiState.isConnected) {
+        if (showConnectionDialog) {
+            if (uiState.isConnected) {
+                // If already connected, don't show dialog
+                hasProcessedQrDialog = true
+            } else if (uiState.isDialogVisible) {
+                // Dialog is being shown, mark as processed
+                hasProcessedQrDialog = true
+            }
+        }
     }
 
     // Refresh permissions when returning from settings
@@ -127,11 +143,11 @@ fun AirSyncMainScreen(
         }
     }
 
-    // Cleanup WebSocket when screen is disposed
+    // Cleanup WebSocket only when the entire app is being destroyed, not on navigation
     DisposableEffect(Unit) {
         onDispose {
+            // Only stop clipboard sync on dispose, keep WebSocket connection alive for navigation
             ClipboardSyncManager.stopSync(context)
-            WebSocketUtil.cleanup()
         }
     }
 
