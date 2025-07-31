@@ -4,6 +4,9 @@ Android app for AirSync 2.0 built with Kotlin Jetpack Compose
 ## Installation and troubleshooting
 ![Frame 1 Large](https://github.com/user-attachments/assets/24db7555-2518-44ee-83f3-6c7f84cb8b54)
 
+## How to connect?
+Use your built-in camera or Google lense or anything that can scan a QR code. I twill prompt you to open the app. Once authorized, The last device will be saved on the mobile for now for easier re-connection.
+
 
 Definitely need someone to help with documentation ;)
 
