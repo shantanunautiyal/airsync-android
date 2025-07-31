@@ -80,7 +80,7 @@ fun AboutDialog(
                 // Get AirSync+ button
                 OutlinedButton(
                     onClick = {
-                        val airSyncPlusUrl = "https://store.sameerasw.com"
+                        val airSyncPlusUrl = "https://airsync.sameerasw.com"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
                         context.startActivity(intent)
                     },
