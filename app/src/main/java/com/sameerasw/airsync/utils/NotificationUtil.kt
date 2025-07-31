@@ -8,6 +8,7 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.sameerasw.airsync.MainActivity
+import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.service.NotificationActionReceiver
 import java.text.SimpleDateFormat
@@ -87,7 +88,7 @@ object NotificationUtil {
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setSmallIcon(icon)
+            .setSmallIcon(R.drawable.ic_stat_name)
             .setContentIntent(openAppPendingIntent)
             .addAction(
                 android.R.drawable.ic_media_pause,
