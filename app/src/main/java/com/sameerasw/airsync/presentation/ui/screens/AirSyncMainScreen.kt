@@ -1,5 +1,7 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -268,6 +270,17 @@ fun AirSyncMainScreen(
                     sendMessage(message)
                 }
             )
+
+            OutlinedButton(
+                onClick = {
+                    val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/issues/new"
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Provide feedback")
+            }
 
             // Response Display
             if (uiState.response.isNotEmpty()) {

@@ -41,6 +41,56 @@ fun AboutDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(top = 16.dp)
             ) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Left
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Website button
+                Button(
+                    onClick = {
+                        val websiteUrl = "https://www.sameerasw.com/airsync"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(websiteUrl))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Website")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Get the mac app button
+                OutlinedButton(
+                    onClick = {
+                        val macAppUrl = "https://github.com/sameerasw/airsync-mac/releases/latest"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(macAppUrl))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Get the mac app")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Get AirSync+ button
+                OutlinedButton(
+                    onClick = {
+                        val airSyncPlusUrl = "https://store.sameerasw.com"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Get AirSync+")
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
+
                 Image(
                     painter = painterResource(id = R.drawable.avatar),
                     contentDescription = "Developer Avatar",
@@ -56,13 +106,11 @@ fun AboutDialog(
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
+                
                 Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Left
+                    "With ❤\uFE0F",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -75,14 +123,12 @@ fun AboutDialog(
             }
         },
         dismissButton = {
-            if (githubUsername.isNotBlank()) {
-                TextButton(onClick = {
-                    val githubUrl = "https://github.com/$githubUsername"
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(githubUrl))
-                    context.startActivity(intent)
-                }) {
-                    Text("GitHub")
-                }
+            Button(onClick = {
+                val websiteUrl = "https://www.sameerasw.com"
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(websiteUrl))
+                context.startActivity(intent)
+            }) {
+                Text("My website")
             }
         },
         confirmButton = {
