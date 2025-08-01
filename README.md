@@ -8,6 +8,68 @@ Android app for AirSync 2.0 built with Kotlin Jetpack Compose
 Use your built-in camera or Google lense or anything that can scan a QR code. I twill prompt you to open the app. Once authorized, The last device will be saved on the mobile for now for easier re-connection.
 
 
+## ADB setup
+
+### 📡 Step-by-Step Instructions
+
+1. **Enable Developer Options on your Android**
+
+    - Open `Settings` → `About phone`
+    - Tap **Build number** 7 times until you see _“You are now a developer!”_
+
+2. **Enable Wireless Debugging**
+
+    - Go to `Settings` → `System` → `Developer options`
+    - Scroll down and **enable** `Wireless debugging`
+
+3. **Pair your device with your Mac**
+
+    - Tap on `Wireless debugging`
+    - Tap `Pair device with pairing code`
+    - Note down the **IP address and port**, and the **6-digit pairing code**
+
+    **Example:**
+    ```
+    IP:Port → 192.168.1.35:37099  
+    Pairing Code → 123456
+    ```
+
+4. **On your Mac, open Terminal**
+
+    Run the pairing command using the IP and port:
+
+    ```bash
+    adb pair 192.168.1.35:37099
+    ```
+
+    When prompted, enter the 6-digit pairing code:
+
+    ```text
+    Enter pairing code: 123456
+    ```
+
+    You should see:
+
+    ```text
+    Successfully paired to 192.168.1.35:37099 [guid=...]
+    ```
+
+5. **Finalize and connect**
+
+    - Close the pairing dialog on Android
+    - You'll return to the `Wireless debugging` screen
+    - Use the **IP:port shown there** (usually `:5555`) in the **AirSync Mac app**
+    - Enter it, then start ADB connection
+
+✅ It should now connect successfully!
+
+You can expand the console in the Mac app for more information. Once connected, the **Mirror** button will appear automatically.
+
+---
+
+🎉 **Done!** You’re now connected over Wi-Fi.
+
+
 Definitely need someone to help with documentation ;)
 
 
