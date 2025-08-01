@@ -125,7 +125,8 @@ object SyncManager {
                 val deviceName = dataStoreManager.getDeviceName().first()
                 val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
                 val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port)
+                val adbPort = dataStoreManager.getAdbPort().first()
+                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, adbPort)
 
                 if (WebSocketUtil.sendMessage(deviceInfoJson)) {
                     Log.d(TAG, "✅ Device info sent")

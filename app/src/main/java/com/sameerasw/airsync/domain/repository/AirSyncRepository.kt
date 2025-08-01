@@ -14,6 +14,9 @@ interface AirSyncRepository {
     suspend fun saveDeviceName(deviceName: String)
     fun getDeviceName(): Flow<String>
 
+    suspend fun saveAdbPort(adbPort: String)
+    fun getAdbPort(): Flow<String>
+
     suspend fun setFirstRun(isFirstRun: Boolean)
     fun getFirstRun(): Flow<Boolean>
 

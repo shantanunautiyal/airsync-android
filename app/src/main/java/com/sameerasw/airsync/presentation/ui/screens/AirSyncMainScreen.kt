@@ -238,7 +238,19 @@ fun AirSyncMainScreen(
             DeviceInfoCard(
                 deviceName = uiState.deviceNameInput,
                 localIp = deviceInfo.localIp,
-                onDeviceNameChange = { viewModel.updateDeviceName(it) }
+                adbPort = uiState.adbPortInput,
+                onDeviceNameChange = { viewModel.updateDeviceName(it) },
+                onAdbPortChange = { viewModel.updateAdbPort(it) },
+                onSetAdbPort = {
+                    // Send device info with updated ADB port
+                    val message = JsonUtil.createDeviceInfoJson(
+                        deviceInfo.name,
+                        deviceInfo.localIp,
+                        uiState.port.toIntOrNull() ?: 6996,
+                        uiState.adbPortInput
+                    )
+                    sendMessage(message)
+                }
             )
 
             // Developer Mode Card - Contains test functions
@@ -250,7 +262,8 @@ fun AirSyncMainScreen(
                     val message = JsonUtil.createDeviceInfoJson(
                         deviceInfo.name,
                         deviceInfo.localIp,
-                        uiState.port.toIntOrNull() ?: 6996
+                        uiState.port.toIntOrNull() ?: 6996,
+                        deviceInfo.adbPort
                     )
                     sendMessage(message)
                 },
