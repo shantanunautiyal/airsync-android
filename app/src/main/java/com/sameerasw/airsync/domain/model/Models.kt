@@ -6,7 +6,6 @@ data class UiState(
     val ipAddress: String = "",
     val port: String = "",
     val deviceNameInput: String = "",
-    val adbPortInput: String = "",
     val isLoading: Boolean = false,
     val response: String = "",
     val isDialogVisible: Boolean = false,
@@ -23,8 +22,7 @@ data class UiState(
 
 data class DeviceInfo(
     val name: String = "",
-    val localIp: String = "",
-    val adbPort: String = ""
+    val localIp: String = ""
 )
 
 data class ConnectedDevice(

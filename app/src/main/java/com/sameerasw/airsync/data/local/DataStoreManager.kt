@@ -20,7 +20,6 @@ class DataStoreManager(private val context: Context) {
         private val IP_ADDRESS = stringPreferencesKey("ip_address")
         private val PORT = stringPreferencesKey("port")
         private val DEVICE_NAME = stringPreferencesKey("device_name")
-        private val ADB_PORT = stringPreferencesKey("adb_port")
         private val FIRST_RUN = booleanPreferencesKey("first_run")
         private val PERMISSIONS_CHECKED = booleanPreferencesKey("permissions_checked")
         private val LAST_CONNECTED_PC_NAME = stringPreferencesKey("last_connected_pc_name")
@@ -67,18 +66,6 @@ class DataStoreManager(private val context: Context) {
     fun getDeviceName(): Flow<String> {
         return context.dataStore.data.map { preferences ->
             preferences[DEVICE_NAME] ?: ""
-        }
-    }
-
-    suspend fun saveAdbPort(adbPort: String) {
-        context.dataStore.edit { preferences ->
-            preferences[ADB_PORT] = adbPort
-        }
-    }
-
-    fun getAdbPort(): Flow<String> {
-        return context.dataStore.data.map { preferences ->
-            preferences[ADB_PORT] ?: "5555"
         }
     }
 

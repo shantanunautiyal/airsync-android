@@ -68,7 +68,6 @@ class AirSyncViewModel(
             val savedIp = initialIp ?: repository.getIpAddress().first()
             val savedPort = initialPort ?: repository.getPort().first()
             val savedDeviceName = repository.getDeviceName().first()
-            val savedAdbPort = repository.getAdbPort().first()
             val lastConnected = repository.getLastConnectedDevice().first()
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
             val isDeveloperMode = repository.getDeveloperMode().first()
@@ -83,7 +82,7 @@ class AirSyncViewModel(
 
             val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
 
-            _deviceInfo.value = DeviceInfo(name = deviceName, localIp = localIp, adbPort = savedAdbPort)
+            _deviceInfo.value = DeviceInfo(name = deviceName, localIp = localIp)
 
             // Check permissions
             val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
@@ -96,7 +95,6 @@ class AirSyncViewModel(
                 ipAddress = savedIp,
                 port = savedPort,
                 deviceNameInput = deviceName,
-                adbPortInput = savedAdbPort,
                 // Only show dialog if not already connected and showConnectionDialog is true
                 isDialogVisible = showConnectionDialog && !currentlyConnected,
                 missingPermissions = missingPermissions,
@@ -142,14 +140,6 @@ class AirSyncViewModel(
         _deviceInfo.value = _deviceInfo.value.copy(name = name)
         viewModelScope.launch {
             repository.saveDeviceName(name)
-        }
-    }
-
-    fun updateAdbPort(adbPort: String) {
-        _uiState.value = _uiState.value.copy(adbPortInput = adbPort)
-        _deviceInfo.value = _deviceInfo.value.copy(adbPort = adbPort)
-        viewModelScope.launch {
-            repository.saveAdbPort(adbPort)
         }
     }
 

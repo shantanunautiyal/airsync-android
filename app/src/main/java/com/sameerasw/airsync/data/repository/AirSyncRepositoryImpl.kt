@@ -34,14 +34,6 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getDeviceName()
     }
 
-    override suspend fun saveAdbPort(adbPort: String) {
-        dataStoreManager.saveAdbPort(adbPort)
-    }
-
-    override fun getAdbPort(): Flow<String> {
-        return dataStoreManager.getAdbPort()
-    }
-
     override suspend fun setFirstRun(isFirstRun: Boolean) {
         dataStoreManager.setFirstRun(isFirstRun)
     }

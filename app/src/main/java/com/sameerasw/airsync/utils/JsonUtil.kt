@@ -13,8 +13,8 @@ object JsonUtil {
     /**
      * Creates a single-line JSON string for device info
      */
-    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int, adbPort: String): String {
-        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port,"adbPort":"$adbPort"}}"""
+    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int): String {
+        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port}}"""
     }
 
     /**
