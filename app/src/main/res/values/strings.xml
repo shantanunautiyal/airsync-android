@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AirSync Beta</string>
+    <string name="qs_tile_label">AirSync</string>
 </resources>
