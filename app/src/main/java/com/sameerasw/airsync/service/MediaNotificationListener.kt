@@ -319,6 +319,7 @@ class MediaNotificationListener : NotificationListenerService() {
             val ipAddress = dataStoreManager.getIpAddress().first()
             val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
 
+            // Check if user manually disconnected and prevent auto-reconnection
             val userManuallyDisconnected = dataStoreManager.getUserManuallyDisconnected().first()
             if (userManuallyDisconnected && !WebSocketUtil.isConnected()) {
                 Log.d(TAG, "User manually disconnected, skipping notification sync and auto-reconnection")
@@ -346,42 +347,10 @@ class MediaNotificationListener : NotificationListenerService() {
                 )
             )
 
-            Log.d(TAG, "Sending notification to $ipAddress:$port via WebSocket - $notificationJson")
+            Log.d(TAG, "Preparing to send notification: $notificationJson")
 
-            // Check if WebSocket is connected, if not establish connection
-            if (!WebSocketUtil.isConnected()) {
-                WebSocketUtil.connect(
-                    context = this@MediaNotificationListener,
-                    ipAddress = ipAddress,
-                    port = port,
-                    onConnectionStatus = { connected ->
-                        if (connected) {
-                            // Send the notification after connection is established
-                            val success = WebSocketUtil.sendMessage(notificationJson)
-                            if (success) {
-                                Log.d(TAG, "Notification sent successfully via WebSocket")
-                                serviceScope.launch {
-                                    updatePersistentNotification(isConnected = true)
-                                }
-                            } else {
-                                Log.e(TAG, "Failed to send notification via WebSocket")
-                                serviceScope.launch {
-                                    updatePersistentNotification(isConnected = false)
-                                }
-                            }
-                        } else {
-                            Log.e(TAG, "Failed to connect to WebSocket server")
-                            serviceScope.launch {
-                                updatePersistentNotification(isConnected = false)
-                            }
-                        }
-                    },
-                    onMessage = { response ->
-                        Log.d(TAG, "Received response for notification: $response")
-                    }
-                )
-            } else {
-                // Already connected, just send the notification
+            if (WebSocketUtil.isConnected()) {
+                Log.d(TAG, "Sending notification to $ipAddress:$port via existing WebSocket connection")
                 val success = WebSocketUtil.sendMessage(notificationJson)
                 if (success) {
                     Log.d(TAG, "Notification sent successfully via existing WebSocket connection")
@@ -390,6 +359,9 @@ class MediaNotificationListener : NotificationListenerService() {
                     Log.e(TAG, "Failed to send notification via WebSocket")
                     updatePersistentNotification(isConnected = false)
                 }
+            } else {
+                Log.d(TAG, "WebSocket not connected, skipping notification sync")
+                updatePersistentNotification(isConnected = false)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in sendNotificationToDesktop: ${e.message}")
