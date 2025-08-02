@@ -12,8 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.ui.components.*
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
@@ -151,10 +153,8 @@ fun AirSyncMainScreen(
         }
     }
 
-    // Cleanup WebSocket only when the entire app is being destroyed, not on navigation
     DisposableEffect(Unit) {
         onDispose {
-            // Only stop clipboard sync on dispose, keep WebSocket connection alive for navigation
             ClipboardSyncManager.stopSync(context)
         }
     }
@@ -173,10 +173,22 @@ fun AirSyncMainScreen(
             ) {
                 Text("AirSync", style = MaterialTheme.typography.headlineMedium)
                 Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = {
+                        val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/issues/new"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_feedback_24),
+                        contentDescription = "Feedback"
+                    )
+                }
                 IconButton(onClick = { showAboutDialog = true }) {
                     Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "About"
+                        painter = painterResource(id = R.drawable.outline_info_24),
+                        contentDescription = "Feedback"
                     )
                 }
             }
@@ -273,16 +285,7 @@ fun AirSyncMainScreen(
                 uiState = uiState
             )
 
-            OutlinedButton(
-                onClick = {
-                    val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/issues/new"
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
-                    context.startActivity(intent)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Provide feedback")
-            }
+
 
             // Manual Icon Sync Button
             Button(
