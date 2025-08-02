@@ -123,15 +123,20 @@ object SyncManager {
 
                 // 1. Send device info
                 delay(500) // Small delay to ensure connection is stable
-                val deviceName = dataStoreManager.getDeviceName().first()
+                val savedDeviceName = dataStoreManager.getDeviceName().first()
+                val deviceName = savedDeviceName.ifEmpty {
+                    val autoName = DeviceInfoUtil.getDeviceName(context)
+                    dataStoreManager.saveDeviceName(autoName)
+                    autoName
+                }
                 val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
                 val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
                 val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port)
 
                 if (WebSocketUtil.sendMessage(deviceInfoJson)) {
-                    Log.d(TAG, "✅ Device info sent")
+                    Log.d(TAG, "Device info sent")
                 } else {
-                    Log.e(TAG, "❌ Failed to send device info")
+                    Log.e(TAG, "Failed to send device info")
                 }
 
                 delay(250)
@@ -139,12 +144,12 @@ object SyncManager {
                 // 2. Send device status
                 val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
                 if (WebSocketUtil.sendMessage(statusJson)) {
-                    Log.d(TAG, "✅ Device status sent")
+                    Log.d(TAG, "Device status sent")
                     // Update our cached values
                     lastAudioInfo = DeviceInfoUtil.getAudioInfo(context)
                     lastBatteryInfo = DeviceInfoUtil.getBatteryInfo(context)
                 } else {
-                    Log.e(TAG, "❌ Failed to send device status")
+                    Log.e(TAG, "Failed to send device status")
                 }
 
                 delay(250)
@@ -262,9 +267,9 @@ object SyncManager {
             )
 
             if (WebSocketUtil.sendMessage(sampleNotificationJson)) {
-                Log.d(TAG, "✅ Sample notification sent")
+                Log.d(TAG, "Sample notification sent")
             } else {
-                Log.e(TAG, "❌ Failed to send sample notification")
+                Log.e(TAG, "Failed to send sample notification")
             }
 
             // Note: Android doesn't provide access to existing notifications

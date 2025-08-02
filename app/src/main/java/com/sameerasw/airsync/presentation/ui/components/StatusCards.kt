@@ -43,6 +43,20 @@ fun NotificationSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Notification Sync", style = MaterialTheme.typography.titleMedium)
                 }
+                if (isNotificationEnabled) {
+                    IconButton(
+                        onClick = onManageApps,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = "Manage Apps",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                }
                 Switch(
                     checked = isNotificationSyncEnabled && isNotificationEnabled,
                     onCheckedChange = { enabled ->
@@ -54,20 +68,6 @@ fun NotificationSyncCard(
                     },
                     enabled = isNotificationEnabled
                 )
-                if (isNotificationEnabled) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    IconButton(
-                        onClick = onManageApps,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Manage Apps",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                }
             }
 
             if (!isNotificationEnabled) {

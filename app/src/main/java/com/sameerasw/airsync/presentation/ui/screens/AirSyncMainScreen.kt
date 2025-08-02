@@ -261,7 +261,7 @@ fun AirSyncMainScreen(
                 isConnected = uiState.isConnected,
                 isConnecting = uiState.isConnecting,
                 onDisconnect = { disconnect() },
-                connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null,
+                connectedDevice = uiState.lastConnectedDevice,
                 lastConnected = uiState.lastConnectedDevice != null
             )
 
@@ -271,6 +271,7 @@ fun AirSyncMainScreen(
                     LastConnectedDeviceCard(
                         device = device,
                         onQuickConnect = {
+                            viewModel.updateDeviceName(device.name)
                             viewModel.updateIpAddress(device.ipAddress)
                             viewModel.updatePort(device.port)
                             connect()
