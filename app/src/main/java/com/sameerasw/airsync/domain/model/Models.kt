@@ -15,6 +15,7 @@ data class UiState(
     val lastConnectedDevice: ConnectedDevice? = null,
     val isNotificationSyncEnabled: Boolean = true,
     val isDeveloperMode: Boolean = false,
+    val isDeveloperModeVisible: Boolean = false,
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
     val isClipboardSyncEnabled: Boolean = true,

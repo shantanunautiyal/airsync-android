@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,7 +177,7 @@ fun AirSyncMainScreen(
                 IconButton(
                     onClick = {
                         val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/issues/new"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
                         context.startActivity(intent)
                     }
                 ) {
@@ -253,37 +254,39 @@ fun AirSyncMainScreen(
                 onDeviceNameChange = { viewModel.updateDeviceName(it) }
             )
 
-            // Developer Mode Card - Contains test functions
-            DeveloperModeCard(
-                isDeveloperMode = uiState.isDeveloperMode,
-                onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
-                isLoading = uiState.isLoading,
-                onSendDeviceInfo = {
-                    val message = JsonUtil.createDeviceInfoJson(
-                        deviceInfo.name,
-                        deviceInfo.localIp,
-                        uiState.port.toIntOrNull() ?: 6996
-                    )
-                    sendMessage(message)
-                },
-                onSendNotification = {
-                    val message = JsonUtil.createNotificationJson(
-                        "121212",
-                        "Test Message",
-                        "This is a simulated notification from AirSync.",
-                        "AirSync",
-                        "com.sameerasw.airsync"
-                    )
-                    sendMessage(message)
-                },
-                onSendDeviceStatus = {
-                    val message = DeviceInfoUtil.generateDeviceStatusJson(
-                        context
-                    )
-                    sendMessage(message)
-                },
-                uiState = uiState
-            )
+            // Developer Mode Card
+            if (uiState.isDeveloperModeVisible) {
+                DeveloperModeCard(
+                    isDeveloperMode = uiState.isDeveloperMode,
+                    onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
+                    isLoading = uiState.isLoading,
+                    onSendDeviceInfo = {
+                        val message = JsonUtil.createDeviceInfoJson(
+                            deviceInfo.name,
+                            deviceInfo.localIp,
+                            uiState.port.toIntOrNull() ?: 6996
+                        )
+                        sendMessage(message)
+                    },
+                    onSendNotification = {
+                        val message = JsonUtil.createNotificationJson(
+                            "121212",
+                            "Test Message",
+                            "This is a simulated notification from AirSync.",
+                            "AirSync",
+                            "com.sameerasw.airsync"
+                        )
+                        sendMessage(message)
+                    },
+                    onSendDeviceStatus = {
+                        val message = DeviceInfoUtil.generateDeviceStatusJson(
+                            context
+                        )
+                        sendMessage(message)
+                    },
+                    uiState = uiState
+                )
+            }
 
 
 
@@ -371,7 +374,8 @@ fun AirSyncMainScreen(
         // About Dialog
         if (showAboutDialog) {
             AboutDialog(
-                onDismissRequest = { showAboutDialog = false }
+                onDismissRequest = { showAboutDialog = false },
+                onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() }
             )
         }
     }

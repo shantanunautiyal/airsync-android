@@ -2,7 +2,9 @@ package com.sameerasw.airsync.presentation.ui.components
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -12,7 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,12 +26,14 @@ import com.sameerasw.airsync.R
 @Composable
 fun AboutDialog(
     onDismissRequest: () -> Unit,
+    onToggleDeveloperMode: () -> Unit = {},
     appName: String = "AirSync BETA",
     developerName: String = "Sameera Wijerathna",
     description: String = "AirSync enables seamless synchronization between your Android device and mac. Share notifications, clipboard content, and device status wirelessly over your local network.",
     githubUsername: String = "sameerasw"
 ) {
     val context = LocalContext.current
+    val hapticFeedback = LocalHapticFeedback.current
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -97,6 +104,20 @@ fun AboutDialog(
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    // Trigger haptic feedback
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                                    // Show toast
+                                    Toast.makeText(context, "Developer Mode", Toast.LENGTH_SHORT).show()
+
+                                    // Toggle developer mode visibility
+                                    onToggleDeveloperMode()
+                                }
+                            )
+                        }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))

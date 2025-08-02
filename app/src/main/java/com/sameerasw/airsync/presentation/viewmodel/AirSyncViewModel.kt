@@ -75,11 +75,11 @@ class AirSyncViewModel(
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
 
             // Get device info
-            val deviceName = if (savedDeviceName.isEmpty()) {
+            val deviceName = savedDeviceName.ifEmpty {
                 val autoName = DeviceInfoUtil.getDeviceName(context)
                 repository.saveDeviceName(autoName)
                 autoName
-            } else savedDeviceName
+            }
 
             val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
 
@@ -207,6 +207,12 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.setDeveloperMode(enabled)
         }
+    }
+
+    fun toggleDeveloperModeVisibility() {
+        _uiState.value = _uiState.value.copy(
+            isDeveloperModeVisible = !_uiState.value.isDeveloperModeVisible
+        )
     }
 
     fun setClipboardSyncEnabled(enabled: Boolean) {
