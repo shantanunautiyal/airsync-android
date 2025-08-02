@@ -284,6 +284,58 @@ fun AirSyncMainScreen(
                 Text("Provide feedback")
             }
 
+            // Manual Icon Sync Button
+            Button(
+                onClick = {
+                    viewModel.manualSyncAppIcons(context)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = uiState.isConnected && !uiState.isIconSyncLoading
+            ) {
+                if (uiState.isIconSyncLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
+            }
+
+            // Icon Sync Message Display
+            if (uiState.iconSyncMessage.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
+                            MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = uiState.iconSyncMessage,
+                            modifier = Modifier.weight(1f),
+                            color = if (uiState.iconSyncMessage.contains("Successfully"))
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        TextButton(
+                            onClick = { viewModel.clearIconSyncMessage() }
+                        ) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
+            }
+
 
             // Dialogs
             if (uiState.isDialogVisible) {

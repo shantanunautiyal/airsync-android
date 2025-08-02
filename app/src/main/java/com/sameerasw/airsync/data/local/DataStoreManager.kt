@@ -31,6 +31,8 @@ class DataStoreManager(private val context: Context) {
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         private val CLIPBOARD_SYNC_ENABLED = booleanPreferencesKey("clipboard_sync_enabled")
+        private val ICON_SYNC_COUNT = stringPreferencesKey("icon_sync_count")
+        private val LAST_ICON_SYNC_DATE = stringPreferencesKey("last_icon_sync_date")
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -124,6 +126,10 @@ class DataStoreManager(private val context: Context) {
             preferences[LAST_CONNECTED_PC_PORT] = device.port
             preferences[LAST_CONNECTED_TIMESTAMP] = device.lastConnected.toString()
             preferences[LAST_CONNECTED_PC_PLUS] = device.isPlus
+            preferences[ICON_SYNC_COUNT] = device.iconSyncCount.toString()
+            device.lastIconSyncDate?.let {
+                preferences[LAST_ICON_SYNC_DATE] = it
+            }
             device.lastSyncTime?.let {
                 preferences[LAST_SYNC_TIME] = it.toString()
             }
@@ -138,6 +144,8 @@ class DataStoreManager(private val context: Context) {
             val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
             val isPlus = preferences[LAST_CONNECTED_PC_PLUS] ?: false
             val lastSyncTime = preferences[LAST_SYNC_TIME]?.toLongOrNull()
+            val iconSyncCount = preferences[ICON_SYNC_COUNT]?.toIntOrNull() ?: 0
+            val lastIconSyncDate = preferences[LAST_ICON_SYNC_DATE]
 
             if (name != null && ip != null && port != null && timestamp != null) {
                 ConnectedDevice(
@@ -146,7 +154,9 @@ class DataStoreManager(private val context: Context) {
                     port = port,
                     lastConnected = timestamp.toLongOrNull() ?: 0L,
                     lastSyncTime = lastSyncTime,
-                    isPlus = isPlus
+                    isPlus = isPlus,
+                    iconSyncCount = iconSyncCount,
+                    lastIconSyncDate = lastIconSyncDate
                 )
             } else {
                 null

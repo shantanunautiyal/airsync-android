@@ -11,6 +11,7 @@ import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -213,5 +214,22 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.setClipboardSyncEnabled(enabled)
         }
+    }
+
+    fun manualSyncAppIcons(context: Context) {
+        _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
+
+        SyncManager.manualSyncAppIcons(context) { success, message ->
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(
+                    isIconSyncLoading = false,
+                    iconSyncMessage = message
+                )
+            }
+        }
+    }
+
+    fun clearIconSyncMessage() {
+        _uiState.value = _uiState.value.copy(iconSyncMessage = "")
     }
 }

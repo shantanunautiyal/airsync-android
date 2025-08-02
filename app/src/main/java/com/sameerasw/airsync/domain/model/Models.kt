@@ -17,7 +17,9 @@ data class UiState(
     val isDeveloperMode: Boolean = false,
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
-    val isClipboardSyncEnabled: Boolean = true
+    val isClipboardSyncEnabled: Boolean = true,
+    val isIconSyncLoading: Boolean = false,
+    val iconSyncMessage: String = ""
 )
 
 data class DeviceInfo(
@@ -31,7 +33,9 @@ data class ConnectedDevice(
     val port: String,
     val lastConnected: Long,
     val lastSyncTime: Long? = null,
-    val isPlus: Boolean = false
+    val isPlus: Boolean = false,
+    val iconSyncCount: Int = 0,
+    val lastIconSyncDate: String? = null // Format: YYYY-MM-DD
 )
 
 data class BatteryInfo(

@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object SyncManager {
     private const val TAG = "SyncManager"
     private const val BATTERY_SYNC_INTERVAL = 60_000L // 1 minute
+    private const val MAX_DAILY_ICON_SYNCS = 3
 
     private var syncJob: Job? = null
     private var lastAudioInfo: AudioInfo? = null
@@ -133,7 +134,7 @@ object SyncManager {
                     Log.e(TAG, "❌ Failed to send device info")
                 }
 
-                delay(1000)
+                delay(250)
 
                 // 2. Send device status
                 val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
@@ -146,12 +147,16 @@ object SyncManager {
                     Log.e(TAG, "❌ Failed to send device status")
                 }
 
-                delay(1000)
+                delay(250)
 
-                // 3. Send app icons
-                sendAppIcons(context)
+                // 3. Send app icons (only if under daily limit)
+                if (shouldSyncIconsAutomatically(context)) {
+                    sendAppIcons(context, isManualSync = false)
+                } else {
+                    Log.d(TAG, "Skipping automatic icon sync - daily limit reached")
+                }
 
-                delay(1000)
+                delay(250)
 
                 // 4. Send existing notifications (recent ones)
                 sendRecentNotifications()
@@ -160,6 +165,87 @@ object SyncManager {
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error in initial sync: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Check if automatic icon sync is allowed based on daily limit
+     */
+    private suspend fun shouldSyncIconsAutomatically(context: Context): Boolean {
+        try {
+            val dataStoreManager = DataStoreManager(context)
+            val lastDevice = dataStoreManager.getLastConnectedDevice().first()
+
+            if (lastDevice == null) return true // First connection always syncs
+
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(java.util.Date())
+
+            // If it's a new day, reset the counter
+            if (lastDevice.lastIconSyncDate != today) {
+                Log.d(TAG, "New day detected, resetting icon sync counter")
+                return true
+            }
+
+            // Check if under daily limit
+            val isUnderLimit = lastDevice.iconSyncCount < MAX_DAILY_ICON_SYNCS
+            Log.d(TAG, "Icon sync count for today: ${lastDevice.iconSyncCount}/$MAX_DAILY_ICON_SYNCS")
+
+            return isUnderLimit
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking icon sync limit: ${e.message}")
+            return false
+        }
+    }
+
+    /**
+     * Update icon sync counter after successful sync
+     */
+    private suspend fun updateIconSyncCounter(context: Context) {
+        try {
+            val dataStoreManager = DataStoreManager(context)
+            val lastDevice = dataStoreManager.getLastConnectedDevice().first()
+
+            if (lastDevice != null) {
+                val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                    .format(java.util.Date())
+
+                val newCount = if (lastDevice.lastIconSyncDate == today) {
+                    lastDevice.iconSyncCount + 1
+                } else {
+                    1 // New day, reset to 1
+                }
+
+                val updatedDevice = lastDevice.copy(
+                    iconSyncCount = newCount,
+                    lastIconSyncDate = today
+                )
+
+                dataStoreManager.saveLastConnectedDevice(updatedDevice)
+                Log.d(TAG, "Updated icon sync counter: $newCount/$MAX_DAILY_ICON_SYNCS for $today")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating icon sync counter: ${e.message}")
+        }
+    }
+
+    /**
+     * Manually sync app icons (ignores daily limit)
+     */
+    fun manualSyncAppIcons(context: Context, onResult: (Boolean, String) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!WebSocketUtil.isConnected()) {
+                    onResult(false, "Not connected to desktop")
+                    return@launch
+                }
+
+                Log.d(TAG, "Starting manual app icons sync")
+                sendAppIcons(context, isManualSync = true, onResult = onResult)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in manual icon sync: ${e.message}")
+                onResult(false, "Error: ${e.message}")
             }
         }
     }
@@ -189,16 +275,22 @@ object SyncManager {
         }
     }
 
-    private suspend fun sendAppIcons(context: Context) {
+    private suspend fun sendAppIcons(
+        context: Context,
+        isManualSync: Boolean = false,
+        onResult: ((Boolean, String) -> Unit)? = null
+    ) {
         try {
-            Log.d(TAG, "Starting app icons sync")
+            Log.d(TAG, "Starting app icons sync (manual: $isManualSync)")
 
             // Get enabled notification apps from DataStore
             val dataStoreManager = DataStoreManager(context)
             val notificationApps = dataStoreManager.getNotificationApps().first()
 
             if (notificationApps.isEmpty()) {
-                Log.d(TAG, "No notification apps found, skipping app icons sync")
+                val message = "No notification apps found, skipping app icons sync"
+                Log.d(TAG, message)
+                onResult?.invoke(false, message)
                 return
             }
 
@@ -206,7 +298,9 @@ object SyncManager {
             val enabledPackages = notificationApps.filter { it.isEnabled }.map { it.packageName }
 
             if (enabledPackages.isEmpty()) {
-                Log.d(TAG, "No enabled notification apps found, skipping app icons sync")
+                val message = "No enabled notification apps found, skipping app icons sync"
+                Log.d(TAG, message)
+                onResult?.invoke(false, message)
                 return
             }
 
@@ -221,15 +315,27 @@ object SyncManager {
 
                 if (WebSocketUtil.sendMessage(appIconsJson)) {
                     Log.d(TAG, "✅ App icons sent successfully (${iconMap.size} icons)")
+
+                    // Update counter only for automatic syncs
+                    if (!isManualSync) {
+                        updateIconSyncCounter(context)
+                    }
+
+                    val message = "Successfully synced ${iconMap.size} app icons"
+                    onResult?.invoke(true, message)
                 } else {
                     Log.e(TAG, "❌ Failed to send app icons")
+                    onResult?.invoke(false, "Failed to send app icons")
                 }
             } else {
-                Log.w(TAG, "No app icons could be collected")
+                val message = "No app icons could be collected"
+                Log.w(TAG, message)
+                onResult?.invoke(false, message)
             }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error sending app icons: ${e.message}")
+            onResult?.invoke(false, "Error: ${e.message}")
         }
     }
 
