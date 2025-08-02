@@ -184,7 +184,7 @@ class AirSyncViewModel(
     fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false) {
         viewModelScope.launch {
             val connectedDevice = ConnectedDevice(
-                name = pcName ?: "Desktop PC",
+                name = pcName ?: "My Mac",
                 ipAddress = _uiState.value.ipAddress,
                 port = _uiState.value.port,
                 lastConnected = System.currentTimeMillis(),
