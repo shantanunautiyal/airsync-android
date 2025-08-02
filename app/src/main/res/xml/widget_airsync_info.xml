@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialKeyguardLayout="@layout/widget_airsync"
+    android:initialLayout="@layout/widget_airsync"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:maxResizeWidth="320dp"
+    android:maxResizeHeight="200dp"
+    android:previewImage="@drawable/widget_preview"
+    android:previewLayout="@layout/widget_airsync"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />
+

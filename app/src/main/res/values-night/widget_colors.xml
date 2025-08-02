@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget background colors (dark theme) -->
+    <color name="widget_background">#1C1B1F</color>
+    <color name="widget_border">#49454F</color>
+
+    <!-- Widget text colors (dark theme) -->
+    <color name="widget_primary_text">#E6E1E5</color>
+    <color name="widget_secondary_text">#CAC4D0</color>
+    <color name="widget_on_primary">#FFFFFF</color>
+
+    <!-- Status colors (same for dark theme) -->
+    <color name="connected_green">#4CAF50</color>
+    <color name="disconnected_red">#F44336</color>
+    <color name="not_configured_gray">#9E9E9E</color>
+    <color name="error_red">#EF5350</color>
+
+    <!-- Button colors (dark theme) -->
+    <color name="widget_primary_button">#D0BCFF</color>
+    <color name="widget_secondary_button">#49454F</color>
+    <color name="widget_button_border">#938F99</color>
+
+    <!-- Plus badge (dark theme) -->
+    <color name="widget_plus_badge_bg">#D0BCFF</color>
+    <color name="plus_badge_bg">#D0BCFF</color>
+</resources>
+

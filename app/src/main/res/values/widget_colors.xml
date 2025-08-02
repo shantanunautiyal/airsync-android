@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget background colors -->
+    <color name="widget_background">#F5F5F5</color>
+    <color name="widget_border">#E0E0E0</color>
+
+    <!-- Widget text colors -->
+    <color name="widget_primary_text">#1C1B1F</color>
+    <color name="widget_secondary_text">#49454F</color>
+    <color name="widget_on_primary">#FFFFFF</color>
+
+    <!-- Status colors -->
+    <color name="connected_green">#2E7D32</color>
+    <color name="disconnected_red">#D32F2F</color>
+    <color name="not_configured_gray">#757575</color>
+    <color name="error_red">#C62828</color>
+
+    <!-- Button colors -->
+    <color name="widget_primary_button">#6750A4</color>
+    <color name="widget_secondary_button">#FFFFFF</color>
+    <color name="widget_button_border">#79747E</color>
+
+    <!-- Plus badge -->
+    <color name="widget_plus_badge_bg">#6750A4</color>
+    <color name="plus_badge_bg">#6750A4</color>
+</resources>
+

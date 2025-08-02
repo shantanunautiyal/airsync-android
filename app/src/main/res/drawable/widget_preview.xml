@@ -1,0 +1,51 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="180dp"
+    android:height="110dp"
+    android:viewportWidth="180"
+    android:viewportHeight="110">
+
+    <!-- Widget background -->
+    <path
+        android:fillColor="#F5F5F5"
+        android:pathData="M8,0L172,0A8,8 0 0,1 180,8L180,102A8,8 0 0,1 172,110L8,110A8,8 0 0,1 0,102L0,8A8,8 0 0,1 8,0z" />
+
+    <!-- Border -->
+    <path
+        android:strokeColor="#E0E0E0"
+        android:strokeWidth="1"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M8,0L172,0A8,8 0 0,1 180,8L180,102A8,8 0 0,1 172,110L8,110A8,8 0 0,1 0,102L0,8A8,8 0 0,1 8,0z" />
+
+    <!-- Status indicator (green circle) -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M22,18A4,4 0 0,1 18,22A4,4 0 0,1 14,18A4,4 0 0,1 18,14A4,4 0 0,1 22,18z" />
+
+    <!-- Title text mockup -->
+    <path
+        android:fillColor="#1C1B1F"
+        android:pathData="M30,18L120,18L120,26L30,26z" />
+
+    <!-- Device name mockup -->
+    <path
+        android:fillColor="#1C1B1F"
+        android:pathData="M12,35L140,35L140,45L12,45z" />
+
+    <!-- Connection info mockup -->
+    <path
+        android:fillColor="#49454F"
+        android:pathData="M12,50L100,50L100,58L12,58z" />
+
+    <!-- Primary button mockup -->
+    <path
+        android:fillColor="#6750A4"
+        android:pathData="M12,75L85,75A4,4 0 0,1 89,79L89,95A4,4 0 0,1 85,99L12,99A4,4 0 0,1 8,95L8,79A4,4 0 0,1 12,75z" />
+
+    <!-- Secondary button mockup -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#79747E"
+        android:strokeWidth="1"
+        android:pathData="M95,75L168,75A4,4 0 0,1 172,79L172,95A4,4 0 0,1 168,99L95,99A4,4 0 0,1 91,95L91,79A4,4 0 0,1 95,75z" />
+
+</vector>

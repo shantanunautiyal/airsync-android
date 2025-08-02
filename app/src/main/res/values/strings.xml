@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">AirSync Beta</string>
     <string name="qs_tile_label">AirSync</string>
+    <string name="widget_description">Shows AirSync connection status and provides quick actions</string>
 </resources>

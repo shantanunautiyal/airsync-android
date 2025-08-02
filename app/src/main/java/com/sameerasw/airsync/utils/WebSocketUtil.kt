@@ -92,6 +92,9 @@ object WebSocketUtil {
 
                     // Notify all registered listeners about the connection status
                     notifyConnectionStatusListeners(true)
+
+                    // Update widgets
+                    updateWidgets(context)
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -115,6 +118,9 @@ object WebSocketUtil {
 
                     // Notify all registered listeners about the connection status
                     notifyConnectionStatusListeners(false)
+
+                    // Update widgets
+                    updateWidgets(context)
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -128,6 +134,9 @@ object WebSocketUtil {
 
                     // Notify all registered listeners about the connection status
                     notifyConnectionStatusListeners(false)
+
+                    // Update widgets
+                    updateWidgets(context)
                 }
             }
 
@@ -248,6 +257,15 @@ object WebSocketUtil {
     private fun notifyConnectionStatusListeners(isConnected: Boolean) {
         connectionStatusListeners.forEach { listener ->
             listener(isConnected)
+        }
+    }
+
+    // Update widgets when connection status changes
+    fun updateWidgets(context: Context) {
+        try {
+            com.sameerasw.airsync.widget.AirSyncWidgetProvider.updateAllWidgets(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating widget: ${e.message}")
         }
     }
 }
