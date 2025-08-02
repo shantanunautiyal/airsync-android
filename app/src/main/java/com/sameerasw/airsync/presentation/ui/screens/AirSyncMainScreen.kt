@@ -203,6 +203,28 @@ fun AirSyncMainScreen(
                 onRequestNotificationPermission = onRequestNotificationPermission
             )
 
+            // Connection Status Card - New main connection interface
+            ConnectionStatusCard(
+                isConnected = uiState.isConnected,
+                isConnecting = uiState.isConnecting,
+                onDisconnect = { disconnect() },
+                connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
+            )
+
+            // Last Connected Device Section - only show when not currently connected
+            if (!uiState.isConnected) {
+                uiState.lastConnectedDevice?.let { device ->
+                    LastConnectedDeviceCard(
+                        device = device,
+                        onQuickConnect = {
+                            viewModel.updateIpAddress(device.ipAddress)
+                            viewModel.updatePort(device.port)
+                            connect()
+                        }
+                    )
+                }
+            }
+
             // Notification Sync Settings Card
             NotificationSyncCard(
                 isNotificationEnabled = uiState.isNotificationEnabled,
@@ -221,32 +243,6 @@ fun AirSyncMainScreen(
                 isConnected = uiState.isConnected
             )
 
-            // Last Connected Device Section - only show when not currently connected
-            if (!uiState.isConnected) {
-                uiState.lastConnectedDevice?.let { device ->
-                    LastConnectedDeviceCard(
-                        device = device,
-                        onQuickConnect = {
-                            viewModel.updateIpAddress(device.ipAddress)
-                            viewModel.updatePort(device.port)
-                            connect()
-                        }
-                    )
-                }
-            }
-
-            // Connection Status Card - New main connection interface
-            ConnectionStatusCard(
-                ipAddress = uiState.ipAddress,
-                port = uiState.port,
-                isConnected = uiState.isConnected,
-                isConnecting = uiState.isConnecting,
-                onConnect = { connect() },
-                onDisconnect = { disconnect() },
-                onIpAddressChange = { viewModel.updateIpAddress(it) },
-                onPortChange = { viewModel.updatePort(it) },
-                connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
-            )
 
             DeviceInfoCard(
                 deviceName = uiState.deviceNameInput,

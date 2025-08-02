@@ -76,20 +76,13 @@ fun LastConnectedDeviceCard(
 
 @Composable
 fun ConnectionStatusCard(
-    ipAddress: String,
-    port: String,
     isConnected: Boolean,
     isConnecting: Boolean,
-    onConnect: () -> Unit,
     onDisconnect: () -> Unit,
-    onIpAddressChange: (String) -> Unit,
-    onPortChange: (String) -> Unit,
     connectedDevice: ConnectedDevice? = null
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Connection", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Connection status
             Row(
@@ -98,7 +91,7 @@ fun ConnectionStatusCard(
             ) {
                 val statusText = when {
                     isConnecting -> "🟡 Connecting..."
-                    isConnected -> "🟢 Connected"
+                    isConnected -> "🟢 Syncing"
                     else -> "🔴 Disconnected"
                 }
 
@@ -112,13 +105,6 @@ fun ConnectionStatusCard(
                     OutlinedButton(onClick = onDisconnect) {
                         Text("Disconnect")
                     }
-                } else {
-                    Button(
-                        onClick = onConnect,
-                        enabled = !isConnecting && ipAddress.isNotBlank() && port.isNotBlank()
-                    ) {
-                        Text("Connect")
-                    }
                 }
             }
 
@@ -126,11 +112,10 @@ fun ConnectionStatusCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "📡 Connected to ${connectedDevice.name}",
+                        "Connected to ${connectedDevice.name}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
@@ -162,29 +147,6 @@ fun ConnectionStatusCard(
                     "${connectedDevice.ipAddress}:${connectedDevice.port}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Connection settings (only show when not connected)
-            if (!isConnected) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = ipAddress,
-                    onValueChange = onIpAddressChange,
-                    label = { Text("Desktop IP Address") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isConnecting
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = port,
-                    onValueChange = onPortChange,
-                    label = { Text("Desktop Port") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isConnecting
                 )
             }
         }
