@@ -7,8 +7,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.R
 
+
 @Composable
 fun AboutDialog(
     onDismissRequest: () -> Unit,
@@ -34,6 +33,15 @@ fun AboutDialog(
 ) {
     val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
+
+    val versionName = try {
+        context.packageManager
+            .getPackageInfo(context.packageName, 0)
+            .versionName
+    } catch (e: Exception) {
+        "Unknown"
+    }
+
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -137,7 +145,7 @@ fun AboutDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    "Version 2.0.0-BETA",
+                    "Version $versionName BETA",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
