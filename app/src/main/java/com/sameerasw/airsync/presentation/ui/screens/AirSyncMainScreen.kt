@@ -170,7 +170,7 @@ fun AirSyncMainScreen(
             modifier = modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -178,7 +178,7 @@ fun AirSyncMainScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("AirSync", style = MaterialTheme.typography.headlineMedium)
+                Text("AirSync", style = MaterialTheme.typography.headlineLarge)
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(
                     onClick = {
@@ -293,7 +293,7 @@ fun AirSyncMainScreen(
 
 
             // Manual Icon Sync Button
-            Button(
+            OutlinedButton(
                 onClick = {
                     viewModel.manualSyncAppIcons(context)
                 },

@@ -371,27 +371,6 @@ fun PermissionStatusCard(
                 }
             }
         }
-    } else {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "✅ All Permissions Granted",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.weight(1f)
-                )
-
-                TextButton(onClick = onRefreshPermissions) {
-                    Text("Refresh")
-                }
-            }
-        }
     }
 }
 
