@@ -271,7 +271,6 @@ fun AirSyncMainScreen(
                     LastConnectedDeviceCard(
                         device = device,
                         onQuickConnect = {
-                            viewModel.updateDeviceName(device.name)
                             viewModel.updateIpAddress(device.ipAddress)
                             viewModel.updatePort(device.port)
                             connect()

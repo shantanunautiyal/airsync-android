@@ -126,6 +126,7 @@ object SyncManager {
                 val savedDeviceName = dataStoreManager.getDeviceName().first()
                 val deviceName = savedDeviceName.ifEmpty {
                     val autoName = DeviceInfoUtil.getDeviceName(context)
+                    // Save the auto-generated name for future use
                     dataStoreManager.saveDeviceName(autoName)
                     autoName
                 }
