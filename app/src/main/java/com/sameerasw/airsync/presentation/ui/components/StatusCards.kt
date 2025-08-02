@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,14 +58,15 @@ fun NotificationSyncCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     IconButton(
                         onClick = onManageApps,
-                        modifier = Modifier
-                            .size(48.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Manage Apps"
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = "Manage Apps",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
+
                 }
             }
 

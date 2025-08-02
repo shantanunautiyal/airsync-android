@@ -209,7 +209,15 @@ fun AirSyncMainScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(all = 0.dp)
             ) {
-                Text("AirSync", style = MaterialTheme.typography.headlineLarge)
+                Image(
+                    painter = painterResource(id = R.drawable.ic_laptop_24),
+                    contentDescription = "AirSync Logo",
+                    modifier = Modifier.size(32.dp),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                )
+
+                Text("AirSync", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(start = 10.dp), color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(
                     onClick = {
