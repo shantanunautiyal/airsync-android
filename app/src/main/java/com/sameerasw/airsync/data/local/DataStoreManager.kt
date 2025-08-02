@@ -33,6 +33,7 @@ class DataStoreManager(private val context: Context) {
         private val CLIPBOARD_SYNC_ENABLED = booleanPreferencesKey("clipboard_sync_enabled")
         private val ICON_SYNC_COUNT = stringPreferencesKey("icon_sync_count")
         private val LAST_ICON_SYNC_DATE = stringPreferencesKey("last_icon_sync_date")
+        private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -246,6 +247,18 @@ class DataStoreManager(private val context: Context) {
     fun getDeveloperMode(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[DEVELOPER_MODE] == true // Default to disabled
+        }
+    }
+
+    suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_MANUALLY_DISCONNECTED] = disconnected
+        }
+    }
+
+    fun getUserManuallyDisconnected(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[USER_MANUALLY_DISCONNECTED] == true // Default to false
         }
     }
 }

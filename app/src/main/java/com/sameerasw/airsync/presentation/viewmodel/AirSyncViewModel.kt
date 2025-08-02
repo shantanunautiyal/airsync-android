@@ -238,4 +238,10 @@ class AirSyncViewModel(
     fun clearIconSyncMessage() {
         _uiState.value = _uiState.value.copy(iconSyncMessage = "")
     }
+
+    fun setUserManuallyDisconnected(disconnected: Boolean) {
+        viewModelScope.launch {
+            repository.setUserManuallyDisconnected(disconnected)
+        }
+    }
 }

@@ -319,6 +319,12 @@ class MediaNotificationListener : NotificationListenerService() {
             val ipAddress = dataStoreManager.getIpAddress().first()
             val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
 
+            val userManuallyDisconnected = dataStoreManager.getUserManuallyDisconnected().first()
+            if (userManuallyDisconnected && !WebSocketUtil.isConnected()) {
+                Log.d(TAG, "User manually disconnected, skipping notification sync and auto-reconnection")
+                return
+            }
+
             // Generate unique notification ID
             val notificationId = NotificationDismissalUtil.generateNotificationId(
                 sbn.packageName,

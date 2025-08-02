@@ -129,6 +129,12 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
 
     private fun handleDisconnectAction(context: Context) {
         WebSocketUtil.disconnect()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val dataStoreManager = DataStoreManager(context)
+            dataStoreManager.setUserManuallyDisconnected(true)
+        }
+
         updateAllWidgets(context)
     }
 

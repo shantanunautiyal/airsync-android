@@ -97,4 +97,12 @@ class AirSyncRepositoryImpl(
     override fun getClipboardSyncEnabled(): Flow<Boolean> {
         return dataStoreManager.getClipboardSyncEnabled()
     }
+
+    override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
+        dataStoreManager.setUserManuallyDisconnected(disconnected)
+    }
+
+    override fun getUserManuallyDisconnected(): Flow<Boolean> {
+        return dataStoreManager.getUserManuallyDisconnected()
+    }
 }

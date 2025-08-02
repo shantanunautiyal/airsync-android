@@ -89,6 +89,9 @@ fun AirSyncMainScreen(
     // Connection management functions
     fun connect() {
         viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
+
+        viewModel.setUserManuallyDisconnected(false)
+
         WebSocketUtil.connect(
             context = context,
             ipAddress = uiState.ipAddress,
@@ -131,6 +134,9 @@ fun AirSyncMainScreen(
         WebSocketUtil.disconnect()
         viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
         viewModel.setResponse("Disconnected")
+
+        // Set manual disconnect flag to prevent auto-reconnection
+        viewModel.setUserManuallyDisconnected(true)
     }
 
     fun sendMessage(message: String) {

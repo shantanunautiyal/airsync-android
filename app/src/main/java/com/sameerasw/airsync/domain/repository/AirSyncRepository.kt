@@ -40,4 +40,8 @@ interface AirSyncRepository {
     // Clipboard sync settings
     suspend fun setClipboardSyncEnabled(enabled: Boolean)
     fun getClipboardSyncEnabled(): Flow<Boolean>
+
+    // User manual disconnect tracking
+    suspend fun setUserManuallyDisconnected(disconnected: Boolean)
+    fun getUserManuallyDisconnected(): Flow<Boolean>
 }

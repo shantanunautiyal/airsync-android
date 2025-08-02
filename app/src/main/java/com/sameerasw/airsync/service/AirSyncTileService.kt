@@ -56,11 +56,11 @@ class AirSyncTileService : TileService() {
             val isConnected = WebSocketUtil.isConnected()
 
             if (isConnected) {
-                // If connected, disconnect
                 WebSocketUtil.disconnect()
+                dataStoreManager.setUserManuallyDisconnected(true)
                 updateTileState()
             } else {
-                // If not connected, try to reconnect to last device
+                dataStoreManager.setUserManuallyDisconnected(false)
                 connectToLastDevice()
             }
         }
