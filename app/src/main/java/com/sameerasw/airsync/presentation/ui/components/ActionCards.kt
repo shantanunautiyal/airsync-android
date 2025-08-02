@@ -358,13 +358,27 @@ fun PermissionStatusCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
+
                     optionalPermissions.forEach { permission ->
-                        Text(
-                            "• $permission",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        when (permission) {
+                            "Background App Usage" -> {
+                                Text(
+                                    "• $permission - Prevents Android from killing AirSync in background",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    "• $permission",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Show Android 14+ notification permission button if applicable
                     if (PermissionUtil.isNotificationPermissionRequired() &&
@@ -373,9 +387,23 @@ fun PermissionStatusCard(
 
                         OutlinedButton(
                             onClick = onRequestNotificationPermission,
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                         ) {
                             Text("Grant Notification Permission")
+                        }
+                    }
+
+                    // Show battery optimization button if applicable
+                    if (PermissionUtil.isBatteryOptimizationPermissionRequired() &&
+                        !PermissionUtil.isBatteryOptimizationDisabled(context)) {
+
+                        OutlinedButton(
+                            onClick = {
+                                PermissionUtil.openBatteryOptimizationSettings(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Allow Background Usage")
                         }
                     }
                 }
