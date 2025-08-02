@@ -66,6 +66,7 @@ dependencies {
 
     // WebSocket support
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.ui.graphics)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

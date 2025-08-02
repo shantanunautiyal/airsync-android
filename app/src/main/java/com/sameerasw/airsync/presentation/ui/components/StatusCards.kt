@@ -1,13 +1,18 @@
 package com.sameerasw.airsync.presentation.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
+import com.sameerasw.airsync.ui.theme.minCornerRadius
 
 @Composable
 fun NotificationSyncCard(
@@ -19,7 +24,15 @@ fun NotificationSyncCard(
     onGrantPermissions: () -> Unit,
     onManageApps: () -> Unit = {}
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top=20.dp),
+        shape = RoundedCornerShape(
+            topStart = ExtraCornerRadius,
+            topEnd = ExtraCornerRadius,
+            bottomStart = minCornerRadius,
+            bottomEnd = minCornerRadius
+        ),
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -74,7 +87,15 @@ fun DeviceInfoCard(
     localIp: String,
     onDeviceNameChange: (String) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(
+            topStart = minCornerRadius,
+            topEnd = minCornerRadius,
+            bottomStart = ExtraCornerRadius,
+            bottomEnd = ExtraCornerRadius
+        ),
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("My Android", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
@@ -85,7 +106,13 @@ fun DeviceInfoCard(
                 value = deviceName,
                 onValueChange = onDeviceNameChange,
                 label = { Text("Device Name") },
-                modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(
+                    topStart = minCornerRadius,
+                    topEnd = minCornerRadius,
+                    bottomStart = ExtraCornerRadius - minCornerRadius,
+                    bottomEnd = ExtraCornerRadius - minCornerRadius
+                ),
             )
         }
     }

@@ -1,9 +1,16 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -11,9 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.ui.components.*
@@ -28,6 +39,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import androidx.core.net.toUri
+import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
+import com.sameerasw.airsync.ui.theme.minCornerRadius
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -139,6 +152,24 @@ fun AirSyncMainScreen(
         viewModel.setUserManuallyDisconnected(true)
     }
 
+    fun launchScanner(context: Context) {
+        val lensIntent = Intent("com.google.vr.apps.ornament.app.lens.LensLauncherActivity.MAIN")
+        lensIntent.setPackage("com.google.ar.lens")
+
+        try {
+            context.startActivity(lensIntent)
+        } catch (e: ActivityNotFoundException) {
+            // Fallback to default camera app
+            val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+            try {
+                context.startActivity(cameraIntent)
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(context, "No camera app found", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+
     fun sendMessage(message: String) {
         scope.launch {
             viewModel.setLoading(true)
@@ -170,13 +201,13 @@ fun AirSyncMainScreen(
             modifier = modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(all = 0.dp)
             ) {
                 Text("AirSync", style = MaterialTheme.typography.headlineLarge)
                 Spacer(modifier = Modifier.weight(1f))
@@ -200,6 +231,14 @@ fun AirSyncMainScreen(
                 }
             }
 
+            if (uiState.missingPermissions.isEmpty()) {
+                QrScannerRow(
+                    onLaunchScanner = {
+                        launchScanner(context)
+                    }
+                )
+            }
+
 
             // Permission Status Card
             PermissionStatusCard(
@@ -214,7 +253,8 @@ fun AirSyncMainScreen(
                 isConnected = uiState.isConnected,
                 isConnecting = uiState.isConnecting,
                 onDisconnect = { disconnect() },
-                connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null
+                connectedDevice = if (uiState.isConnected) uiState.lastConnectedDevice else null,
+                lastConnected = uiState.lastConnectedDevice != null
             )
 
             // Last Connected Device Section - only show when not currently connected
@@ -297,7 +337,13 @@ fun AirSyncMainScreen(
                 onClick = {
                     viewModel.manualSyncAppIcons(context)
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top=  if (uiState.isDeveloperModeVisible)0.dp else 20.dp),
+                shape = RoundedCornerShape(
+                    topStart = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
+                    topEnd = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
+                    bottomStart = ExtraCornerRadius,
+                    bottomEnd = ExtraCornerRadius
+                ),
                 enabled = uiState.isConnected && !uiState.isIconSyncLoading
             ) {
                 if (uiState.isIconSyncLoading) {
@@ -315,6 +361,7 @@ fun AirSyncMainScreen(
             if (uiState.iconSyncMessage.isNotEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(ExtraCornerRadius),
                     colors = CardDefaults.cardColors(
                         containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
                             MaterialTheme.colorScheme.primaryContainer
