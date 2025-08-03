@@ -5,6 +5,7 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.domain.model.BatteryInfo
+import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
@@ -131,10 +132,13 @@ object SyncManager {
 
                 val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
                 val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
+                val version = context.packageManager
+                    .getPackageInfo(context.packageName, 0).versionName ?: "2.0.0"
+
 
                 // Get wallpaper as base64
                 val wallpaperBase64 = WallpaperUtil.getWallpaperAsBase64(context)
-                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, wallpaperBase64)
+                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version,wallpaperBase64)
 
                 if (WebSocketUtil.sendMessage(deviceInfoJson)) {
                     Log.d(TAG, "Device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}")

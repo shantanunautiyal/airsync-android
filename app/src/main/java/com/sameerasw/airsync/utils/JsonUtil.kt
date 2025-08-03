@@ -1,6 +1,9 @@
 package com.sameerasw.airsync.utils
 
+import androidx.compose.ui.platform.LocalContext
+
 object JsonUtil {
+
     /**
      * Ensures JSON string is a single line by removing all newlines and extra whitespace
      */
@@ -13,20 +16,20 @@ object JsonUtil {
     /**
      * Creates a single-line JSON string for device info
      */
-    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int): String {
-        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port}}"""
+    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int, version: String): String {
+        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version"}}"""
     }
 
     /**
      * Creates a single-line JSON string for device info with wallpaper
      */
-    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int, wallpaperBase64: String?): String {
+    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int, version: String , wallpaperBase64: String?): String {
         val wallpaperJson = if (wallpaperBase64 != null) {
             ""","wallpaper":"$wallpaperBase64""""
         } else {
             ""
         }
-        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port$wallpaperJson}}"""
+        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version"$wallpaperJson}}"""
     }
 
     /**

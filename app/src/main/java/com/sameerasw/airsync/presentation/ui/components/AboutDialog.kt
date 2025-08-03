@@ -31,8 +31,8 @@ fun AboutDialog(
     description: String = "AirSync enables seamless synchronization between your Android device and mac. Share notifications, clipboard content, and device status wirelessly over your local network.",
     githubUsername: String = "sameerasw"
 ) {
-    val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
+    val context = LocalContext.current
 
     val versionName = try {
         context.packageManager

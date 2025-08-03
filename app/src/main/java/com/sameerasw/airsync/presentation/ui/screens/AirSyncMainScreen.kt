@@ -55,6 +55,14 @@ fun AirSyncMainScreen(
     onRequestNotificationPermission: () -> Unit = {}
 ) {
     val context = LocalContext.current
+
+    val versionName = try {
+        context.packageManager
+            .getPackageInfo(context.packageName, 0)
+            .versionName
+    } catch (e: Exception) {
+        "2.0.0"
+    }
     val viewModel: AirSyncViewModel = viewModel { AirSyncViewModel.create(context) }
     val uiState by viewModel.uiState.collectAsState()
     val deviceInfo by viewModel.deviceInfo.collectAsState()
@@ -231,6 +239,18 @@ fun AirSyncMainScreen(
                         contentDescription = "Feedback"
                     )
                 }
+                IconButton(
+                    onClick = {
+                        val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/releases/latest"
+                        val intent = Intent(Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_downloading_24),
+                        contentDescription = "Update"
+                    )
+                }
                 IconButton(onClick = { showAboutDialog = true }) {
                     Icon(
                         painter = painterResource(id = R.drawable.outline_info_24),
@@ -314,7 +334,8 @@ fun AirSyncMainScreen(
                         val message = JsonUtil.createDeviceInfoJson(
                             deviceInfo.name,
                             deviceInfo.localIp,
-                            uiState.port.toIntOrNull() ?: 6996
+                            uiState.port.toIntOrNull() ?: 6996,
+                            versionName ?: "2.0.0"
                         )
                         sendMessage(message)
                     },
