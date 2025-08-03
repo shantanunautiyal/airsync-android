@@ -18,6 +18,18 @@ object JsonUtil {
     }
 
     /**
+     * Creates a single-line JSON string for device info with wallpaper
+     */
+    fun createDeviceInfoJson(name: String, ipAddress: String, port: Int, wallpaperBase64: String?): String {
+        val wallpaperJson = if (wallpaperBase64 != null) {
+            ""","wallpaper":"$wallpaperBase64""""
+        } else {
+            ""
+        }
+        return """{"type":"device","data":{"name":"$name","ipAddress":"$ipAddress","port":$port$wallpaperJson}}"""
+    }
+
+    /**
      * Creates a single-line JSON string for notifications with unique ID
      */
     fun createNotificationJson(id: String, title: String, body: String, app: String, packageName: String): String {

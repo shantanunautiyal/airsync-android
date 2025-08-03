@@ -413,6 +413,13 @@ fun PermissionStatusCard(
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
+                            "Wallpaper Access" -> {
+                                Text(
+                                    "• $permission - Enables wallpaper sync to desktop (optional feature)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
                             else -> {
                                 Text(
                                     "• $permission",
@@ -425,7 +432,7 @@ fun PermissionStatusCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Show Android 14+ notification permission button if applicable
+                    // Show Android 14+ notification permission
                     if (PermissionUtil.isNotificationPermissionRequired() &&
                         !PermissionUtil.isPostNotificationPermissionGranted(context) &&
                         onRequestNotificationPermission != null) {
@@ -438,7 +445,7 @@ fun PermissionStatusCard(
                         }
                     }
 
-                    // Show battery optimization button if applicable
+                    // Show battery optimization
                     if (PermissionUtil.isBatteryOptimizationPermissionRequired() &&
                         !PermissionUtil.isBatteryOptimizationDisabled(context)) {
 
@@ -446,9 +453,21 @@ fun PermissionStatusCard(
                             onClick = {
                                 PermissionUtil.openBatteryOptimizationSettings(context)
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                         ) {
                             Text("Allow Background Usage")
+                        }
+                    }
+
+                    // Show wallpaper access
+                    if (!PermissionUtil.hasWallpaperAccess(context)) {
+                        OutlinedButton(
+                            onClick = {
+                                PermissionUtil.openManageExternalStorageSettings(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Enable Wallpaper Sync")
                         }
                     }
                 }

@@ -119,6 +119,53 @@ object PermissionUtil {
         context.startActivity(intent)
     }
 
+    /**
+     * Check if MANAGE_EXTERNAL_STORAGE permission is granted (Android 11+)
+     */
+    fun hasManageExternalStoragePermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                android.os.Environment.isExternalStorageManager()
+            } catch (e: Exception) {
+                false
+            }
+        } else {
+            // For older versions, check external storage permission
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    /**
+     * Open MANAGE_EXTERNAL_STORAGE permission settings
+     */
+    fun openManageExternalStorageSettings(context: Context) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } else {
+                // Fallback for older versions
+                openAppSpecificBatterySettings(context)
+            }
+        } catch (e: Exception) {
+            // Fallback to app settings
+            openAppSpecificBatterySettings(context)
+        }
+    }
+
+    /**
+     * Check if wallpaper access is available
+     */
+    fun hasWallpaperAccess(context: Context): Boolean {
+        return hasManageExternalStoragePermission(context)
+    }
+
     fun getAllMissingPermissions(context: Context): List<String> {
         val missing = mutableListOf<String>()
 
@@ -135,6 +182,11 @@ object PermissionUtil {
         // Check battery optimization permission
         if (isBatteryOptimizationPermissionRequired() && !isBatteryOptimizationDisabled(context)) {
             missing.add("Background App Usage")
+        }
+
+        // Check wallpaper access permission (optional)
+        if (!hasWallpaperAccess(context)) {
+            missing.add("Wallpaper Access")
         }
 
         return missing
@@ -168,6 +220,11 @@ object PermissionUtil {
         // Battery optimization is recommended for better reliability
         if (isBatteryOptimizationPermissionRequired() && !isBatteryOptimizationDisabled(context)) {
             optional.add("Background App Usage")
+        }
+
+        // Wallpaper access is optional for wallpaper sync feature
+        if (!hasWallpaperAccess(context)) {
+            optional.add("Wallpaper Access")
         }
 
         return optional

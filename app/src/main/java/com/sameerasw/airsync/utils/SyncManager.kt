@@ -121,21 +121,23 @@ object SyncManager {
             try {
                 val dataStoreManager = DataStoreManager(context)
 
-                // 1. Send device info
+                // 1. Send device info with wallpaper
                 delay(500) // Small delay to ensure connection is stable
-                val savedDeviceName = dataStoreManager.getDeviceName().first()
-                val deviceName = savedDeviceName.ifEmpty {
-                    val autoName = DeviceInfoUtil.getDeviceName(context)
-                    // Save the auto-generated name for future use
-                    dataStoreManager.saveDeviceName(autoName)
-                    autoName
-                }
+
+                // Always get the  Android device name
+                val deviceName = DeviceInfoUtil.getDeviceName(context)
+                Log.d(TAG, "Using Android device name: $deviceName")
+                dataStoreManager.saveDeviceName(deviceName)
+
                 val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
                 val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port)
+
+                // Get wallpaper as base64
+                val wallpaperBase64 = WallpaperUtil.getWallpaperAsBase64(context)
+                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, wallpaperBase64)
 
                 if (WebSocketUtil.sendMessage(deviceInfoJson)) {
-                    Log.d(TAG, "Device info sent")
+                    Log.d(TAG, "Device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}")
                 } else {
                     Log.e(TAG, "Failed to send device info")
                 }
