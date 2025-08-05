@@ -8,13 +8,17 @@ import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.UiState
+import com.sameerasw.airsync.domain.model.UpdateInfo
+import com.sameerasw.airsync.domain.model.UpdateStatus
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
+import com.sameerasw.airsync.utils.UpdateManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -33,6 +37,21 @@ class AirSyncViewModel(
 
     private val _deviceInfo = MutableStateFlow(DeviceInfo())
     val deviceInfo: StateFlow<DeviceInfo> = _deviceInfo.asStateFlow()
+
+    // Update-related state
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+
+    private val _updateStatus = MutableStateFlow(UpdateStatus.NO_UPDATE)
+    val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
+
+    private val _downloadProgress = MutableStateFlow(0)
+    val downloadProgress: StateFlow<Int> = _downloadProgress.asStateFlow()
+
+    private val _showUpdateDialog = MutableStateFlow(false)
+    val showUpdateDialog: StateFlow<Boolean> = _showUpdateDialog.asStateFlow()
+
+    private var currentDownloadId: Long? = null
 
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
@@ -243,5 +262,141 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.setUserManuallyDisconnected(disconnected)
         }
+    }
+
+    fun checkForUpdates(context: Context, showDialogOnUpdate: Boolean = true) {
+        viewModelScope.launch {
+            _updateStatus.value = UpdateStatus.CHECKING
+
+            try {
+                val updateInfo = UpdateManager.checkForUpdate(context)
+
+                if (updateInfo != null) {
+                    _updateInfo.value = updateInfo
+                    _updateStatus.value = UpdateStatus.UPDATE_AVAILABLE
+
+                    if (showDialogOnUpdate) {
+                        _showUpdateDialog.value = true
+                    }
+                } else {
+                    _updateStatus.value = UpdateStatus.NO_UPDATE
+
+                    // Show "up to date" dialog when manually checking
+                    if (showDialogOnUpdate) {
+                        val currentVersion = UpdateManager.getCurrentVersionName(context)
+                        _updateInfo.value = UpdateInfo(
+                            release = com.sameerasw.airsync.domain.model.GitHubRelease(
+                                tagName = "v$currentVersion",
+                                name = "AirSync $currentVersion",
+                                changelog = "You are running the latest version of AirSync!",
+                                isPrerelease = currentVersion.contains("BETA", ignoreCase = true),
+                                isDraft = false,
+                                publishedAt = "",
+                                assets = emptyList()
+                            ),
+                            asset = com.sameerasw.airsync.domain.model.GitHubAsset(
+                                name = "current-version",
+                                downloadUrl = "",
+                                size = 0
+                            ),
+                            currentVersion = currentVersion,
+                            newVersion = currentVersion,
+                            isBetaUpdate = currentVersion.contains("BETA", ignoreCase = true),
+                            downloadSize = ""
+                        )
+                        _showUpdateDialog.value = true
+                    }
+                }
+            } catch (e: Exception) {
+                _updateStatus.value = UpdateStatus.ERROR
+
+                // Show error dialog when manually checking
+                if (showDialogOnUpdate) {
+                    val currentVersion = UpdateManager.getCurrentVersionName(context)
+                    _updateInfo.value = UpdateInfo(
+                        release = com.sameerasw.airsync.domain.model.GitHubRelease(
+                            tagName = "v$currentVersion",
+                            name = "Update Check Failed",
+                            changelog = "Failed to check for updates. Please check your internet connection and try again.",
+                            isPrerelease = false,
+                            isDraft = false,
+                            publishedAt = "",
+                            assets = emptyList()
+                        ),
+                        asset = com.sameerasw.airsync.domain.model.GitHubAsset(
+                            name = "error",
+                            downloadUrl = "",
+                            size = 0
+                        ),
+                        currentVersion = currentVersion,
+                        newVersion = currentVersion,
+                        isBetaUpdate = false,
+                        downloadSize = ""
+                    )
+                    _showUpdateDialog.value = true
+                }
+            }
+        }
+    }
+
+    fun downloadUpdate(context: Context) {
+        val updateInfo = _updateInfo.value ?: return
+
+        viewModelScope.launch {
+            try {
+                _updateStatus.value = UpdateStatus.DOWNLOADING
+                _downloadProgress.value = 0
+
+                val downloadId = UpdateManager.downloadUpdate(context, updateInfo)
+                currentDownloadId = downloadId
+
+                // Monitor download progress
+                monitorDownloadProgress(context, downloadId)
+
+            } catch (e: Exception) {
+                _updateStatus.value = UpdateStatus.ERROR
+            }
+        }
+    }
+
+    private suspend fun monitorDownloadProgress(context: Context, downloadId: Long) {
+        while (_updateStatus.value == UpdateStatus.DOWNLOADING) {
+            delay(500)
+
+            val progress = UpdateManager.getDownloadProgress(context, downloadId)
+            _downloadProgress.value = progress
+
+            if (UpdateManager.isDownloadComplete(context, downloadId)) {
+                _updateStatus.value = UpdateStatus.DOWNLOADED
+                break
+            }
+        }
+    }
+
+    fun installUpdate(context: Context) {
+        viewModelScope.launch {
+            try {
+                UpdateManager.installUpdate(context)
+                _showUpdateDialog.value = false
+            } catch (e: Exception) {
+                _updateStatus.value = UpdateStatus.ERROR
+            }
+        }
+    }
+
+    fun openInstallPermissionSettings(context: Context) {
+        UpdateManager.openInstallPermissionSettings(context)
+    }
+
+    fun dismissUpdateDialog() {
+        _showUpdateDialog.value = false
+        _updateStatus.value = UpdateStatus.NO_UPDATE
+        _updateInfo.value = null
+        currentDownloadId = null
+    }
+
+    fun retryDownload(context: Context) {
+        _updateStatus.value = UpdateStatus.UPDATE_AVAILABLE
+        downloadUpdate(context)
     }
 }

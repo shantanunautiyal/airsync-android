@@ -41,6 +41,7 @@ import org.json.JSONObject
 import androidx.core.net.toUri
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.domain.model.UpdateStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +67,10 @@ fun AirSyncMainScreen(
     val viewModel: AirSyncViewModel = viewModel { AirSyncViewModel.create(context) }
     val uiState by viewModel.uiState.collectAsState()
     val deviceInfo by viewModel.deviceInfo.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
+    val updateStatus by viewModel.updateStatus.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
+    val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val scope = rememberCoroutineScope()
 
     // Track if we've already processed the QR code dialog to prevent re-showing
@@ -76,6 +81,9 @@ fun AirSyncMainScreen(
 
     LaunchedEffect(Unit) {
         viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus)
+
+        // Check for updates on app start (silently)
+        viewModel.checkForUpdates(context, showDialogOnUpdate = false)
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
@@ -241,22 +249,36 @@ fun AirSyncMainScreen(
                 }
                 IconButton(
                     onClick = {
-                        val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/releases/latest"
-                        val intent = Intent(Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
-                        context.startActivity(intent)
+                        // Check for updates and show dialog if available
+                        viewModel.checkForUpdates(context, showDialogOnUpdate = true)
                     }
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.outline_downloading_24),
-                        contentDescription = "Update"
-                    )
+                    // Show update indicator if available
+                    Box {
+                        Icon(
+                            painter = painterResource(id = R.drawable.outline_downloading_24),
+                            contentDescription = "Check for Updates"
+                        )
+                        if (updateStatus == UpdateStatus.UPDATE_AVAILABLE) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.error,
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .align(Alignment.TopEnd)
+                            )
+                        }
+                    }
                 }
                 IconButton(onClick = { showAboutDialog = true }) {
                     Icon(
                         painter = painterResource(id = R.drawable.outline_info_24),
-                        contentDescription = "Feedback"
+                        contentDescription = "About"
                     )
                 }
+
             }
 
             if (uiState.missingPermissions.isEmpty()) {
@@ -447,6 +469,19 @@ fun AirSyncMainScreen(
                         viewModel.setPermissionDialogVisible(false)
                     }
                 )
+        }
+
+        // Update Dialog
+        if (showUpdateDialog) {
+            UpdateDialog(
+                updateInfo = updateInfo,
+                updateStatus = updateStatus,
+                downloadProgress = downloadProgress,
+                onDismiss = { viewModel.dismissUpdateDialog() },
+                onDownload = { viewModel.downloadUpdate(context) },
+                onInstall = { viewModel.installUpdate(context) },
+                onOpenSettings = { viewModel.openInstallPermissionSettings(context) }
+            )
         }
 
         // About Dialog

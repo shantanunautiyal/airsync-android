@@ -16,7 +16,7 @@ android {
         minSdk = 32
         targetSdk = 36
         versionCode = 1
-        versionName = "2.0.4"
+        versionName = "2.0.6-BETA"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -66,6 +66,10 @@ dependencies {
 
     // WebSocket support
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // JSON parsing for GitHub API
+    implementation("com.google.code.gson:gson:2.10.1")
+
     implementation(libs.ui.graphics)
 
     testImplementation(libs.junit)
