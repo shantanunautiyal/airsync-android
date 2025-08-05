@@ -13,11 +13,9 @@ import kotlinx.coroutines.yield
 
 object AppUtil {
     private const val TAG = "AppUtil"
-    private const val CHUNK_SIZE = 20 // Process apps in chunks to avoid memory pressure
 
     /**
-     * Get all installed apps that can potentially send notifications
-     * Optimized for performance with chunked processing
+     * Get all installed apps
      */
     suspend fun getInstalledApps(context: Context): List<NotificationApp> = withContext(Dispatchers.IO) {
         try {

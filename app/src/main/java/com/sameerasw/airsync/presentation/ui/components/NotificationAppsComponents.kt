@@ -57,7 +57,7 @@ fun NotificationAppsContent(
         }
 
         // Apps list
-        if (searchQuery.length < 5) {
+        if (searchQuery.length < 3) {
             PromptSearchMessage()
         } else if (isLoading) {
             LoadingSection()
@@ -402,7 +402,7 @@ private fun PromptSearchMessage() {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Enter at least 5 characters to search",
+                text = "Enter at least 3 characters to search",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
