@@ -1,9 +1,12 @@
 package com.sameerasw.airsync.presentation.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -15,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
@@ -169,28 +173,31 @@ private fun AppsListSection(
     if (filteredApps.isEmpty()) {
         EmptyAppsMessage(showSystemApps = showSystemApps)
     } else {
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            item {
-                Text(
-                    text = "${filteredApps.size} apps found",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
-                )
-            }
+        Column {
+            Text(
+                text = "${filteredApps.size} apps found",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            )
 
-            items(
-                items = filteredApps,
-                key = { it.packageName }
-            ) { app ->
-                NotificationAppItem(
-                    app = app,
-                    onToggle = { isEnabled ->
-                        onToggleApp(app.packageName, isEnabled)
-                    }
-                )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(5),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(4.dp)
+            ) {
+                items(
+                    items = filteredApps,
+                    key = { it.packageName }
+                ) { app ->
+                    NotificationAppItem(
+                        app = app,
+                        onToggle = { isEnabled ->
+                            onToggleApp(app.packageName, isEnabled)
+                        }
+                    )
+                }
             }
         }
     }
@@ -235,15 +242,24 @@ private fun NotificationAppItem(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(0.85f),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        onClick = { onToggle(!app.isEnabled) },
+        border = if (app.isEnabled) {
+            BorderStroke(
+                width = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else null
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // App icon
             AppIcon(
@@ -252,38 +268,16 @@ private fun NotificationAppItem(
                 modifier = Modifier.size(40.dp)
             )
 
-            // App info
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = app.appName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = app.packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (app.isSystemApp) {
-                    Text(
-                        text = "System app",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            // Toggle switch
-            Switch(
-                checked = app.isEnabled,
-                onCheckedChange = onToggle
+            // App name
+            Text(
+                text = app.appName,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+                lineHeight = MaterialTheme.typography.labelSmall.lineHeight
             )
         }
     }
@@ -388,24 +382,16 @@ private fun ErrorCard(
 @Composable
 private fun PromptSearchMessage() {
     Box(
-        modifier = Modifier.fillMaxWidth().padding(32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Enter at least 3 characters to search",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "Please enter at least 3 characters to search",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
