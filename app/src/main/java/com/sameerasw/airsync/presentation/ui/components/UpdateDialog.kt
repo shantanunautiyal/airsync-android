@@ -1,366 +1,282 @@
 package com.sameerasw.airsync.presentation.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.sameerasw.airsync.domain.model.UpdateInfo
 import com.sameerasw.airsync.domain.model.UpdateStatus
-import com.sameerasw.airsync.utils.UpdateManager
 
 @Composable
 fun UpdateDialog(
     updateInfo: UpdateInfo?,
     updateStatus: UpdateStatus,
-    downloadProgress: Int = 0,
+    downloadProgress: Int,
     onDismiss: () -> Unit,
     onDownload: () -> Unit,
-    onInstall: () -> Unit,
-    onOpenSettings: () -> Unit
+    onInstall: () -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
-    val context = LocalContext.current
-
     if (updateInfo == null) return
 
-    Dialog(
-        onDismissRequest = {
-            if (updateStatus != UpdateStatus.DOWNLOADING) {
-                onDismiss()
-            }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = when (updateStatus) {
+                    UpdateStatus.UPDATE_AVAILABLE -> if (updateInfo.isBetaUpdate) "Beta Update Available" else "Update Available"
+                    UpdateStatus.DOWNLOADING -> "Downloading Update"
+                    UpdateStatus.DOWNLOADED -> "Update Downloaded"
+                    UpdateStatus.ERROR -> "Update Error"
+                    UpdateStatus.NO_UPDATE -> "No Updates"
+                    else -> "Checking for Updates"
+                },
+                style = MaterialTheme.typography.headlineSmall
+            )
         },
-        properties = DialogProperties(
-            dismissOnBackPress = updateStatus != UpdateStatus.DOWNLOADING,
-            dismissOnClickOutside = updateStatus != UpdateStatus.DOWNLOADING
-        )
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
-                Text(
-                    text = when {
-                        updateStatus == UpdateStatus.ERROR -> "Update Check Failed"
-                        updateStatus == UpdateStatus.NO_UPDATE -> "You're Up to Date!"
-                        else -> "Update Available"
-                    },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (updateStatus == UpdateStatus.UPDATE_AVAILABLE) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Current: ${updateInfo.currentVersion}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Latest: ${updateInfo.newVersion}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-
-                        // Beta badge
-                        if (updateInfo.isBetaUpdate) {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                )
-                            ) {
-                                Text(
-                                    text = "BETA",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // fallbvack
-                    Text(
-                        text = "Current Version: ${updateInfo.currentVersion}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // is beta
-                    if (updateInfo.isBetaUpdate) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        ) {
-                            Text(
-                                text = "BETA",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Release notes/message
-                if (updateInfo.release.changelog.isNotBlank()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = when (updateStatus) {
-                                UpdateStatus.ERROR -> MaterialTheme.colorScheme.errorContainer
-                                UpdateStatus.NO_UPDATE -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = when (updateStatus) {
-                                    UpdateStatus.ERROR -> "Error Details"
-                                    UpdateStatus.NO_UPDATE -> "Status"
-                                    else -> "What's New"
-                                },
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium,
-                                color = when (updateStatus) {
-                                    UpdateStatus.ERROR -> MaterialTheme.colorScheme.onErrorContainer
-                                    UpdateStatus.NO_UPDATE -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Parse and display markdown
-                            val changelog = updateInfo.release.changelog
-                                .replace("\\r\\n", "\n")
-                                .replace("\\n", "\n")
-                                .trim()
-
-                            Text(
-                                text = changelog,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier
-                                    .heightIn(max = 120.dp)
-                                    .verticalScroll(rememberScrollState()),
-                                color = when (updateStatus) {
-                                    UpdateStatus.ERROR -> MaterialTheme.colorScheme.onErrorContainer
-                                    UpdateStatus.NO_UPDATE -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // Download size
-                if (updateStatus == UpdateStatus.UPDATE_AVAILABLE && updateInfo.downloadSize.isNotEmpty()) {
-                    Text(
-                        text = "Download size: ${updateInfo.downloadSize}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-                }
-
-                // Status
                 when (updateStatus) {
+                    UpdateStatus.CHECKING -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Checking for updates...")
+                    }
+
                     UpdateStatus.UPDATE_AVAILABLE -> {
-                        if (!UpdateManager.canInstallPackages(context)) {
+                        // Version info
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (updateInfo.isBetaUpdate)
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                else MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = updateInfo.release.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${updateInfo.currentVersion} → ${updateInfo.newVersion}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (updateInfo.isBetaUpdate) {
+                                    Text(
+                                        text = "BETA",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                                Text(
+                                    text = "Size: ${updateInfo.downloadSize}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Release notes
+                        if (updateInfo.release.changelog.isNotBlank()) {
+                            Text(
+                                text = "Release Notes:",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
                             ) {
                                 Text(
-                                    text = "Permission required to install apps from unknown sources",
+                                    text = updateInfo.release.changelog,
                                     modifier = Modifier.padding(12.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    textAlign = TextAlign.Center
+                                    style = MaterialTheme.typography.bodySmall
                                 )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = onOpenSettings,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Text("Grant Permission")
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = onDismiss,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Later")
-                            }
-
-                            Button(
-                                onClick = onDownload,
-                                modifier = Modifier.weight(1f),
-                                enabled = UpdateManager.canInstallPackages(context)
-                            ) {
-                                Text("Download")
                             }
                         }
                     }
 
                     UpdateStatus.DOWNLOADING -> {
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "Downloading update...",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
                             LinearProgressIndicator(
-                            progress = { downloadProgress / 100f },
-                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .height(8.dp),
-                            color = ProgressIndicatorDefaults.linearColor,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
+                                progress = { downloadProgress / 100f },
+                                modifier = Modifier.fillMaxWidth(),
                             )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("$downloadProgress%")
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "$downloadProgress%",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "Downloading ${updateInfo.release.name}...",
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         }
                     }
 
                     UpdateStatus.DOWNLOADED -> {
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Download complete!",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = " Download Complete",
+                                style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-
                             Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
+                            Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                )
                             ) {
-                                OutlinedButton(
-                                    onClick = onDismiss,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Later")
-                                }
-
-                                Button(
-                                    onClick = onInstall,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Install")
-                                }
+                                Text(
+                                    text = "To install the update:\n\n" +
+                                           "1. Open your notifications\n" +
+                                           "2. Tap on the download completed notification\n" +
+                                           "3. Follow the installation prompts",
+                                    modifier = Modifier.padding(16.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Start
+                                )
                             }
                         }
                     }
 
                     UpdateStatus.ERROR -> {
+                        Text(
+                            text = "❌ ${updateInfo.release.changelog}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    UpdateStatus.NO_UPDATE -> {
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Download failed",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
+                                text = "✅ You're up to date!",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
                             )
-
                             Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
+                            Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
                             ) {
-                                OutlinedButton(
-                                    onClick = onDismiss,
-                                    modifier = Modifier.weight(1f)
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.Start
                                 ) {
-                                    Text("Close")
-                                }
-
-                                Button(
-                                    onClick = onDownload,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Retry")
+                                    Text(
+                                        text = updateInfo.release.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Version ${updateInfo.currentVersion}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    if (updateInfo.isBetaUpdate) {
+                                        Text(
+                                            text = "BETA",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                }
+            }
+        },
+        confirmButton = {
+            when (updateStatus) {
+                UpdateStatus.UPDATE_AVAILABLE -> {
+                    Button(
+                        onClick = onDownload,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Download")
+                    }
+                }
 
-                    else -> {}
+                UpdateStatus.DOWNLOADING -> {
+                    // No action button while downloading
+                }
+
+                UpdateStatus.DOWNLOADED -> {
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("OK")
+                    }
+                }
+
+                UpdateStatus.ERROR -> {
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("OK")
+                    }
+                }
+
+                UpdateStatus.NO_UPDATE -> {
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("OK")
+                    }
+                }
+
+                else -> {
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            if (updateStatus == UpdateStatus.UPDATE_AVAILABLE) {
+                TextButton(onClick = onDismiss) {
+                    Text("Later")
                 }
             }
         }
-    }
+    )
 }

@@ -478,9 +478,7 @@ fun AirSyncMainScreen(
                 updateStatus = updateStatus,
                 downloadProgress = downloadProgress,
                 onDismiss = { viewModel.dismissUpdateDialog() },
-                onDownload = { viewModel.downloadUpdate(context) },
-                onInstall = { viewModel.installUpdate(context) },
-                onOpenSettings = { viewModel.openInstallPermissionSettings(context) }
+                onDownload = { viewModel.downloadUpdate(context) }
             )
         }
 

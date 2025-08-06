@@ -373,21 +373,6 @@ class AirSyncViewModel(
         }
     }
 
-    fun installUpdate(context: Context) {
-        viewModelScope.launch {
-            try {
-                UpdateManager.installUpdate(context)
-                _showUpdateDialog.value = false
-            } catch (e: Exception) {
-                _updateStatus.value = UpdateStatus.ERROR
-            }
-        }
-    }
-
-    fun openInstallPermissionSettings(context: Context) {
-        UpdateManager.openInstallPermissionSettings(context)
-    }
-
     fun dismissUpdateDialog() {
         _showUpdateDialog.value = false
         _updateStatus.value = UpdateStatus.NO_UPDATE

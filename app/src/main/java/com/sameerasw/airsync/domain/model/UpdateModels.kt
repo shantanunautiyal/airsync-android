@@ -28,8 +28,8 @@ data class UpdateInfo(
 )
 
 enum class UpdateStatus {
-    CHECKING,
     NO_UPDATE,
+    CHECKING,
     UPDATE_AVAILABLE,
     DOWNLOADING,
     DOWNLOADED,

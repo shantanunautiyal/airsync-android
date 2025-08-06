@@ -2,12 +2,9 @@ package com.sameerasw.airsync.utils
 
 import android.app.DownloadManager
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Environment
-import android.provider.Settings
 import android.util.Log
-import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import com.google.gson.Gson
 import com.sameerasw.airsync.domain.model.GitHubRelease
@@ -110,10 +107,10 @@ object UpdateManager {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            packageInfo.versionName ?: "2.0.4"
+            packageInfo.versionName ?: "2.0.7"
         } catch (e: Exception) {
             Log.w(TAG, "Could not get version name: ${e.message}")
-            "2.0.4"
+            "2.0.7"
         }
     }
 
@@ -132,7 +129,7 @@ object UpdateManager {
     }
 
     /**
-     * Parse version string like beta
+     * Parse version string with proper beta handling
      */
     private fun parseVersionCode(version: String): Int {
         val cleanVersion = version.removePrefix("v")
@@ -153,11 +150,9 @@ object UpdateManager {
      */
     fun downloadUpdate(context: Context, updateInfo: UpdateInfo): Long {
         try {
-            // Create download directory
-            val downloadDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "updates")
-            downloadDir.mkdirs()
-
-            val apkFile = File(downloadDir, APK_FILE_NAME)
+            // Create download directory in Downloads folder
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val apkFile = File(downloadsDir, "AirSync-${updateInfo.newVersion}.apk")
 
             // Delete existing file
             if (apkFile.exists()) {
@@ -175,7 +170,7 @@ object UpdateManager {
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = downloadManager.enqueue(request)
 
-            Log.d(TAG, "Started download with ID: $downloadId")
+            Log.d(TAG, "Started download with ID: $downloadId to ${apkFile.absolutePath}")
             return downloadId
 
         } catch (e: Exception) {
@@ -185,74 +180,7 @@ object UpdateManager {
     }
 
     /**
-     * Install downloaded APK
-     */
-    fun installUpdate(context: Context) {
-        try {
-            val downloadDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "updates")
-            val apkFile = File(downloadDir, APK_FILE_NAME)
-
-            if (!apkFile.exists()) {
-                Log.e(TAG, "APK file not found for installation")
-                return
-            }
-
-            val apkUri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                apkFile
-            )
-
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-
-            context.startActivity(installIntent)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error installing update", e)
-            throw e
-        }
-    }
-
-    /**
-     * Check if app can install packages from unknown sources
-     */
-    fun canInstallPackages(context: Context): Boolean {
-        return context.packageManager.canRequestPackageInstalls()
-    }
-
-    /**
-     * Open settings to allow installation from unknown sources
-     */
-    fun openInstallPermissionSettings(context: Context) {
-        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-            data = "package:${context.packageName}".toUri()
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-    }
-
-    /**
-     * Format file size in human readable format
-     */
-    private fun formatFileSize(bytes: Long): String {
-        val units = arrayOf("B", "KB", "MB", "GB")
-        var size = bytes.toDouble()
-        var unitIndex = 0
-
-        while (size >= 1024 && unitIndex < units.size - 1) {
-            size /= 1024
-            unitIndex++
-        }
-
-        return String.format(Locale.US, "%.1f %s", size, units[unitIndex])
-    }
-
-    /**
-     * Get download progress
+     * Get download progress for monitoring
      */
     fun getDownloadProgress(context: Context, downloadId: Long): Int {
         return try {
@@ -265,7 +193,7 @@ object UpdateManager {
                 val bytesTotal = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
 
                 if (bytesTotal > 0) {
-                    ((bytesDownloaded * 100L) / bytesTotal).toInt()
+                    ((bytesDownloaded * 100) / bytesTotal).toInt()
                 } else {
                     0
                 }
@@ -297,5 +225,21 @@ object UpdateManager {
             Log.e(TAG, "Error checking download status", e)
             false
         }
+    }
+
+    /**
+     * Format file size in human readable format
+     */
+    private fun formatFileSize(bytes: Long): String {
+        val units = arrayOf("B", "KB", "MB", "GB")
+        var size = bytes.toDouble()
+        var unitIndex = 0
+
+        while (size >= 1024 && unitIndex < units.size - 1) {
+            size /= 1024
+            unitIndex++
+        }
+
+        return String.format(Locale.US, "%.1f %s", size, units[unitIndex])
     }
 }
