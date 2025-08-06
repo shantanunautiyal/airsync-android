@@ -29,3 +29,6 @@ replay_pid*
 *.DS_Store
 .gradle/
 .idea
+
+
+app/release
