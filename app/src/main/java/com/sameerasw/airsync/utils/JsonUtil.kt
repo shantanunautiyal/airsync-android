@@ -77,13 +77,21 @@ object JsonUtil {
     }
 
     /**
-     * Creates a JSON string for app icons with package name to base64 mapping
+     * Creates a JSON string for app icons
      */
-    fun createAppIconsJson(iconMap: Map<String, String>): String {
-        val iconEntries = iconMap.entries.joinToString(",") { (packageName, base64Icon) ->
-            """"$packageName":"$base64Icon""""
+    fun createAppIconsJson(apps: List<com.sameerasw.airsync.domain.model.NotificationApp>, iconMap: Map<String, String>): String {
+        val appEntries = apps.joinToString(",") { app ->
+            val iconData = iconMap[app.packageName] ?: ""
+            """
+            "${app.packageName}": {
+                "name": "${app.appName}",
+                "icon": "$iconData",
+                "listening": ${app.isEnabled},
+                "systemApp": ${app.isSystemApp}
+            }
+            """.trimIndent()
         }
-        return """{"type":"appIcons","data":{ $iconEntries }}"""
+        return """{"type":"appIcons","data":{ $appEntries }}"""
     }
 
     /**
@@ -93,5 +101,17 @@ object JsonUtil {
         // Escape quotes and newlines in the text
         val escapedText = text.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
         return """{"type":"clipboardUpdate","data":{"text":"$escapedText"}}"""
+    }
+
+    /**
+     * Creates a response JSON for app notification toggle result
+     */
+    fun createToggleAppNotificationResponse(
+        packageName: String,
+        success: Boolean,
+        newState: Boolean,
+        message: String = ""
+    ): String {
+        return """{"type":"toggleAppNotifResponse","data":{"package":"$packageName","success":$success,"newState":$newState,"message":"$message"}}"""
     }
 }

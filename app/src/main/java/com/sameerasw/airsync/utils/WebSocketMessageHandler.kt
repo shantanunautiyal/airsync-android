@@ -2,8 +2,11 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.util.Log
+import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -27,6 +30,7 @@ object WebSocketMessageHandler {
                 "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
                 "disconnectRequest" -> handleDisconnectRequest()
+                "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "ping" -> handlePing(context)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
@@ -233,6 +237,83 @@ object WebSocketMessageHandler {
         CoroutineScope(Dispatchers.IO).launch {
             val response = JsonUtil.createNotificationDismissalResponse(id, success, message)
             WebSocketUtil.sendMessage(response)
+        }
+    }
+
+    private fun handleToggleAppNotification(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "Toggle app notification data is null")
+                    return@launch
+                }
+
+                val packageName = data.optString("package")
+                val stateString = data.optString("state")
+
+                if (packageName.isEmpty()) {
+                    Log.e(TAG, "Package name is empty in toggle app notification")
+                    return@launch
+                }
+
+                val newState = stateString.toBoolean()
+
+                Log.d(TAG, "Toggling notification for package: $packageName to state: $newState")
+
+                // Get the repository
+                val dataStoreManager = DataStoreManager(context)
+                val repository = AirSyncRepositoryImpl(dataStoreManager)
+
+                // Get current apps
+                val currentApps = repository.getNotificationApps().first().toMutableList()
+
+                // Find and update the app
+                val appIndex = currentApps.indexOfFirst { it.packageName == packageName }
+
+                if (appIndex != -1) {
+                    // Update existing app
+                    val updatedApp = currentApps[appIndex].copy(isEnabled = newState)
+                    currentApps[appIndex] = updatedApp
+
+                    // Save updated apps
+                    repository.saveNotificationApps(currentApps)
+
+                    Log.d(TAG, "Successfully updated notification state for $packageName to $newState")
+
+                    // Send confirmation response back to Mac
+                    val responseMessage = JsonUtil.createToggleAppNotificationResponse(
+                        packageName = packageName,
+                        success = true,
+                        newState = newState,
+                        message = "App notification state updated successfully"
+                    )
+                    WebSocketUtil.sendMessage(responseMessage)
+                } else {
+                    Log.w(TAG, "App with package name $packageName not found in notification apps")
+
+                    // Send error response
+                    val responseMessage = JsonUtil.createToggleAppNotificationResponse(
+                        packageName = packageName,
+                        success = false,
+                        newState = newState,
+                        message = "App not found"
+                    )
+                    WebSocketUtil.sendMessage(responseMessage)
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling toggle app notification: ${e.message}")
+
+                // Send error response
+                val packageName = data?.optString("package") ?: ""
+                val responseMessage = JsonUtil.createToggleAppNotificationResponse(
+                    packageName = packageName,
+                    success = false,
+                    newState = false,
+                    message = "Error: ${e.message}"
+                )
+                WebSocketUtil.sendMessage(responseMessage)
+            }
         }
     }
 }

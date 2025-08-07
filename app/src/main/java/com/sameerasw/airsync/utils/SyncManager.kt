@@ -295,45 +295,49 @@ object SyncManager {
         try {
             Log.d(TAG, "Starting app icons sync (manual: $isManualSync)")
 
-            // Get enabled notification apps from DataStore
             val dataStoreManager = DataStoreManager(context)
-            val notificationApps = dataStoreManager.getNotificationApps().first()
 
-            if (notificationApps.isEmpty()) {
-                val message = "No notification apps found, skipping app icons sync"
-                Log.d(TAG, message)
+            // Get ALL installed apps first
+            val installedApps = AppUtil.getInstalledApps(context)
+            Log.d(TAG, "Found ${installedApps.size} installed apps")
+
+            if (installedApps.isEmpty()) {
+                val message = "No installed apps found"
+                Log.w(TAG, message)
                 onResult?.invoke(false, message)
                 return
             }
 
-            // Get package names of enabled apps
-            val enabledPackages = notificationApps.filter { it.isEnabled }.map { it.packageName }
+            // Get saved notification app preferences
+            val savedNotificationApps = dataStoreManager.getNotificationApps().first()
 
-            if (enabledPackages.isEmpty()) {
-                val message = "No enabled notification apps found, skipping app icons sync"
-                Log.d(TAG, message)
-                onResult?.invoke(false, message)
-                return
-            }
+            // Merge installed apps with saved preferences
+            val allApps = AppUtil.mergeWithSavedApps(installedApps, savedNotificationApps)
 
-            Log.d(TAG, "Collecting icons for ${enabledPackages.size} enabled apps")
+            // Save the merged list back to DataStore
+            dataStoreManager.saveNotificationApps(allApps)
+
+            Log.d(TAG, "Collecting icons for ${allApps.size} apps (${allApps.count { it.isEnabled }} enabled)")
+
+            // Get package names for icon collection
+            val allPackages = allApps.map { it.packageName }
 
             // Get app icons as base64
-            val iconMap = AppIconUtil.getAppIconsAsBase64(context, enabledPackages)
+            val iconMap = AppIconUtil.getAppIconsAsBase64(context, allPackages)
 
             if (iconMap.isNotEmpty()) {
                 // Create and send app icons JSON
-                val appIconsJson = JsonUtil.createAppIconsJson(iconMap)
+                val appIconsJson = JsonUtil.createAppIconsJson(allApps, iconMap)
 
                 if (WebSocketUtil.sendMessage(appIconsJson)) {
-                    Log.d(TAG, "✅ App icons sent successfully (${iconMap.size} icons)")
+                    Log.d(TAG, "✅ App icons sent successfully (${iconMap.size} icons with full app details)")
 
                     // Update counter only for automatic syncs
                     if (!isManualSync) {
                         updateIconSyncCounter(context)
                     }
 
-                    val message = "Successfully synced ${iconMap.size} app icons"
+                    val message = "Successfully synced ${iconMap.size} app icons with details"
                     onResult?.invoke(true, message)
                 } else {
                     Log.e(TAG, "❌ Failed to send app icons")
