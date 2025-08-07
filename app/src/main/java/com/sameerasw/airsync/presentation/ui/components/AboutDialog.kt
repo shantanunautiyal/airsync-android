@@ -145,7 +145,7 @@ fun AboutDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    "Version $versionName BETA",
+                    "Version $versionName",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
