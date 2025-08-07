@@ -13,6 +13,7 @@ import com.sameerasw.airsync.domain.model.UpdateInfo
 import com.sameerasw.airsync.domain.model.UpdateStatus
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.UpdateManager
@@ -57,6 +58,10 @@ class AirSyncViewModel(
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
     val networkDevices: StateFlow<List<NetworkDeviceConnection>> = _networkDevices.asStateFlow()
+
+    // Network monitoring
+    private var isNetworkMonitoringActive = false
+    private var previousNetworkIp: String? = null
 
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
@@ -445,5 +450,142 @@ class AirSyncViewModel(
     fun retryDownload(context: Context) {
         _updateStatus.value = UpdateStatus.UPDATE_AVAILABLE
         downloadUpdate(context)
+    }
+
+    fun startNetworkMonitoring(context: Context) {
+        if (isNetworkMonitoringActive) return
+
+        isNetworkMonitoringActive = true
+        previousNetworkIp = _deviceInfo.value.localIp
+
+        viewModelScope.launch {
+            NetworkMonitor.observeNetworkChanges(context)
+                .collect { networkInfo ->
+                    handleNetworkChange(context, networkInfo)
+                }
+        }
+    }
+
+    fun stopNetworkMonitoring() {
+        isNetworkMonitoringActive = false
+    }
+
+    private suspend fun handleNetworkChange(context: Context, networkInfo: com.sameerasw.airsync.utils.NetworkInfo) {
+        val currentIp = networkInfo.ipAddress
+
+        // Update device info with new IP
+        if (currentIp != null && currentIp != _deviceInfo.value.localIp) {
+            _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
+
+            // Load network devices to check for network-aware connections
+            loadNetworkDevices()
+
+            // Check if we have a network-aware device for this new network
+            val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+
+            if (networkAwareDevice != null) {
+                // Update the UI state with network-aware device info
+                _uiState.value = _uiState.value.copy(
+                    lastConnectedDevice = networkAwareDevice,
+                    ipAddress = networkAwareDevice.ipAddress,
+                    port = networkAwareDevice.port
+                )
+
+                // Save the new connection info
+                repository.saveIpAddress(networkAwareDevice.ipAddress)
+                repository.savePort(networkAwareDevice.port)
+
+                // If we were connected and user didn't manually disconnect, try to reconnect
+                val wasConnected = WebSocketUtil.isConnected()
+                val userManuallyDisconnected = repository.getUserManuallyDisconnected().first()
+
+                if (wasConnected && !userManuallyDisconnected) {
+                    // Attempt automatic reconnection with network-aware device
+                    attemptAutoReconnection(context, networkAwareDevice)
+                }
+            } else {
+                // No network-aware device found, update last connected device info
+                // with current network mapping if we have a previous connection
+                _uiState.value.lastConnectedDevice?.let { lastDevice ->
+                    // Save network mapping for future connections
+                    repository.saveNetworkDeviceConnection(
+                        lastDevice.name,
+                        currentIp,
+                        lastDevice.ipAddress,
+                        lastDevice.port,
+                        lastDevice.isPlus
+                    )
+
+                    // Reload network devices
+                    loadNetworkDevices()
+                }
+            }
+
+            // Update previous IP for next comparison
+            previousNetworkIp = currentIp
+        } else if (currentIp == null && networkInfo.isWifi) {
+            // Wi-Fi connected but no IP yet, update device info
+            _deviceInfo.value = _deviceInfo.value.copy(localIp = "Unknown")
+        } else if (!networkInfo.isWifi) {
+            // Not on Wi-Fi anymore
+            _deviceInfo.value = _deviceInfo.value.copy(localIp = "No Wi-Fi")
+
+            // Disconnect if connected
+            if (WebSocketUtil.isConnected()) {
+                WebSocketUtil.disconnect()
+                setConnectionStatus(isConnected = false, isConnecting = false)
+                setResponse("Disconnected - Wi-Fi lost")
+            }
+        }
+    }
+
+    private suspend fun attemptAutoReconnection(context: Context, device: ConnectedDevice) {
+        // Add a small delay to ensure network is stable
+        delay(2000)
+
+        // Check if we're still on the same network and not manually disconnected
+        val currentIp = DeviceInfoUtil.getWifiIpAddress(context)
+        val userManuallyDisconnected = repository.getUserManuallyDisconnected().first()
+
+        if (currentIp != null && !userManuallyDisconnected && !WebSocketUtil.isConnected()) {
+            setConnectionStatus(isConnected = false, isConnecting = true)
+            setResponse("Auto-reconnecting to ${device.name}...")
+
+            WebSocketUtil.connect(
+                context = context,
+                ipAddress = device.ipAddress,
+                port = device.port.toIntOrNull() ?: 6996,
+                onConnectionStatus = { connected ->
+                    viewModelScope.launch {
+                        setConnectionStatus(isConnected = connected, isConnecting = false)
+                        if (connected) {
+                            setResponse("Auto-reconnected to ${device.name}")
+                            // Update last connected timestamp
+                            repository.updateNetworkDeviceLastConnected(device.name, System.currentTimeMillis())
+                        } else {
+                            setResponse("Auto-reconnection failed")
+                        }
+                    }
+                },
+                onMessage = { response ->
+                    viewModelScope.launch {
+                        setResponse("Received: $response")
+                        // Handle clipboard updates and other messages as usual
+                        try {
+                            val json = org.json.JSONObject(response)
+                            if (json.optString("type") == "clipboardUpdate") {
+                                val data = json.optJSONObject("data")
+                                val text = data?.optString("text")
+                                if (!text.isNullOrEmpty()) {
+                                    com.sameerasw.airsync.utils.ClipboardSyncManager.handleClipboardUpdate(context, text)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Not a clipboard update, ignore
+                        }
+                    }
+                }
+            )
+        }
     }
 }

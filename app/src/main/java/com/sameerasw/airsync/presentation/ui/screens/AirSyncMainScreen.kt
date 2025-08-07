@@ -84,6 +84,9 @@ fun AirSyncMainScreen(
 
         // Check for updates on app start (silently)
         viewModel.checkForUpdates(context, showDialogOnUpdate = false)
+
+        // Start network monitoring for dynamic Wi-Fi changes
+        viewModel.startNetworkMonitoring(context)
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
