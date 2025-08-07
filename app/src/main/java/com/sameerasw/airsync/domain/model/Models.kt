@@ -36,8 +36,41 @@ data class ConnectedDevice(
     val lastSyncTime: Long? = null,
     val isPlus: Boolean = false,
     val iconSyncCount: Int = 0,
-    val lastIconSyncDate: String? = null // Format: YYYY-MM-DD
+    val lastIconSyncDate: String? = null
 )
+
+data class NetworkDeviceConnection(
+    val deviceName: String,
+    val networkConnections: Map<String, String>,
+    val port: String,
+    val lastConnected: Long,
+    val lastSyncTime: Long? = null,
+    val isPlus: Boolean = false,
+    val iconSyncCount: Int = 0,
+    val lastIconSyncDate: String? = null
+) {
+    // get client IP for current network
+    fun getClientIpForNetwork(ourIp: String): String? {
+        return networkConnections[ourIp]
+    }
+
+    // create ConnectedDevice for current network
+    fun toConnectedDevice(ourIp: String): ConnectedDevice? {
+        val clientIp = getClientIpForNetwork(ourIp)
+        return if (clientIp != null) {
+            ConnectedDevice(
+                name = deviceName,
+                ipAddress = clientIp,
+                port = port,
+                lastConnected = lastConnected,
+                lastSyncTime = lastSyncTime,
+                isPlus = isPlus,
+                iconSyncCount = iconSyncCount,
+                lastIconSyncDate = lastIconSyncDate
+            )
+        } else null
+    }
+}
 
 data class BatteryInfo(
     val level: Int,

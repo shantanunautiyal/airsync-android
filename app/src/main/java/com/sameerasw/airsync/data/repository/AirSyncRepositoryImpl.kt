@@ -2,6 +2,7 @@ package com.sameerasw.airsync.data.repository
 
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.NotificationApp
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import kotlinx.coroutines.flow.Flow
@@ -72,6 +73,23 @@ class AirSyncRepositoryImpl(
 
     override fun getLastConnectedDevice(): Flow<ConnectedDevice?> {
         return dataStoreManager.getLastConnectedDevice()
+    }
+
+    // Network-aware device connections
+    override suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean) {
+        dataStoreManager.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus)
+    }
+
+    override fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?> {
+        return dataStoreManager.getNetworkDeviceConnection(deviceName)
+    }
+
+    override fun getAllNetworkDeviceConnections(): Flow<List<NetworkDeviceConnection>> {
+        return dataStoreManager.getAllNetworkDeviceConnections()
+    }
+
+    override suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long) {
+        dataStoreManager.updateNetworkDeviceLastConnected(deviceName, timestamp)
     }
 
     override suspend fun saveNotificationApps(apps: List<NotificationApp>) {

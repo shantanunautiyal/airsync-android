@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -34,6 +35,10 @@ class DataStoreManager(private val context: Context) {
         private val ICON_SYNC_COUNT = stringPreferencesKey("icon_sync_count")
         private val LAST_ICON_SYNC_DATE = stringPreferencesKey("last_icon_sync_date")
         private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
+
+        // Network-aware device connections
+        private val NETWORK_DEVICES_PREFIX = "network_device_"
+        private val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -259,6 +264,125 @@ class DataStoreManager(private val context: Context) {
     fun getUserManuallyDisconnected(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[USER_MANUALLY_DISCONNECTED] == true // Default to false
+        }
+    }
+
+    // Network-aware device connections
+    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean) {
+        context.dataStore.edit { preferences ->
+            // Load existing connections for this device
+            val existingConnectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
+            val existingConnections = try {
+                val json = org.json.JSONObject(existingConnectionsJson)
+                val map = mutableMapOf<String, String>()
+                json.keys().forEach { key ->
+                    map[key] = json.getString(key)
+                }
+                map
+            } catch (e: Exception) {
+                mutableMapOf<String, String>()
+            }
+
+            // Add/update the new connection
+            existingConnections[ourIp] = clientIp
+
+            // Convert back to JSON
+            val updatedJson = org.json.JSONObject(existingConnections).toString()
+
+            // Save device info
+            preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_name")] = deviceName
+            preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")] = port
+            preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] = isPlus
+            preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = System.currentTimeMillis().toString()
+            preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] = updatedJson
+        }
+    }
+
+    fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?> {
+        return context.dataStore.data.map { preferences ->
+            val name = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_name")]
+            val port = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")]
+            val isPlus = preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] ?: false
+            val lastConnected = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")]?.toLongOrNull() ?: 0L
+            val connectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
+
+            if (name != null && port != null) {
+                val connections = try {
+                    val json = org.json.JSONObject(connectionsJson)
+                    val map = mutableMapOf<String, String>()
+                    json.keys().forEach { key ->
+                        map[key] = json.getString(key)
+                    }
+                    map
+                } catch (e: Exception) {
+                    emptyMap<String, String>()
+                }
+
+                NetworkDeviceConnection(
+                    deviceName = name,
+                    networkConnections = connections,
+                    port = port,
+                    lastConnected = lastConnected,
+                    isPlus = isPlus
+                )
+            } else {
+                null
+            }
+        }
+    }
+
+    fun getAllNetworkDeviceConnections(): Flow<List<NetworkDeviceConnection>> {
+        return context.dataStore.data.map { preferences ->
+            val devices = mutableListOf<NetworkDeviceConnection>()
+            val deviceNames = mutableSetOf<String>()
+
+            // Extract device names from preference keys
+            preferences.asMap().keys.forEach { key ->
+                if (key.name.startsWith(NETWORK_DEVICES_PREFIX) && key.name.endsWith("_name")) {
+                    val deviceName = key.name.removePrefix(NETWORK_DEVICES_PREFIX).removeSuffix("_name")
+                    deviceNames.add(deviceName)
+                }
+            }
+
+            // Build device objects
+            deviceNames.forEach { deviceName ->
+                val name = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_name")]
+                val port = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")]
+                val isPlus = preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] ?: false
+                val lastConnected = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")]?.toLongOrNull() ?: 0L
+                val connectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
+
+                if (name != null && port != null) {
+                    val connections = try {
+                        val json = org.json.JSONObject(connectionsJson)
+                        val map = mutableMapOf<String, String>()
+                        json.keys().forEach { key ->
+                            map[key] = json.getString(key)
+                        }
+                        map
+                    } catch (e: Exception) {
+                        emptyMap<String, String>()
+                    }
+
+                    devices.add(
+                        NetworkDeviceConnection(
+                            deviceName = name,
+                            networkConnections = connections,
+                            port = port,
+                            lastConnected = lastConnected,
+                            isPlus = isPlus
+                        )
+                    )
+                }
+            }
+
+            devices.sortedByDescending { it.lastConnected }
+        }
+    }
+
+    suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = timestamp.toString()
         }
     }
 }

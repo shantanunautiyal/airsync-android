@@ -7,6 +7,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.DeviceInfo
+import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.model.UpdateInfo
 import com.sameerasw.airsync.domain.model.UpdateStatus
@@ -52,6 +53,10 @@ class AirSyncViewModel(
     val showUpdateDialog: StateFlow<Boolean> = _showUpdateDialog.asStateFlow()
 
     private var currentDownloadId: Long? = null
+
+    // Network-aware device connections state
+    private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
+    val networkDevices: StateFlow<List<NetworkDeviceConnection>> = _networkDevices.asStateFlow()
 
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
@@ -104,6 +109,13 @@ class AirSyncViewModel(
 
             _deviceInfo.value = DeviceInfo(name = deviceName, localIp = localIp)
 
+            // Load network-aware device connections
+            loadNetworkDevices()
+
+            // Check for network-aware device for current network
+            val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+            val deviceToShow = networkAwareDevice ?: lastConnected
+
             // Check permissions
             val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
             val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
@@ -119,7 +131,7 @@ class AirSyncViewModel(
                 isDialogVisible = showConnectionDialog && !currentlyConnected,
                 missingPermissions = missingPermissions,
                 isNotificationEnabled = isNotificationEnabled,
-                lastConnectedDevice = lastConnected,
+                lastConnectedDevice = deviceToShow,
                 isNotificationSyncEnabled = isNotificationSyncEnabled,
                 isDeveloperMode = isDeveloperMode,
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
@@ -202,15 +214,65 @@ class AirSyncViewModel(
 
     fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false) {
         viewModelScope.launch {
+            val deviceName = pcName ?: "My Mac"
+            val ourIp = _deviceInfo.value.localIp
+            val clientIp = _uiState.value.ipAddress
+            val port = _uiState.value.port
+
+            // Save using network-aware storage
+            repository.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus)
+
+            // Also save to legacy storage for backwards compatibility
             val connectedDevice = ConnectedDevice(
-                name = pcName ?: "My Mac",
-                ipAddress = _uiState.value.ipAddress,
-                port = _uiState.value.port,
+                name = deviceName,
+                ipAddress = clientIp,
+                port = port,
                 lastConnected = System.currentTimeMillis(),
                 isPlus = isPlus
             )
             repository.saveLastConnectedDevice(connectedDevice)
             _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)
+
+            // Refresh network devices list
+            loadNetworkDevices()
+        }
+    }
+
+    private suspend fun loadNetworkDevices() {
+        repository.getAllNetworkDeviceConnections().first().let { devices ->
+            _networkDevices.value = devices
+        }
+    }
+
+    fun getNetworkAwareLastConnectedDevice(): ConnectedDevice? {
+        val ourIp = _deviceInfo.value.localIp
+        if (ourIp.isEmpty() || ourIp == "Unknown") return null
+
+        // Find the most recent device that has a connection for our current network
+        val networkDevice = _networkDevices.value
+            .filter { it.getClientIpForNetwork(ourIp) != null }
+            .maxByOrNull { it.lastConnected }
+
+        return networkDevice?.toConnectedDevice(ourIp)
+    }
+
+    fun connectToNetworkDevice(deviceName: String) {
+        viewModelScope.launch {
+            val ourIp = _deviceInfo.value.localIp
+            if (ourIp.isEmpty() || ourIp == "Unknown") return@launch
+
+            val networkDevice = repository.getNetworkDeviceConnection(deviceName).first()
+            val clientIp = networkDevice?.getClientIpForNetwork(ourIp)
+
+            if (clientIp != null && networkDevice != null) {
+                // Update IP and port in UI state
+                updateIpAddress(clientIp)
+                updatePort(networkDevice.port)
+
+                // Update last connected timestamp
+                repository.updateNetworkDeviceLastConnected(deviceName, System.currentTimeMillis())
+                loadNetworkDevices()
+            }
         }
     }
 

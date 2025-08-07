@@ -2,6 +2,7 @@ package com.sameerasw.airsync.domain.repository
 
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.NotificationApp
+import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import kotlinx.coroutines.flow.Flow
 
 interface AirSyncRepository {
@@ -28,6 +29,12 @@ interface AirSyncRepository {
 
     suspend fun saveLastConnectedDevice(device: ConnectedDevice)
     fun getLastConnectedDevice(): Flow<ConnectedDevice?>
+
+    // Network-aware device connections
+    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean)
+    fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?>
+    fun getAllNetworkDeviceConnections(): Flow<List<NetworkDeviceConnection>>
+    suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long)
 
     // App notification preferences
     suspend fun saveNotificationApps(apps: List<NotificationApp>)

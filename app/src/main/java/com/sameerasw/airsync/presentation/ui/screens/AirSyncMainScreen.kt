@@ -313,9 +313,19 @@ fun AirSyncMainScreen(
                     LastConnectedDeviceCard(
                         device = device,
                         onQuickConnect = {
-                            viewModel.updateIpAddress(device.ipAddress)
-                            viewModel.updatePort(device.port)
-                            connect()
+                            // Check if we can use network-aware connection first
+                            val networkAwareDevice = viewModel.getNetworkAwareLastConnectedDevice()
+                            if (networkAwareDevice != null) {
+                                // Use network-aware device IP for current network
+                                viewModel.updateIpAddress(networkAwareDevice.ipAddress)
+                                viewModel.updatePort(networkAwareDevice.port)
+                                connect()
+                            } else {
+                                // Fallback to legacy stored device
+                                viewModel.updateIpAddress(device.ipAddress)
+                                viewModel.updatePort(device.port)
+                                connect()
+                            }
                         }
                     )
                 }
