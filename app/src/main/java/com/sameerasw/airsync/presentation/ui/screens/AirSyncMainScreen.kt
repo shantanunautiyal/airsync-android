@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +77,12 @@ fun AirSyncMainScreen(
 
     // Track if we've already processed the QR code dialog to prevent re-showing
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
+
+    // State for advanced settings expansion
+    var settingsExpanded by remember { mutableStateOf(true) }
+    LaunchedEffect(uiState.isConnected) {
+        settingsExpanded = !uiState.isConnected
+    }
 
     // State for About dialog
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -370,127 +377,157 @@ fun AirSyncMainScreen(
                 }
             }
 
-            // Notification Sync Settings Card
-            NotificationSyncCard(
-                isNotificationEnabled = uiState.isNotificationEnabled,
-                isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
-                onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
-                onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                onManageApps = onNavigateToApps
-            )
-
-            // Clipboard Sync Card
-            ClipboardSyncCard(
-                isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) }
-            )
-
-
-            DeviceInfoCard(
-                deviceName = uiState.deviceNameInput,
-                localIp = deviceInfo.localIp,
-                onDeviceNameChange = { viewModel.updateDeviceName(it) }
-            )
-
-            // Developer Mode Card
-            AnimatedVisibility(
-                visible = uiState.isDeveloperModeVisible,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+            // Advanced Settings Section
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { settingsExpanded = !settingsExpanded }
+                    .padding(vertical = 8.dp, horizontal = 16.dp)
             ) {
-                DeveloperModeCard(
-                    isDeveloperMode = uiState.isDeveloperMode,
-                    onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
-                    isLoading = uiState.isLoading,
-                    onSendDeviceInfo = {
-                        val message = JsonUtil.createDeviceInfoJson(
-                            deviceInfo.name,
-                            deviceInfo.localIp,
-                            uiState.port.toIntOrNull() ?: 6996,
-                            versionName ?: "2.0.0"
-                        )
-                        sendMessage(message)
-                    },
-                    onSendNotification = {
-                        val message = JsonUtil.createNotificationJson(
-                            "121212",
-                            "Test Message",
-                            "This is a simulated notification from AirSync.",
-                            "AirSync",
-                            "com.sameerasw.airsync"
-                        )
-                        sendMessage(message)
-                    },
-                    onSendDeviceStatus = {
-                        val message = DeviceInfoUtil.generateDeviceStatusJson(
-                            context
-                        )
-                        sendMessage(message)
-                    },
-                    uiState = uiState
+                Text("Settings", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    painter = painterResource(
+                        if (settingsExpanded) R.drawable.outline_expand_circle_up_24 else R.drawable.outline_expand_circle_down_24
+                    ),
+                    contentDescription = if (settingsExpanded) "Collapse" else "Expand"
                 )
             }
 
-
-
-            // Manual Icon Sync Button
-            OutlinedButton(
-                onClick = {
-                    viewModel.manualSyncAppIcons(context)
-                },
-                modifier = Modifier.fillMaxWidth().padding(top=  if (uiState.isDeveloperModeVisible)0.dp else 20.dp),
-                shape = RoundedCornerShape(
-                    topStart = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
-                    topEnd = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
-                    bottomStart = ExtraCornerRadius,
-                    bottomEnd = ExtraCornerRadius
-                ),
-                enabled = uiState.isConnected && !uiState.isIconSyncLoading
-            ) {
-                if (uiState.isIconSyncLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
-            }
-
-            // Icon Sync Message Display
             AnimatedVisibility(
-                visible = uiState.iconSyncMessage.isNotEmpty(),
+                visible = settingsExpanded,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(ExtraCornerRadius),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
-                            MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.errorContainer
-                    )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
+                    // Notification Sync Settings Card
+                    NotificationSyncCard(
+                        isNotificationEnabled = uiState.isNotificationEnabled,
+                        isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
+                        onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
+                        onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+                        onManageApps = onNavigateToApps
+                    )
+
+                    // Clipboard Sync Card
+                    ClipboardSyncCard(
+                        isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                        onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) }
+                    )
+
+
+                    DeviceInfoCard(
+                        deviceName = uiState.deviceNameInput,
+                        localIp = deviceInfo.localIp,
+                        onDeviceNameChange = { viewModel.updateDeviceName(it) }
+                    )
+
+                    // Developer Mode Card
+                    AnimatedVisibility(
+                        visible = uiState.isDeveloperModeVisible,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        DeveloperModeCard(
+                            isDeveloperMode = uiState.isDeveloperMode,
+                            onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
+                            isLoading = uiState.isLoading,
+                            onSendDeviceInfo = {
+                                val message = JsonUtil.createDeviceInfoJson(
+                                    deviceInfo.name,
+                                    deviceInfo.localIp,
+                                    uiState.port.toIntOrNull() ?: 6996,
+                                    versionName ?: "2.0.0"
+                                )
+                                sendMessage(message)
+                            },
+                            onSendNotification = {
+                                val message = JsonUtil.createNotificationJson(
+                                    "121212",
+                                    "Test Message",
+                                    "This is a simulated notification from AirSync.",
+                                    "AirSync",
+                                    "com.sameerasw.airsync"
+                                )
+                                sendMessage(message)
+                            },
+                            onSendDeviceStatus = {
+                                val message = DeviceInfoUtil.generateDeviceStatusJson(
+                                    context
+                                )
+                                sendMessage(message)
+                            },
+                            uiState = uiState
+                        )
+                    }
+
+
+
+                    // Manual Icon Sync Button
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.manualSyncAppIcons(context)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(top = if (uiState.isDeveloperModeVisible) 0.dp else 20.dp),
+                        shape = RoundedCornerShape(
+                            topStart = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
+                            topEnd = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
+                            bottomStart = ExtraCornerRadius,
+                            bottomEnd = ExtraCornerRadius
+                        ),
+                        enabled = uiState.isConnected && !uiState.isIconSyncLoading
                     ) {
-                        Text(
-                            text = uiState.iconSyncMessage,
-                            modifier = Modifier.weight(1f),
-                            color = if (uiState.iconSyncMessage.contains("Successfully"))
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        TextButton(
-                            onClick = { viewModel.clearIconSyncMessage() }
+                        if (uiState.isIconSyncLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
+                    }
+
+                    // Icon Sync Message Display
+                    AnimatedVisibility(
+                        visible = uiState.iconSyncMessage.isNotEmpty(),
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(ExtraCornerRadius),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.errorContainer
+                            )
                         ) {
-                            Text("Dismiss")
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = uiState.iconSyncMessage,
+                                    modifier = Modifier.weight(1f),
+                                    color = if (uiState.iconSyncMessage.contains("Successfully"))
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                TextButton(
+                                    onClick = { viewModel.clearIconSyncMessage() }
+                                ) {
+                                    Text("Dismiss")
+                                }
+                            }
                         }
                     }
                 }
