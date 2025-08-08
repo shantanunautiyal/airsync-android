@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit
 object UpdateManager {
     private const val TAG = "UpdateManager"
     private const val GITHUB_API_URL = "https://api.github.com/repos/sameerasw/airsync-android/releases/latest"
-    private const val APK_FILE_NAME = "app-release.apk"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)

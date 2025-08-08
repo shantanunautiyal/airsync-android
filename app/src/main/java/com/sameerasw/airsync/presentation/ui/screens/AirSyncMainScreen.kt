@@ -338,8 +338,6 @@ fun AirSyncMainScreen(
             NotificationSyncCard(
                 isNotificationEnabled = uiState.isNotificationEnabled,
                 isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
-                ipAddress = uiState.ipAddress,
-                port = uiState.port,
                 onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
                 onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
                 onManageApps = onNavigateToApps
@@ -348,8 +346,7 @@ fun AirSyncMainScreen(
             // Clipboard Sync Card
             ClipboardSyncCard(
                 isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
-                isConnected = uiState.isConnected
+                onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) }
             )
 
 

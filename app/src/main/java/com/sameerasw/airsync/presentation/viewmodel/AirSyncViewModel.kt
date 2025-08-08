@@ -57,7 +57,6 @@ class AirSyncViewModel(
 
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
-    val networkDevices: StateFlow<List<NetworkDeviceConnection>> = _networkDevices.asStateFlow()
 
     // Network monitoring
     private var isNetworkMonitoringActive = false
@@ -212,11 +211,6 @@ class AirSyncViewModel(
         )
     }
 
-    fun refreshDeviceInfo(context: Context) {
-        val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
-        _deviceInfo.value = _deviceInfo.value.copy(localIp = localIp)
-    }
-
     fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false) {
         viewModelScope.launch {
             val deviceName = pcName ?: "My Mac"
@@ -259,26 +253,6 @@ class AirSyncViewModel(
             .maxByOrNull { it.lastConnected }
 
         return networkDevice?.toConnectedDevice(ourIp)
-    }
-
-    fun connectToNetworkDevice(deviceName: String) {
-        viewModelScope.launch {
-            val ourIp = _deviceInfo.value.localIp
-            if (ourIp.isEmpty() || ourIp == "Unknown") return@launch
-
-            val networkDevice = repository.getNetworkDeviceConnection(deviceName).first()
-            val clientIp = networkDevice?.getClientIpForNetwork(ourIp)
-
-            if (clientIp != null && networkDevice != null) {
-                // Update IP and port in UI state
-                updateIpAddress(clientIp)
-                updatePort(networkDevice.port)
-
-                // Update last connected timestamp
-                repository.updateNetworkDeviceLastConnected(deviceName, System.currentTimeMillis())
-                loadNetworkDevices()
-            }
-        }
     }
 
     fun setNotificationSyncEnabled(enabled: Boolean) {
@@ -447,11 +421,6 @@ class AirSyncViewModel(
         currentDownloadId = null
     }
 
-    fun retryDownload(context: Context) {
-        _updateStatus.value = UpdateStatus.UPDATE_AVAILABLE
-        downloadUpdate(context)
-    }
-
     fun startNetworkMonitoring(context: Context) {
         if (isNetworkMonitoringActive) return
 
@@ -464,10 +433,6 @@ class AirSyncViewModel(
                     handleNetworkChange(context, networkInfo)
                 }
         }
-    }
-
-    fun stopNetworkMonitoring() {
-        isNetworkMonitoringActive = false
     }
 
     private suspend fun handleNetworkChange(context: Context, networkInfo: com.sameerasw.airsync.utils.NetworkInfo) {

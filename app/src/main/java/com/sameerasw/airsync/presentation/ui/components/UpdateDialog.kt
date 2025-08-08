@@ -21,8 +21,6 @@ fun UpdateDialog(
     downloadProgress: Int,
     onDismiss: () -> Unit,
     onDownload: () -> Unit,
-    onInstall: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
 ) {
     if (updateInfo == null) return
 

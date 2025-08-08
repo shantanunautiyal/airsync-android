@@ -5,7 +5,6 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.domain.model.BatteryInfo
-import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean

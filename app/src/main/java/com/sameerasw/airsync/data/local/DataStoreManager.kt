@@ -280,7 +280,7 @@ class DataStoreManager(private val context: Context) {
                 }
                 map
             } catch (e: Exception) {
-                mutableMapOf<String, String>()
+                mutableMapOf()
             }
 
             // Add/update the new connection
@@ -315,7 +315,7 @@ class DataStoreManager(private val context: Context) {
                     }
                     map
                 } catch (e: Exception) {
-                    emptyMap<String, String>()
+                    emptyMap()
                 }
 
                 NetworkDeviceConnection(
@@ -361,7 +361,7 @@ class DataStoreManager(private val context: Context) {
                         }
                         map
                     } catch (e: Exception) {
-                        emptyMap<String, String>()
+                        emptyMap()
                     }
 
                     devices.add(

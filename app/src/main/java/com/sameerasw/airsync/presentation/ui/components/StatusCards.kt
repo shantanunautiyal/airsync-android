@@ -19,8 +19,6 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 fun NotificationSyncCard(
     isNotificationEnabled: Boolean,
     isNotificationSyncEnabled: Boolean,
-    ipAddress: String,
-    port: String,
     onToggleSync: (Boolean) -> Unit,
     onGrantPermissions: () -> Unit,
     onManageApps: () -> Unit = {}

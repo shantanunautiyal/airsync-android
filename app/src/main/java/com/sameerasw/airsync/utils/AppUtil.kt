@@ -3,13 +3,10 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import android.util.Log
 import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 
 object AppUtil {
     private const val TAG = "AppUtil"

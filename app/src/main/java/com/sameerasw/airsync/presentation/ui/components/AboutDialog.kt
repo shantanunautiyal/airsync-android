@@ -1,7 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components
 
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,6 +19,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.R
+import androidx.core.net.toUri
 
 
 @Composable
@@ -29,7 +29,6 @@ fun AboutDialog(
     appName: String = "AirSync BETA",
     developerName: String = "Sameera Wijerathna",
     description: String = "AirSync enables seamless synchronization between your Android device and mac. Share notifications, clipboard content, and device status wirelessly over your local network.",
-    githubUsername: String = "sameerasw"
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -38,7 +37,7 @@ fun AboutDialog(
         context.packageManager
             .getPackageInfo(context.packageName, 0)
             .versionName
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         "Unknown"
     }
 
@@ -68,7 +67,7 @@ fun AboutDialog(
                 Button(
                     onClick = {
                         val websiteUrl = "https://www.sameerasw.com/airsync"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(websiteUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, websiteUrl.toUri())
                         context.startActivity(intent)
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -82,7 +81,7 @@ fun AboutDialog(
                 OutlinedButton(
                     onClick = {
                         val macAppUrl = "https://github.com/sameerasw/airsync-mac/releases/latest"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(macAppUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, macAppUrl.toUri())
                         context.startActivity(intent)
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -96,7 +95,7 @@ fun AboutDialog(
                 OutlinedButton(
                     onClick = {
                         val airSyncPlusUrl = "https://airsync.sameerasw.com"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(airSyncPlusUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
                         context.startActivity(intent)
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -154,7 +153,7 @@ fun AboutDialog(
         dismissButton = {
             Button(onClick = {
                 val websiteUrl = "https://www.sameerasw.com"
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(websiteUrl))
+                val intent = Intent(Intent.ACTION_VIEW, websiteUrl.toUri())
                 context.startActivity(intent)
             }) {
                 Text("My website")
