@@ -12,6 +12,7 @@ import android.provider.Settings
 import android.text.TextUtils
 import androidx.core.content.ContextCompat
 import com.sameerasw.airsync.service.MediaNotificationListener
+import androidx.core.net.toUri
 
 object PermissionUtil {
 
@@ -37,7 +38,7 @@ object PermissionUtil {
      * Check if battery optimization permission is required for this Android version
      */
     fun isBatteryOptimizationPermissionRequired(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+        return true
     }
 
     /**
@@ -145,7 +146,7 @@ object PermissionUtil {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(intent)

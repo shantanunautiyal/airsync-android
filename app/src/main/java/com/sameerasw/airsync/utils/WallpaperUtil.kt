@@ -9,6 +9,8 @@ import android.os.Build
 import android.util.Base64
 import android.util.Log
 import java.io.ByteArrayOutputStream
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 
 object WallpaperUtil {
     private const val TAG = "WallpaperUtil"
@@ -98,13 +100,9 @@ object WallpaperUtil {
 
             val bitmap = if (drawable.intrinsicWidth <= 0 || drawable.intrinsicHeight <= 0) {
                 // Single color bitmap will be created of 1x1 pixel
-                Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+                createBitmap(1, 1)
             } else {
-                Bitmap.createBitmap(
-                    drawable.intrinsicWidth,
-                    drawable.intrinsicHeight,
-                    Bitmap.Config.ARGB_8888
-                )
+                createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight)
             }
 
             val canvas = android.graphics.Canvas(bitmap)
@@ -138,7 +136,7 @@ object WallpaperUtil {
 
         Log.d(TAG, "Resizing wallpaper from ${width}x${height} to ${newWidth}x${newHeight}")
 
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        return bitmap.scale(newWidth, newHeight)
     }
 
     /**
@@ -154,39 +152,5 @@ object WallpaperUtil {
             Log.e(TAG, "Error converting bitmap to base64: ${e.message}")
             null
         }
-    }
-
-    /**
-     * Get wallpaper info for debugging
-     */
-    fun getWallpaperInfo(context: Context): Map<String, String> {
-        val info = mutableMapOf<String, String>()
-
-        try {
-            val wallpaperManager = WallpaperManager.getInstance(context)
-
-            info["hasPermissions"] = hasWallpaperPermissions(context).toString()
-            info["apiLevel"] = Build.VERSION.SDK_INT.toString()
-
-            try {
-                val wallpaper = wallpaperManager.drawable
-                if (wallpaper != null) {
-                    info["wallpaperWidth"] = wallpaper.intrinsicWidth.toString()
-                    info["wallpaperHeight"] = wallpaper.intrinsicHeight.toString()
-                    info["wallpaperType"] = wallpaper::class.java.simpleName
-                } else {
-                    info["wallpaperStatus"] = "null"
-                }
-            } catch (e: SecurityException) {
-                info["wallpaperError"] = "SecurityException: ${e.message}"
-            } catch (e: Exception) {
-                info["wallpaperError"] = "Exception: ${e.message}"
-            }
-
-        } catch (e: Exception) {
-            info["error"] = e.message ?: "Unknown error"
-        }
-
-        return info
     }
 }

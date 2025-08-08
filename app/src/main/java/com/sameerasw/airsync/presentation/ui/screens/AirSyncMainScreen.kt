@@ -3,7 +3,6 @@ package com.sameerasw.airsync.presentation.ui.screens
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -12,19 +11,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.ui.components.*
@@ -61,7 +56,7 @@ fun AirSyncMainScreen(
         context.packageManager
             .getPackageInfo(context.packageName, 0)
             .versionName
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         "2.0.0"
     }
     val viewModel: AirSyncViewModel = viewModel { AirSyncViewModel.create(context) }
@@ -154,7 +149,7 @@ fun AirSyncMainScreen(
                                 ClipboardSyncManager.handleClipboardUpdate(context, text)
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Not a clipboard update, ignore
                     }
                 }
@@ -177,12 +172,12 @@ fun AirSyncMainScreen(
 
         try {
             context.startActivity(lensIntent)
-        } catch (e: ActivityNotFoundException) {
+        } catch (_: ActivityNotFoundException) {
             // Fallback to default camera app
             val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
             try {
                 context.startActivity(cameraIntent)
-            } catch (e: ActivityNotFoundException) {
+            } catch (_: ActivityNotFoundException) {
                 Toast.makeText(context, "No camera app found", Toast.LENGTH_SHORT).show()
             }
         }

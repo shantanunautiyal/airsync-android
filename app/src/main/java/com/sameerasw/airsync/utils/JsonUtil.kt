@@ -1,7 +1,5 @@
 package com.sameerasw.airsync.utils
 
-import androidx.compose.ui.platform.LocalContext
-
 object JsonUtil {
 
     /**
