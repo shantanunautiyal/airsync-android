@@ -305,26 +305,6 @@ fun AirSyncMainScreen(
                 )
             }
 
-            AnimatedVisibility(
-                visible = !uiState.isConnected,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ManualConnectionCard(
-                        uiState = uiState,
-                        onIpChange = { viewModel.updateIpAddress(it) },
-                        onPortChange = { viewModel.updatePort(it) },
-                        onPcNameChange = { viewModel.updateManualPcName(it) },
-                        onIsPlusChange = { viewModel.updateManualIsPlus(it) },
-                        onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
-                        onConnect = { viewModel.prepareForManualConnection() }
-                    )
-                }
-            }
-
-
             // Permission Status Card
             AnimatedVisibility(
                 visible = uiState.missingPermissions.isNotEmpty(),
@@ -347,6 +327,25 @@ fun AirSyncMainScreen(
                 connectedDevice = uiState.lastConnectedDevice,
                 lastConnected = uiState.lastConnectedDevice != null
             )
+
+            AnimatedVisibility(
+                visible = !uiState.isConnected,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ManualConnectionCard(
+                        uiState = uiState,
+                        onIpChange = { viewModel.updateIpAddress(it) },
+                        onPortChange = { viewModel.updatePort(it) },
+                        onPcNameChange = { viewModel.updateManualPcName(it) },
+                        onIsPlusChange = { viewModel.updateManualIsPlus(it) },
+                        onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
+                        onConnect = { viewModel.prepareForManualConnection() }
+                    )
+                }
+            }
 
             // Last Connected Device Section - only show when not currently connected
             AnimatedVisibility(
