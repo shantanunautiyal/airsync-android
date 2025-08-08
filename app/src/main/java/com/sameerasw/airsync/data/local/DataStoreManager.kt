@@ -28,6 +28,7 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_PC_PORT = stringPreferencesKey("last_connected_pc_port")
         private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
         private val LAST_CONNECTED_PC_PLUS = booleanPreferencesKey("last_connected_pc_plus")
+        private val LAST_CONNECTED_SYMMETRIC_KEY = stringPreferencesKey("last_connected_symmetric_key")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
@@ -132,6 +133,9 @@ class DataStoreManager(private val context: Context) {
             preferences[LAST_CONNECTED_PC_PORT] = device.port
             preferences[LAST_CONNECTED_TIMESTAMP] = device.lastConnected.toString()
             preferences[LAST_CONNECTED_PC_PLUS] = device.isPlus
+            device.symmetricKey?.let {
+                preferences[LAST_CONNECTED_SYMMETRIC_KEY] = it
+            }
             preferences[ICON_SYNC_COUNT] = device.iconSyncCount.toString()
             device.lastIconSyncDate?.let {
                 preferences[LAST_ICON_SYNC_DATE] = it
@@ -149,6 +153,7 @@ class DataStoreManager(private val context: Context) {
             val port = preferences[LAST_CONNECTED_PC_PORT]
             val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
             val isPlus = preferences[LAST_CONNECTED_PC_PLUS] ?: false
+            val symmetricKey = preferences[LAST_CONNECTED_SYMMETRIC_KEY]
             val lastSyncTime = preferences[LAST_SYNC_TIME]?.toLongOrNull()
             val iconSyncCount = preferences[ICON_SYNC_COUNT]?.toIntOrNull() ?: 0
             val lastIconSyncDate = preferences[LAST_ICON_SYNC_DATE]
@@ -162,7 +167,8 @@ class DataStoreManager(private val context: Context) {
                     lastSyncTime = lastSyncTime,
                     isPlus = isPlus,
                     iconSyncCount = iconSyncCount,
-                    lastIconSyncDate = lastIconSyncDate
+                    lastIconSyncDate = lastIconSyncDate,
+                    symmetricKey = symmetricKey
                 )
             } else {
                 null
@@ -268,7 +274,7 @@ class DataStoreManager(private val context: Context) {
     }
 
     // Network-aware device connections
-    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean) {
+    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?) {
         context.dataStore.edit { preferences ->
             // Load existing connections for this device
             val existingConnectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
@@ -293,6 +299,9 @@ class DataStoreManager(private val context: Context) {
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_name")] = deviceName
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")] = port
             preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] = isPlus
+            symmetricKey?.let {
+                preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_symmetric_key")] = it
+            }
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = System.currentTimeMillis().toString()
             preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] = updatedJson
         }
@@ -303,6 +312,7 @@ class DataStoreManager(private val context: Context) {
             val name = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_name")]
             val port = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")]
             val isPlus = preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] ?: false
+            val symmetricKey = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_symmetric_key")]
             val lastConnected = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")]?.toLongOrNull() ?: 0L
             val connectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
 
@@ -323,7 +333,8 @@ class DataStoreManager(private val context: Context) {
                     networkConnections = connections,
                     port = port,
                     lastConnected = lastConnected,
-                    isPlus = isPlus
+                    isPlus = isPlus,
+                    symmetricKey = symmetricKey
                 )
             } else {
                 null
@@ -349,6 +360,7 @@ class DataStoreManager(private val context: Context) {
                 val name = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_name")]
                 val port = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")]
                 val isPlus = preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] ?: false
+                val symmetricKey = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_symmetric_key")]
                 val lastConnected = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")]?.toLongOrNull() ?: 0L
                 val connectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
 
@@ -370,7 +382,8 @@ class DataStoreManager(private val context: Context) {
                             networkConnections = connections,
                             port = port,
                             lastConnected = lastConnected,
-                            isPlus = isPlus
+                            isPlus = isPlus,
+                            symmetricKey = symmetricKey
                         )
                     )
                 }

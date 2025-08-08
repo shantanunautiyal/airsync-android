@@ -83,6 +83,7 @@ class AirSyncTileService : TileService() {
                     context = this@AirSyncTileService,
                     ipAddress = lastDevice.ipAddress,
                     port = lastDevice.port.toIntOrNull() ?: 6996,
+                    symmetricKey = lastDevice.symmetricKey,
                     onConnectionStatus = { connected ->
                         serviceScope.launch {
                             updateTileState()
@@ -94,21 +95,13 @@ class AirSyncTileService : TileService() {
                 val intent = Intent(this, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
-
-                // Use API level appropriate method
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    val pendingIntent = PendingIntent.getActivity(
-                        this@AirSyncTileService,
-                        0,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    startActivityAndCollapse(pendingIntent)
-                } else {
-                    // Use deprecated method for older API levels
-                    @Suppress("DEPRECATION")
-                    startActivityAndCollapse(intent)
-                }
+                val pendingIntent = PendingIntent.getActivity(
+                    this@AirSyncTileService,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                startActivityAndCollapse(pendingIntent)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error connecting to last device", e)

@@ -20,7 +20,8 @@ data class UiState(
     val isConnecting: Boolean = false,
     val isClipboardSyncEnabled: Boolean = true,
     val isIconSyncLoading: Boolean = false,
-    val iconSyncMessage: String = ""
+    val iconSyncMessage: String = "",
+    val symmetricKey: String? = null
 )
 
 data class DeviceInfo(
@@ -36,18 +37,17 @@ data class ConnectedDevice(
     val lastSyncTime: Long? = null,
     val isPlus: Boolean = false,
     val iconSyncCount: Int = 0,
-    val lastIconSyncDate: String? = null
+    val lastIconSyncDate: String? = null,
+    val symmetricKey: String? = null
 )
 
 data class NetworkDeviceConnection(
     val deviceName: String,
-    val networkConnections: Map<String, String>,
+    val networkConnections: Map<String, String>, // Map of our IP -> client IP
     val port: String,
     val lastConnected: Long,
-    val lastSyncTime: Long? = null,
-    val isPlus: Boolean = false,
-    val iconSyncCount: Int = 0,
-    val lastIconSyncDate: String? = null
+    val isPlus: Boolean,
+    val symmetricKey: String? = null
 ) {
     // get client IP for current network
     fun getClientIpForNetwork(ourIp: String): String? {
@@ -61,12 +61,10 @@ data class NetworkDeviceConnection(
             ConnectedDevice(
                 name = deviceName,
                 ipAddress = clientIp,
-                port = port,
-                lastConnected = lastConnected,
-                lastSyncTime = lastSyncTime,
-                isPlus = isPlus,
-                iconSyncCount = iconSyncCount,
-                lastIconSyncDate = lastIconSyncDate
+                port = this.port,
+                lastConnected = this.lastConnected,
+                isPlus = this.isPlus,
+                symmetricKey = this.symmetricKey
             )
         } else null
     }

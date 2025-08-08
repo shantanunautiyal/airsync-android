@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import android.util.Log
-import androidx.core.content.ContextCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.data.local.DataStoreManager
@@ -108,6 +107,7 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
                         context = context,
                         ipAddress = lastDevice.ipAddress,
                         port = lastDevice.port.toIntOrNull() ?: 6996,
+                        symmetricKey = lastDevice.symmetricKey,
                         onConnectionStatus = { connected ->
                             if (connected) {
                                 Log.d(TAG, "Widget reconnected successfully")
@@ -150,7 +150,6 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             try {
                 if (WebSocketUtil.isConnected()) {
                     // Trigger manual icon sync
-                    val dataStoreManager = DataStoreManager(context)
                     com.sameerasw.airsync.utils.SyncManager.manualSyncAppIcons(context) { success, message ->
                         Log.d(TAG, "Manual sync result: $success - $message")
                     }
@@ -161,7 +160,7 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    private suspend fun updateWidget(
+    private fun updateWidget(
         context: Context,
         appWidgetManager: AppWidgetManager,
         widgetId: Int,
@@ -258,9 +257,9 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             val openAppIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
-            val openAppPendingIntent = android.app.PendingIntent.getActivity(
+            val openAppPendingIntent = PendingIntent.getActivity(
                 context, 0, openAppIntent,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_container, openAppPendingIntent)
 
@@ -269,12 +268,12 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
 
         } catch (e: Exception) {
             Log.e(TAG, "Error updating widget $widgetId: ${e.message}")
-            setupErrorState(context, views)
+            setupErrorState(views)
             appWidgetManager.updateAppWidget(widgetId, views)
         }
     }
 
-    private fun setupErrorState(context: Context, views: RemoteViews) {
+    private fun setupErrorState(views: RemoteViews) {
         views.setTextViewText(R.id.widget_device_name, "AirSync")
         views.setTextViewText(R.id.widget_connection_status, "❌")
         views.setTextViewText(R.id.widget_battery_info, "Error")

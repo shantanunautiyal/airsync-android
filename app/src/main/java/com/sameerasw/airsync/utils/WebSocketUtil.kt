@@ -16,6 +16,7 @@ object WebSocketUtil {
     private var client: OkHttpClient? = null
     private var currentIpAddress: String? = null
     private var currentPort: Int? = null
+    private var currentSymmetricKey: javax.crypto.SecretKey? = null
     private var isConnected = AtomicBoolean(false)
     private var isConnecting = AtomicBoolean(false)
 
@@ -39,6 +40,7 @@ object WebSocketUtil {
         context: Context,
         ipAddress: String,
         port: Int,
+        symmetricKey: String?,
         onConnectionStatus: ((Boolean) -> Unit)? = null,
         onMessage: ((String) -> Unit)? = null
     ) {
@@ -57,6 +59,7 @@ object WebSocketUtil {
         isConnecting.set(true)
         currentIpAddress = ipAddress
         currentPort = port
+        currentSymmetricKey = symmetricKey?.let { CryptoUtil.decodeKey(it) }
         onConnectionStatusChanged = onConnectionStatus
         onMessageReceived = onMessage
 
@@ -100,14 +103,23 @@ object WebSocketUtil {
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     Log.d(TAG, "Received: $text")
 
+                    val decryptedMessage = currentSymmetricKey?.let { key ->
+                        CryptoUtil.decryptMessage(text, key)
+                    } ?: text
+
+                    if (decryptedMessage == null) {
+                        Log.e(TAG, "Failed to decrypt message")
+                        return
+                    }
+
                     // Handle incoming commands from Mac
-                    WebSocketMessageHandler.handleIncomingMessage(context, text)
+                    WebSocketMessageHandler.handleIncomingMessage(context, decryptedMessage)
 
                     // Update last sync time on successful response
                     updateLastSyncTime(context)
 
                     // Notify listeners
-                    onMessageReceived?.invoke(text)
+                    onMessageReceived?.invoke(decryptedMessage)
                 }
 
                 override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -165,7 +177,16 @@ object WebSocketUtil {
     fun sendMessage(message: String): Boolean {
         return if (isConnected.get() && webSocket != null) {
             Log.d(TAG, "Sending message: $message")
-            webSocket!!.send(message)
+            val messageToSend = currentSymmetricKey?.let { key ->
+                CryptoUtil.encryptMessage(message, key)
+            } ?: message
+
+            if (messageToSend != null) {
+                webSocket!!.send(messageToSend)
+            } else {
+                Log.e(TAG, "Failed to encrypt message")
+                false
+            }
         } else {
             Log.w(TAG, "WebSocket not connected, cannot send message")
             false
@@ -198,6 +219,7 @@ object WebSocketUtil {
         client = null
         currentIpAddress = null
         currentPort = null
+        currentSymmetricKey = null
         onConnectionStatusChanged = null
         onMessageReceived = null
     }

@@ -90,7 +90,8 @@ class AirSyncViewModel(
         initialPort: String? = null,
         showConnectionDialog: Boolean = false,
         pcName: String? = null,
-        isPlus: Boolean = false
+        isPlus: Boolean = false,
+        symmetricKey: String? = null
     ) {
         viewModelScope.launch {
             // Load saved values
@@ -101,6 +102,7 @@ class AirSyncViewModel(
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
             val isDeveloperMode = repository.getDeveloperMode().first()
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
+            val lastConnectedSymmetricKey = lastConnected?.symmetricKey
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -139,7 +141,8 @@ class AirSyncViewModel(
                 isNotificationSyncEnabled = isNotificationSyncEnabled,
                 isDeveloperMode = isDeveloperMode,
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
-                isConnected = currentlyConnected
+                isConnected = currentlyConnected,
+                symmetricKey = symmetricKey ?: lastConnectedSymmetricKey
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -150,7 +153,8 @@ class AirSyncViewModel(
                         ipAddress = savedIp,
                         port = savedPort,
                         lastConnected = System.currentTimeMillis(),
-                        isPlus = isPlus
+                        isPlus = isPlus,
+                        symmetricKey = symmetricKey
                     )
                 )
             }
@@ -169,6 +173,10 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.savePort(port)
         }
+    }
+
+    fun updateSymmetricKey(symmetricKey: String?) {
+        _uiState.value = _uiState.value.copy(symmetricKey = symmetricKey)
     }
 
     fun updateDeviceName(name: String) {
@@ -211,7 +219,7 @@ class AirSyncViewModel(
         )
     }
 
-    fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false) {
+    fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false, symmetricKey: String? = null) {
         viewModelScope.launch {
             val deviceName = pcName ?: "My Mac"
             val ourIp = _deviceInfo.value.localIp
@@ -219,7 +227,7 @@ class AirSyncViewModel(
             val port = _uiState.value.port
 
             // Save using network-aware storage
-            repository.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus)
+            repository.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus, symmetricKey)
 
             // Also save to legacy storage for backwards compatibility
             val connectedDevice = ConnectedDevice(
@@ -227,7 +235,8 @@ class AirSyncViewModel(
                 ipAddress = clientIp,
                 port = port,
                 lastConnected = System.currentTimeMillis(),
-                isPlus = isPlus
+                isPlus = isPlus,
+                symmetricKey = symmetricKey
             )
             repository.saveLastConnectedDevice(connectedDevice)
             _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)
@@ -453,7 +462,8 @@ class AirSyncViewModel(
                 _uiState.value = _uiState.value.copy(
                     lastConnectedDevice = networkAwareDevice,
                     ipAddress = networkAwareDevice.ipAddress,
-                    port = networkAwareDevice.port
+                    port = networkAwareDevice.port,
+                    symmetricKey = networkAwareDevice.symmetricKey
                 )
 
                 // Save the new connection info
@@ -478,7 +488,8 @@ class AirSyncViewModel(
                         currentIp,
                         lastDevice.ipAddress,
                         lastDevice.port,
-                        lastDevice.isPlus
+                        lastDevice.isPlus,
+                        lastDevice.symmetricKey
                     )
 
                     // Reload network devices
@@ -520,6 +531,7 @@ class AirSyncViewModel(
                 context = context,
                 ipAddress = device.ipAddress,
                 port = device.port.toIntOrNull() ?: 6996,
+                symmetricKey = device.symmetricKey,
                 onConnectionStatus = { connected ->
                     viewModelScope.launch {
                         setConnectionStatus(isConnected = connected, isConnecting = false)
@@ -545,7 +557,7 @@ class AirSyncViewModel(
                                     com.sameerasw.airsync.utils.ClipboardSyncManager.handleClipboardUpdate(context, text)
                                 }
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             // Not a clipboard update, ignore
                         }
                     }

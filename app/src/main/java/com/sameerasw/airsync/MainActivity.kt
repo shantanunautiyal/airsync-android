@@ -39,30 +39,22 @@ class MainActivity : ComponentActivity() {
         // Parse QR code parameters
         var pcName: String? = null
         var isPlus = false
+        var symmetricKey: String? = null
 
         data?.let { uri ->
-            val query = uri.query
-            if (query != null) {
-                // Split on first occurrence of "?plus="
-                if (query.contains("?plus=")) {
-                    val parts = query.split("?plus=", limit = 2)
-                    if (parts.size == 2) {
-                        // Extract name part
-                        val namePart = parts[0]
-                        if (namePart.startsWith("name=")) {
-                            pcName = URLDecoder.decode(namePart.substring(5), "UTF-8")
-                        }
-
-                        // Extract plus value
-                        isPlus = parts[1].toBooleanStrictOrNull() ?: false
-                    }
-                } else {
-                    // Fallback to standard parameter parsing
-                    pcName = uri.getQueryParameter("name")?.let {
-                        URLDecoder.decode(it, "UTF-8")
-                    }
-                    isPlus = uri.getQueryParameter("plus")?.toBooleanStrictOrNull() ?: false
+            val urlString = uri.toString()
+            val queryPart = urlString.substringAfter('?', "")
+            if (queryPart.isNotEmpty()) {
+                val params = queryPart.split('?')
+                val paramMap = params.associate {
+                    val parts = it.split('=', limit = 2)
+                    val key = parts.getOrNull(0) ?: ""
+                    val value = parts.getOrNull(1) ?: ""
+                    key to value
                 }
+                pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
+                isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
+                symmetricKey = paramMap["key"]
             }
         }
 
@@ -85,6 +77,7 @@ class MainActivity : ComponentActivity() {
                                 showConnectionDialog = isFromQrScan,
                                 pcName = pcName,
                                 isPlus = isPlus,
+                                symmetricKey = symmetricKey,
                                 onNavigateToApps = {
                                     navController.navigate("notification_apps")
                                 },
