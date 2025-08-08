@@ -192,7 +192,7 @@ class AirSyncViewModel(
             name = _uiState.value.manualPcName.ifEmpty { "My Mac/PC" },
             ipAddress = _uiState.value.ipAddress,
             port = _uiState.value.port,
-            lastConnected = System.currentTimeMillis()
+            lastConnected = System.currentTimeMillis(),
             isPlus = _uiState.value.manualIsPlus,
             symmetricKey = _uiState.value.symmetricKey
         )

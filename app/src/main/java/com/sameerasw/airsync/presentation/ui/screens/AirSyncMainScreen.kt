@@ -5,6 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -281,7 +286,11 @@ fun AirSyncMainScreen(
 
             }
 
-            if (uiState.missingPermissions.isEmpty() && !uiState.isConnected) {
+            AnimatedVisibility(
+                visible = uiState.missingPermissions.isEmpty() && !uiState.isConnected,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 QrScannerRow(
                     onLaunchScanner = {
                         launchScanner(context)
@@ -289,15 +298,39 @@ fun AirSyncMainScreen(
                 )
             }
 
+            AnimatedVisibility(
+                visible = !uiState.isConnected,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ManualConnectionCard(
+                        uiState = uiState,
+                        onIpChange = { viewModel.updateIpAddress(it) },
+                        onPortChange = { viewModel.updatePort(it) },
+                        onPcNameChange = { viewModel.updateManualPcName(it) },
+                        onIsPlusChange = { viewModel.updateManualIsPlus(it) },
+                        onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
+                        onConnect = { viewModel.prepareForManualConnection() }
+                    )
+                }
+            }
 
 
             // Permission Status Card
-            PermissionStatusCard(
-                missingPermissions = uiState.missingPermissions,
-                onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                onRequestNotificationPermission = onRequestNotificationPermission
-            )
+            AnimatedVisibility(
+                visible = uiState.missingPermissions.isNotEmpty(),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                PermissionStatusCard(
+                    missingPermissions = uiState.missingPermissions,
+                    onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+                    onRefreshPermissions = { viewModel.refreshPermissions(context) },
+                    onRequestNotificationPermission = onRequestNotificationPermission
+                )
+            }
 
             // Connection Status Card - New main connection interface
             ConnectionStatusCard(
@@ -308,21 +341,12 @@ fun AirSyncMainScreen(
                 lastConnected = uiState.lastConnectedDevice != null
             )
 
-
-            if (!uiState.isConnected) {
-                ManualConnectionCard(
-                    uiState = uiState,
-                    onIpChange = { viewModel.updateIpAddress(it) },
-                    onPortChange = { viewModel.updatePort(it) },
-                    onPcNameChange = { viewModel.updateManualPcName(it) },
-                    onIsPlusChange = { viewModel.updateManualIsPlus(it) },
-                    onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
-                    onConnect = { viewModel.prepareForManualConnection() }
-                )
-            }
-
             // Last Connected Device Section - only show when not currently connected
-            if (!uiState.isConnected) {
+            AnimatedVisibility(
+                visible = !uiState.isConnected && uiState.lastConnectedDevice != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 uiState.lastConnectedDevice?.let { device ->
                     LastConnectedDeviceCard(
                         device = device,
@@ -369,7 +393,11 @@ fun AirSyncMainScreen(
             )
 
             // Developer Mode Card
-            if (uiState.isDeveloperModeVisible) {
+            AnimatedVisibility(
+                visible = uiState.isDeveloperModeVisible,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 DeveloperModeCard(
                     isDeveloperMode = uiState.isDeveloperMode,
                     onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
@@ -431,7 +459,11 @@ fun AirSyncMainScreen(
             }
 
             // Icon Sync Message Display
-            if (uiState.iconSyncMessage.isNotEmpty()) {
+            AnimatedVisibility(
+                visible = uiState.iconSyncMessage.isNotEmpty(),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(ExtraCornerRadius),
