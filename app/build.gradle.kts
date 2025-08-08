@@ -71,6 +71,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     implementation(libs.ui.graphics)
+    implementation(libs.androidx.foundation)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

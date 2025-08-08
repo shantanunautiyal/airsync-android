@@ -179,6 +179,29 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(symmetricKey = symmetricKey)
     }
 
+    fun updateManualPcName(name: String) {
+        _uiState.value = _uiState.value.copy(manualPcName = name)
+    }
+
+    fun updateManualIsPlus(isPlus: Boolean) {
+        _uiState.value = _uiState.value.copy(manualIsPlus = isPlus)
+    }
+
+    fun prepareForManualConnection() {
+        val manualDevice = ConnectedDevice(
+            name = _uiState.value.manualPcName.ifEmpty { "My Mac/PC" },
+            ipAddress = _uiState.value.ipAddress,
+            port = _uiState.value.port,
+            lastConnected = System.currentTimeMillis(),
+            isPlus = _uiState.value.manualIsPlus,
+            symmetricKey = _uiState.value.symmetricKey
+        )
+        _uiState.value = _uiState.value.copy(
+            lastConnectedDevice = manualDevice,
+            isDialogVisible = true
+        )
+    }
+
     fun updateDeviceName(name: String) {
         _uiState.value = _uiState.value.copy(deviceNameInput = name)
         _deviceInfo.value = _deviceInfo.value.copy(name = name)

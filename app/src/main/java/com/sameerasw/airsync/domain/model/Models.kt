@@ -21,7 +21,9 @@ data class UiState(
     val isClipboardSyncEnabled: Boolean = true,
     val isIconSyncLoading: Boolean = false,
     val iconSyncMessage: String = "",
-    val symmetricKey: String? = null
+    val symmetricKey: String? = null,
+    val manualPcName: String = "",
+    val manualIsPlus: Boolean = false
 )
 
 data class DeviceInfo(
