@@ -281,13 +281,14 @@ fun AirSyncMainScreen(
 
             }
 
-            if (uiState.missingPermissions.isEmpty()) {
+            if (uiState.missingPermissions.isEmpty() && !uiState.isConnected) {
                 QrScannerRow(
                     onLaunchScanner = {
                         launchScanner(context)
                     }
                 )
             }
+
 
 
             // Permission Status Card
@@ -306,6 +307,19 @@ fun AirSyncMainScreen(
                 connectedDevice = uiState.lastConnectedDevice,
                 lastConnected = uiState.lastConnectedDevice != null
             )
+
+
+            if (!uiState.isConnected) {
+                ManualConnectionCard(
+                    uiState = uiState,
+                    onIpChange = { viewModel.updateIpAddress(it) },
+                    onPortChange = { viewModel.updatePort(it) },
+                    onPcNameChange = { viewModel.updateManualPcName(it) },
+                    onIsPlusChange = { viewModel.updateManualIsPlus(it) },
+                    onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
+                    onConnect = { viewModel.prepareForManualConnection() }
+                )
+            }
 
             // Last Connected Device Section - only show when not currently connected
             if (!uiState.isConnected) {
