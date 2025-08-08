@@ -47,6 +47,7 @@ fun AirSyncMainScreen(
     showConnectionDialog: Boolean = false,
     pcName: String? = null,
     isPlus: Boolean = false,
+    symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {}
 ) {
@@ -75,7 +76,7 @@ fun AirSyncMainScreen(
     var showAboutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus)
+        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
 
         // Check for updates on app start (silently)
         viewModel.checkForUpdates(context, showDialogOnUpdate = false)
@@ -123,6 +124,7 @@ fun AirSyncMainScreen(
             context = context,
             ipAddress = uiState.ipAddress,
             port = uiState.port.toIntOrNull() ?: 6996,
+            symmetricKey = uiState.symmetricKey,
             onConnectionStatus = { connected ->
                 scope.launch(Dispatchers.Main) {
                     viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
@@ -130,7 +132,7 @@ fun AirSyncMainScreen(
                         viewModel.setResponse("Connected successfully!")
                         // Get plus status from current temporary device or use QR code value
                         val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                        viewModel.saveLastConnectedDevice(pcName, plusStatus)
+                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
                     } else {
                         viewModel.setResponse("Failed to connect")
                     }
@@ -322,6 +324,7 @@ fun AirSyncMainScreen(
                                 // Fallback to legacy stored device
                                 viewModel.updateIpAddress(device.ipAddress)
                                 viewModel.updatePort(device.port)
+                                viewModel.updateSymmetricKey(device.symmetricKey)
                                 connect()
                             }
                         }

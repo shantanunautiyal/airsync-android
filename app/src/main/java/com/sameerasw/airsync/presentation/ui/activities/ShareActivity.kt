@@ -32,36 +32,36 @@ class ShareActivity : ComponentActivity() {
                 if (sharedText != null) {
                     val dataStoreManager = DataStoreManager(this@ShareActivity)
 
-                    // Check if clipboard sync is enabled
-                    val isClipboardSyncEnabled = dataStoreManager.getClipboardSyncEnabled().first()
+                    // Try to connect if not already connected
+                    if (!WebSocketUtil.isConnected()) {
+                        val ipAddress = dataStoreManager.getIpAddress().first()
+                        val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
+                        val lastConnectedDevice = dataStoreManager.getLastConnectedDevice().first()
+                        val symmetricKey = lastConnectedDevice?.symmetricKey
 
-                        // Try to connect if not already connected
-                        if (!WebSocketUtil.isConnected()) {
-                            val ipAddress = dataStoreManager.getIpAddress().first()
-                            val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-
-                            WebSocketUtil.connect(
-                                context = this@ShareActivity,
-                                ipAddress = ipAddress,
-                                port = port,
-                                onConnectionStatus = { connected ->
-                                    if (connected) {
-                                        // Send text after connection
-                                        ClipboardSyncManager.syncTextToDesktop(sharedText)
-                                        showToast("Text shared to PC")
-                                    } else {
-                                        showToast("Failed to connect to PC")
-                                    }
-                                    finish()
-                                },
-                                onMessage = { }
-                            )
-                        } else {
-                            // Already connected, send directly
-                            ClipboardSyncManager.syncTextToDesktop(sharedText)
-                            showToast("Text shared to PC")
-                            finish()
-                        }
+                        WebSocketUtil.connect(
+                            context = this@ShareActivity,
+                            ipAddress = ipAddress,
+                            port = port,
+                            symmetricKey = symmetricKey,
+                            onConnectionStatus = { connected ->
+                                if (connected) {
+                                    // Send text after connection
+                                    ClipboardSyncManager.syncTextToDesktop(sharedText)
+                                    showToast("Text shared to PC")
+                                } else {
+                                    showToast("Failed to connect to PC")
+                                }
+                                finish()
+                            },
+                            onMessage = { }
+                        )
+                    } else {
+                        // Already connected, send directly
+                        ClipboardSyncManager.syncTextToDesktop(sharedText)
+                        showToast("Text shared to PC")
+                        finish()
+                    }
                 } else {
                     showToast("No text to share")
                     finish()

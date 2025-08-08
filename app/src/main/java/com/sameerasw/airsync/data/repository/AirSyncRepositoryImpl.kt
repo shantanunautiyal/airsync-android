@@ -76,8 +76,8 @@ class AirSyncRepositoryImpl(
     }
 
     // Network-aware device connections
-    override suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean) {
-        dataStoreManager.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus)
+    override suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?) {
+        dataStoreManager.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus, symmetricKey)
     }
 
     override fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?> {
