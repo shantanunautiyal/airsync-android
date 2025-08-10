@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object SyncManager {
     private const val TAG = "SyncManager"
-    private const val BATTERY_SYNC_INTERVAL = 60_000L // 1 minute
+    private const val BATTERY_SYNC_INTERVAL = 20_000L // 20 seconds
     private const val MAX_DAILY_ICON_SYNCS = 3
 
     private var syncJob: Job? = null
@@ -45,7 +45,7 @@ object SyncManager {
                     delay(BATTERY_SYNC_INTERVAL)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in periodic sync: ${e.message}")
-                    delay(BATTERY_SYNC_INTERVAL) // Continue even if there's an error
+                    delay(BATTERY_SYNC_INTERVAL)
                 }
             }
         }
@@ -83,10 +83,10 @@ object SyncManager {
                     shouldSync = true // First time
                 }
 
-                // Check if battery info changed significantly (>5% or charging state)
+                // Check if battery info changed significantly
                 lastBatteryInfo?.let { last ->
                     if (last.isCharging != currentBattery.isCharging ||
-                        kotlin.math.abs(last.level - currentBattery.level) >= 5) {
+                        kotlin.math.abs(last.level - currentBattery.level) >= 1) {
                         shouldSync = true
                         Log.d(TAG, "Battery info changed significantly, syncing device status")
                     }
@@ -122,9 +122,8 @@ object SyncManager {
                 val dataStoreManager = DataStoreManager(context)
 
                 // 1. Send device info with wallpaper
-                delay(500) // Small delay to ensure connection is stable
+                delay(500)
 
-                // Always get the  Android device name
                 val deviceName = DeviceInfoUtil.getDeviceName(context)
                 Log.d(TAG, "Using Android device name: $deviceName")
                 dataStoreManager.saveDeviceName(deviceName)
@@ -151,7 +150,7 @@ object SyncManager {
                 val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
                 if (WebSocketUtil.sendMessage(statusJson)) {
                     Log.d(TAG, "Device status sent")
-                    // Update our cached values
+                    // Update  cache
                     lastAudioInfo = DeviceInfoUtil.getAudioInfo(context)
                     lastBatteryInfo = DeviceInfoUtil.getBatteryInfo(context)
                 } else {
@@ -166,11 +165,6 @@ object SyncManager {
                 } else {
                     Log.d(TAG, "Skipping automatic icon sync - daily limit reached")
                 }
-
-                delay(250)
-
-                // 4. Send existing notifications (recent ones)
-                sendRecentNotifications()
 
                 Log.d(TAG, "Initial sync sequence completed")
 
@@ -261,31 +255,6 @@ object SyncManager {
         }
     }
 
-    private fun sendRecentNotifications() {
-        try {
-            // Send a sample notification to indicate sync is active
-            val sampleNotificationJson = JsonUtil.createNotificationJson(
-                id = "airsync_welcome_${System.currentTimeMillis()}",
-                title = "AirSync Connected",
-                body = "Notification sync is now active. You'll see your Android notifications here.",
-                app = "AirSync",
-                packageName = "com.sameerasw.airsync"
-            )
-
-            if (WebSocketUtil.sendMessage(sampleNotificationJson)) {
-                Log.d(TAG, "Sample notification sent")
-            } else {
-                Log.e(TAG, "Failed to send sample notification")
-            }
-
-            // Note: Android doesn't provide access to existing notifications
-            // We can only sync new notifications that arrive after the listener is active
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending recent notifications: ${e.message}")
-        }
-    }
-
     private suspend fun sendAppIcons(
         context: Context,
         isManualSync: Boolean = false,
@@ -339,7 +308,7 @@ object SyncManager {
                     val message = "Successfully synced ${iconMap.size} app icons with details"
                     onResult?.invoke(true, message)
                 } else {
-                    Log.e(TAG, "❌ Failed to send app icons")
+                    Log.e(TAG, "Failed to send app icons")
                     onResult?.invoke(false, "Failed to send app icons")
                 }
             } else {
