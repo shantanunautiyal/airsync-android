@@ -3,11 +3,13 @@ package com.sameerasw.airsync.service
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
+import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
@@ -16,6 +18,7 @@ import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -69,6 +72,16 @@ class MediaNotificationListener : NotificationListenerService() {
                         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
 
+                        val albumArtBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+
+                        val albumArtBase64 = albumArtBitmap?.let {
+                            val outputStream = ByteArrayOutputStream()
+                            // Compress to a smaller size to avoid large payloads
+                            it.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
+                            Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                        }
+
                         Log.d(TAG, "Media session - Title: $title, Artist: $artist, Playing: $isPlaying, State: ${playbackState?.state}")
 
                         // Return the first session that has media info or is playing
@@ -76,7 +89,8 @@ class MediaNotificationListener : NotificationListenerService() {
                             return MediaInfo(
                                 isPlaying = isPlaying,
                                 title = title,
-                                artist = artist
+                                artist = artist,
+                                albumArt = albumArtBase64
                             )
                         }
                     }
@@ -91,10 +105,10 @@ class MediaNotificationListener : NotificationListenerService() {
                 }
 
                 Log.d(TAG, "No media info found")
-                MediaInfo(false, "", "")
+                MediaInfo(false, "", "", null)
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting media info: ${e.message}")
-                MediaInfo(false, "", "")
+                MediaInfo(false, "", "", null)
             }
         }
     }

@@ -48,9 +48,11 @@ object JsonUtil {
         title: String,
         artist: String,
         volume: Int,
-        isMuted: Boolean
+        isMuted: Boolean,
+        albumArt: String?
     ): String {
-        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted}}}"""
+        val albumArtJson = if (albumArt != null) ""","albumArt":"$albumArt"""" else ""
+        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson}}}"""
     }
 
     /**

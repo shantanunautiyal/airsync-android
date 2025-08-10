@@ -115,11 +115,12 @@ object DeviceInfoUtil {
                 title = mediaInfo.title.ifEmpty { "" },
                 artist = mediaInfo.artist.ifEmpty { "" },
                 volume = volumePercent,
-                isMuted = isMuted
+                isMuted = isMuted,
+                albumArt = mediaInfo.albumArt
             )
         } catch (e: Exception) {
             Log.e("DeviceInfoUtil", "Error getting audio info: ${e.message}")
-            AudioInfo(false, "", "", 0, true)
+            AudioInfo(false, "", "", 0, true, null)
         }
     }
 
@@ -135,7 +136,8 @@ object DeviceInfoUtil {
             title = audioInfo.title,
             artist = audioInfo.artist,
             volume = audioInfo.volume,
-            isMuted = audioInfo.isMuted
+            isMuted = audioInfo.isMuted,
+            albumArt = audioInfo.albumArt
         )
     }
 }

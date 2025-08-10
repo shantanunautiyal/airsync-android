@@ -82,13 +82,15 @@ data class AudioInfo(
     val title: String,
     val artist: String,
     val volume: Int,
-    val isMuted: Boolean
+    val isMuted: Boolean,
+    val albumArt: String? = null
 )
 
 data class MediaInfo(
     val isPlaying: Boolean,
     val title: String,
-    val artist: String
+    val artist: String,
+    val albumArt: String? = null
 )
 
 data class NotificationApp(
