@@ -205,8 +205,7 @@ fun AirSyncMainScreen(
 
             if (!WebSocketUtil.isConnected()) {
                 connect()
-                // Wait a moment for connection, then send
-                delay(1000)
+                delay(500)
             }
 
             val success = WebSocketUtil.sendMessage(message)
@@ -319,7 +318,7 @@ fun AirSyncMainScreen(
                 )
             }
 
-            // Connection Status Card - New main connection interface
+            // Connection Status Card
             ConnectionStatusCard(
                 isConnected = uiState.isConnected,
                 isConnecting = uiState.isConnecting,
@@ -334,7 +333,6 @@ fun AirSyncMainScreen(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column {
-                    Spacer(modifier = Modifier.height(8.dp))
                     ManualConnectionCard(
                         uiState = uiState,
                         onIpChange = { viewModel.updateIpAddress(it) },
@@ -347,7 +345,7 @@ fun AirSyncMainScreen(
                 }
             }
 
-            // Last Connected Device Section - only show when not currently connected
+            // Last Connected Device Section
             AnimatedVisibility(
                 visible = !uiState.isConnected && uiState.lastConnectedDevice != null,
                 enter = expandVertically() + fadeIn(),
