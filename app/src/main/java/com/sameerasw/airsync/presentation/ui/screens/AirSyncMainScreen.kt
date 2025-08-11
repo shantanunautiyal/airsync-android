@@ -34,6 +34,7 @@ import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.TestNotificationUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -442,12 +443,13 @@ fun AirSyncMainScreen(
                                 sendMessage(message)
                             },
                             onSendNotification = {
+                                val testNotification = TestNotificationUtil.generateRandomNotification()
                                 val message = JsonUtil.createNotificationJson(
-                                    "121212",
-                                    "Test Message",
-                                    "This is a simulated notification from AirSync.",
-                                    "AirSync",
-                                    "com.sameerasw.airsync"
+                                    testNotification.id,
+                                    testNotification.title,
+                                    testNotification.body,
+                                    testNotification.appName,
+                                    testNotification.packageName
                                 )
                                 sendMessage(message)
                             },
