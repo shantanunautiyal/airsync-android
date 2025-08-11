@@ -6,6 +6,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -147,10 +148,14 @@ object WebSocketMessageHandler {
                     message = if (success) "Playback paused" else "Failed to pause playback"
                 }
                 "next" -> {
+                    // Suppress automatic media updates before executing skip command
+                    SyncManager.suppressMediaUpdatesForSkip()
                     success = MediaControlUtil.skipNext(context)
                     message = if (success) "Skipped to next track" else "Failed to skip to next track"
                 }
                 "previous" -> {
+                    // Suppress automatic media updates before executing skip command
+                    SyncManager.suppressMediaUpdatesForSkip()
                     success = MediaControlUtil.skipPrevious(context)
                     message = if (success) "Skipped to previous track" else "Failed to skip to previous track"
                 }
@@ -168,7 +173,16 @@ object WebSocketMessageHandler {
 
             // Send updated media state after successful control
             if (success) {
-                SyncManager.onMediaStateChanged(context)
+                // For track skip actions (next/previous), add a delay to allow media player to update
+                if (action == "next" || action == "previous") {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        delay(1200)
+                        SyncManager.onMediaStateChanged(context)
+                    }
+                } else {
+                    // For other actions, sync immediately
+                    SyncManager.onMediaStateChanged(context)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling media control: ${e.message}")

@@ -20,6 +20,11 @@ object SyncManager {
     private var lastVolume: Int = -1
     private val isSyncing = AtomicBoolean(false)
 
+    // Track skip suppression mechanism
+    @Volatile
+    private var skipCommandTimestamp: Long = 0
+    private const val SKIP_SUPPRESSION_DURATION = 1000L // 1 second suppression after skip command
+
     fun startPeriodicSync(context: Context) {
         if (isSyncing.get()) {
             Log.d(TAG, "Sync already running")
@@ -328,7 +333,29 @@ object SyncManager {
         checkAndSyncDeviceStatus(context)
     }
 
+    /**
+     * Call this before executing a track skip command to suppress automatic media updates
+     */
+    fun suppressMediaUpdatesForSkip() {
+        skipCommandTimestamp = System.currentTimeMillis()
+        Log.d(TAG, "Media update suppression activated for track skip")
+    }
+
+    /**
+     * Check if media updates should be suppressed due to recent skip command
+     */
+    private fun shouldSuppressMediaUpdate(): Boolean {
+        val timeSinceSkip = System.currentTimeMillis() - skipCommandTimestamp
+        return timeSinceSkip < SKIP_SUPPRESSION_DURATION
+    }
+
     fun onMediaStateChanged(context: Context) {
+        // Check if we should suppress this update due to recent skip command
+        if (shouldSuppressMediaUpdate()) {
+            Log.d(TAG, "Media state change suppressed due to recent skip command")
+            return
+        }
+
         Log.d(TAG, "Media state change detected, checking sync")
         checkAndSyncDeviceStatus(context)
     }
