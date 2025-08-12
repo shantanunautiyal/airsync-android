@@ -1,6 +1,8 @@
 # airsync-android
 Android app for AirSync 2.0 built with Kotlin Jetpack Compose
 
+Min : Android 11
+
 ## Installation and troubleshooting
 ![Frame 1 Large](https://github.com/user-attachments/assets/24db7555-2518-44ee-83f3-6c7f84cb8b54)
 
