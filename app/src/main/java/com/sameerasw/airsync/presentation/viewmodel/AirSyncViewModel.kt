@@ -380,7 +380,7 @@ class AirSyncViewModel(
                         _showUpdateDialog.value = true
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _updateStatus.value = UpdateStatus.ERROR
 
                 // Show error dialog when manually checking
@@ -426,7 +426,7 @@ class AirSyncViewModel(
                 // Monitor download progress
                 monitorDownloadProgress(context, downloadId)
 
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _updateStatus.value = UpdateStatus.ERROR
             }
         }

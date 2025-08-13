@@ -132,7 +132,7 @@ object WebSocketMessageHandler {
 
             val action = data.optString("action")
             var success = false
-            var message = ""
+            var message: String
 
             when (action) {
                 "playPause" -> {
@@ -140,11 +140,11 @@ object WebSocketMessageHandler {
                     message = if (success) "Play/pause toggled" else "Failed to toggle play/pause"
                 }
                 "play" -> {
-                    success = MediaControlUtil.playPause(context) // Will play if not playing
+                    success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback started" else "Failed to start playback"
                 }
                 "pause" -> {
-                    success = MediaControlUtil.playPause(context) // Will pause if playing
+                    success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback paused" else "Failed to pause playback"
                 }
                 "next" -> {
@@ -294,7 +294,7 @@ object WebSocketMessageHandler {
 
                     Log.d(TAG, "Successfully updated notification state for $packageName to $newState")
 
-                    // Send confirmation response back to Mac
+                    // Send confirmation response back
                     val responseMessage = JsonUtil.createToggleAppNotificationResponse(
                         packageName = packageName,
                         success = true,

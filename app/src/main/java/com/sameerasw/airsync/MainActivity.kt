@@ -25,7 +25,6 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        // Handle permission result if needed
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

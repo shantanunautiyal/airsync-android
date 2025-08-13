@@ -95,9 +95,6 @@ object WebSocketUtil {
 
                     // Notify all registered listeners about the connection status
                     notifyConnectionStatusListeners(true)
-
-                    // Update widgets
-                    updateWidgets(context)
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -107,12 +104,7 @@ object WebSocketUtil {
                         CryptoUtil.decryptMessage(text, key)
                     } ?: text
 
-                    if (decryptedMessage == null) {
-                        Log.e(TAG, "Failed to decrypt message")
-                        return
-                    }
-
-                    // Handle incoming commands from Mac
+                    // Handle incoming commands
                     WebSocketMessageHandler.handleIncomingMessage(context, decryptedMessage)
 
                     // Update last sync time on successful response
@@ -128,11 +120,8 @@ object WebSocketUtil {
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, false)
 
-                    // Notify all registered listeners about the connection status
+                    // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
-
-                    // Update widgets
-                    updateWidgets(context)
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -144,11 +133,8 @@ object WebSocketUtil {
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, false)
 
-                    // Notify all registered listeners about the connection status
+                    // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
-
-                    // Update widgets
-                    updateWidgets(context)
                 }
             }
 
@@ -181,12 +167,7 @@ object WebSocketUtil {
                 CryptoUtil.encryptMessage(message, key)
             } ?: message
 
-            if (messageToSend != null) {
-                webSocket!!.send(messageToSend)
-            } else {
-                Log.e(TAG, "Failed to encrypt message")
-                false
-            }
+            webSocket!!.send(messageToSend)
         } else {
             Log.w(TAG, "WebSocket not connected, cannot send message")
             false
@@ -205,7 +186,7 @@ object WebSocketUtil {
         webSocket = null
         onConnectionStatusChanged?.invoke(false)
 
-        // Notify all registered listeners about the disconnection
+        // Notify listeners about the disconnection
         notifyConnectionStatusListeners(false)
     }
 
@@ -275,19 +256,10 @@ object WebSocketUtil {
         connectionStatusListeners.remove(listener)
     }
 
-    // Notify all registered listeners about the connection status
+    // Notify listeners about the connection status
     private fun notifyConnectionStatusListeners(isConnected: Boolean) {
         connectionStatusListeners.forEach { listener ->
             listener(isConnected)
-        }
-    }
-
-    // Update widgets when connection status changes
-    fun updateWidgets(context: Context) {
-        try {
-            com.sameerasw.airsync.widget.AirSyncWidgetProvider.updateAllWidgets(context)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating widget: ${e.message}")
         }
     }
 }
