@@ -1,8 +1,20 @@
-package com.sameerasw.airsync.presentation.ui.components
+package com.sameerasw.airsync.presentation.ui.components.dialogs
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -87,58 +99,6 @@ fun ConnectionDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Connect")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PermissionDialog(
-    missingPermissions: List<String>,
-    onDismiss: () -> Unit,
-    onGrantPermissions: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            tonalElevation = 3.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .width(300.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Permissions Required",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
-
-                Text("The following permissions are needed for full functionality:")
-                missingPermissions.forEach { permission ->
-                    Text("• $permission")
-                }
-
-                Text("Please enable them in the settings.")
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Dismiss")
-                    }
-
-                    Button(
-                        onClick = onGrantPermissions,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Settings")
                     }
                 }
             }
