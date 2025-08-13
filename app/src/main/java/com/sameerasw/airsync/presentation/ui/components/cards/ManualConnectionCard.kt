@@ -1,4 +1,4 @@
-package com.sameerasw.airsync.presentation.ui.components
+package com.sameerasw.airsync.presentation.ui.components.cards
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable

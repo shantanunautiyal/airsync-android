@@ -49,8 +49,13 @@ import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
+import com.sameerasw.airsync.presentation.ui.components.cards.QrScannerRow
+import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
+import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionDialog
+import com.sameerasw.airsync.presentation.ui.components.dialogs.UpdateDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -1,4 +1,4 @@
-package com.sameerasw.airsync.presentation.ui.components
+package com.sameerasw.airsync.presentation.ui.components.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
