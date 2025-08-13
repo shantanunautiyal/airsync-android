@@ -2,7 +2,7 @@ package com.sameerasw.airsync.domain.model
 
 data class NetworkDeviceConnection(
     val deviceName: String,
-    val networkConnections: Map<String, String>, // Map of our IP -> client IP
+    val networkConnections: Map<String, String>,
     val port: String,
     val lastConnected: Long,
     val isPlus: Boolean,
