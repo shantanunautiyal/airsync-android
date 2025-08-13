@@ -28,7 +28,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.R
-import com.sameerasw.airsync.presentation.ui.components.*
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.DeviceInfoUtil
@@ -53,6 +52,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCa
 import com.sameerasw.airsync.presentation.ui.components.cards.QrScannerRow
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
+import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.UpdateDialog

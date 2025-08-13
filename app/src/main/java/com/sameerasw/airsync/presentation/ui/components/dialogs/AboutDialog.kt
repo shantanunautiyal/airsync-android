@@ -1,4 +1,4 @@
-package com.sameerasw.airsync.presentation.ui.components
+package com.sameerasw.airsync.presentation.ui.components.dialogs
 
 import android.content.Intent
 import android.widget.Toast
