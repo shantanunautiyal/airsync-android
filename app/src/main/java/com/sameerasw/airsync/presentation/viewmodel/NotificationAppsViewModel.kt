@@ -10,6 +10,7 @@ import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.AppUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.sameerasw.airsync.domain.model.NotificationAppsUiState
 
 class NotificationAppsViewModel(
     private val repository: AirSyncRepository
@@ -117,10 +118,3 @@ class NotificationAppsViewModel(
         _uiState.value = _uiState.value.copy(error = null)
     }
 }
-
-data class NotificationAppsUiState(
-    val apps: List<NotificationApp> = emptyList(),
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val showSystemApps: Boolean = false
-)

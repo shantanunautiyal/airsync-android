@@ -10,12 +10,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-
-data class NetworkInfo(
-    val isConnected: Boolean,
-    val isWifi: Boolean,
-    val ipAddress: String?
-)
+import com.sameerasw.airsync.domain.model.NetworkInfo
 
 object NetworkMonitor {
     private const val TAG = "NetworkMonitor"
