@@ -10,6 +10,7 @@ import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.model.UpdateInfo
+import com.sameerasw.airsync.domain.model.NetworkInfo
 import com.sameerasw.airsync.domain.model.UpdateStatus
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
@@ -467,7 +468,7 @@ class AirSyncViewModel(
         }
     }
 
-    private suspend fun handleNetworkChange(context: Context, networkInfo: com.sameerasw.airsync.utils.NetworkInfo) {
+    private suspend fun handleNetworkChange(context: Context, networkInfo: NetworkInfo) {
         val currentIp = networkInfo.ipAddress
 
         // Update device info with new IP
