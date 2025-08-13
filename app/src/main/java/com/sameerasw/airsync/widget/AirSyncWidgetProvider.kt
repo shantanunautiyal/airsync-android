@@ -201,10 +201,9 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             }
             views.setTextViewText(R.id.widget_volume_info, volumeText)
 
-            // Media info (real data from MediaNotificationListener)
+            // Media info
             val mediaInfo = MediaNotificationListener.getMediaInfo(context)
             if (mediaInfo.isPlaying && (mediaInfo.title.isNotEmpty() || mediaInfo.artist.isNotEmpty())) {
-                // Show real media data
                 views.setViewVisibility(R.id.widget_media_section, android.view.View.VISIBLE)
                 views.setTextViewText(R.id.widget_media_status, "🎵 Playing")
                 views.setTextViewText(

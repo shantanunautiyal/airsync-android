@@ -106,7 +106,7 @@ object UpdateManager {
     fun getCurrentVersionName(context: Context): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            packageInfo.versionName ?: "2.0.7"
+            packageInfo.versionName ?: "2.0.15"
         } catch (e: Exception) {
             Log.w(TAG, "Could not get version name: ${e.message}")
             "2.0.7"
