@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
@@ -12,6 +15,7 @@ import android.util.Log
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.domain.model.BatteryInfo
 import com.sameerasw.airsync.service.MediaNotificationListener
+import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.*
 
@@ -49,23 +53,44 @@ object DeviceInfoUtil {
         return null
     }
 
-    @Suppress("DEPRECATION")
     fun getWifiIpAddress(context: Context): String? {
         return try {
-            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val wifiInfo = wifiManager.connectionInfo
-            val ipAddress = wifiInfo.ipAddress
-            if (ipAddress != 0) {
-                String.format(
-                    Locale.US,
-                    "%d.%d.%d.%d",
-                    ipAddress and 0xff,
-                    ipAddress shr 8 and 0xff,
-                    ipAddress shr 16 and 0xff,
-                    ipAddress shr 24 and 0xff
-                )
-            } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Use ConnectivityManager and LinkProperties for Android 12+
+                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val activeNetwork = connectivityManager.activeNetwork
+                val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+                if (networkCapabilities != null &&
+                    networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                ) {
+                    val linkProperties: LinkProperties? = connectivityManager.getLinkProperties(activeNetwork)
+                    linkProperties?.linkAddresses?.forEach { linkAddress ->
+                        val address = linkAddress.address
+                        if (address is Inet4Address && !address.isLoopbackAddress) {
+                            return address.hostAddress
+                        }
+                    }
+                }
+                // Fallback to local IP if not found
                 getLocalIpAddress()
+            } else {
+                // Deprecated method for older versions
+                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                @Suppress("DEPRECATION")
+                val wifiInfo = wifiManager.connectionInfo
+                val ipAddress = wifiInfo.ipAddress
+                if (ipAddress != 0) {
+                    String.format(
+                        Locale.US,
+                        "%d.%d.%d.%d",
+                        ipAddress and 0xff,
+                        ipAddress shr 8 and 0xff,
+                        ipAddress shr 16 and 0xff,
+                        ipAddress shr 24 and 0xff
+                    )
+                } else {
+                    getLocalIpAddress()
+                }
             }
         } catch (_: Exception) {
             getLocalIpAddress()

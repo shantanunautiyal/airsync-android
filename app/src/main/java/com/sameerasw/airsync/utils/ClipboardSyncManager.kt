@@ -84,7 +84,6 @@ object ClipboardSyncManager {
     private fun syncClipboardToDesktop(text: String) {
         if (text.isBlank()) return
 
-        // Use IO scope for network operations
         syncScope.launch(Dispatchers.IO) {
             try {
                 lastSentText = text
@@ -126,7 +125,7 @@ object ClipboardSyncManager {
     }
 
     /**
-     * Manually sync specific text (for share target functionality)
+     * Manually sync specific text (share target)
      */
     fun syncTextToDesktop(text: String) {
         if (text.isBlank()) return
@@ -144,9 +143,4 @@ object ClipboardSyncManager {
             Log.e(TAG, "Error sharing text to desktop: ${e.message}")
         }
     }
-
-    /**
-     * Check if clipboard sync is currently enabled
-     */
-    fun isClipboardSyncEnabled(): Boolean = isEnabled
 }
