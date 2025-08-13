@@ -19,13 +19,13 @@ object NotificationDismissalUtil {
     }
     
     /**
-     * Store a notification for potential dismissal
+     * Store a notification for dismissal
      */
     fun storeNotification(id: String, notification: StatusBarNotification) {
         activeNotifications[id] = notification
         Log.d(TAG, "Stored notification with ID: $id")
         
-        // Clean up old notifications (keep only last 50)
+        // Clean up old notifications
         if (activeNotifications.size > 50) {
             val oldestKeys = activeNotifications.keys.take(activeNotifications.size - 50)
             oldestKeys.forEach { activeNotifications.remove(it) }
@@ -39,7 +39,7 @@ object NotificationDismissalUtil {
         return try {
             val notification = activeNotifications[notificationId]
             if (notification != null) {
-                // Try to cancel the notification through the service
+                // Try to cancel the notification
                 val service = getNotificationListenerService()
                 if (service != null) {
                     service.cancelNotification(notification.key)

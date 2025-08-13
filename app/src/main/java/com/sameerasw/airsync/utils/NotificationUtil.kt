@@ -41,7 +41,7 @@ object NotificationUtil {
     ) {
         createNotificationChannel(context)
 
-        // Create intent for opening the app
+        // Opening the app
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -50,7 +50,7 @@ object NotificationUtil {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Create intent for stopping notification sync
+        // Stopping notification sync
         val stopSyncIntent = Intent(context, NotificationActionReceiver::class.java).apply {
             action = NotificationActionReceiver.ACTION_STOP_SYNC
         }
@@ -79,9 +79,9 @@ object NotificationUtil {
         }
 
         val icon = if (isConnected) {
-            android.R.drawable.ic_dialog_info // Connected icon
+            android.R.drawable.ic_dialog_info
         } else {
-            android.R.drawable.ic_dialog_alert // Disconnected icon
+            android.R.drawable.ic_dialog_alert
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -105,7 +105,7 @@ object NotificationUtil {
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
         } catch (e: SecurityException) {
-            // Handle case where notification permission is not granted
+            // notification permission is not granted
             android.util.Log.w(TAG, "Failed to show notification: ${e.message}")
         }
     }
