@@ -44,6 +44,11 @@ import androidx.core.net.toUri
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.domain.model.UpdateStatus
+import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
+import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
