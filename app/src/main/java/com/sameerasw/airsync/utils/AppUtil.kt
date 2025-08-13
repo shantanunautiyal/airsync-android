@@ -18,7 +18,7 @@ object AppUtil {
         try {
             val pm = context.packageManager
 
-            // Intent to find apps with launcher entry points
+            // Find apps with launcher entry points
             val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
@@ -27,7 +27,6 @@ object AppUtil {
                 .mapNotNull { resolveInfo ->
                     val appInfo = resolveInfo.activityInfo.applicationInfo
 
-                    // Skip our own app
                     if (appInfo.packageName.contains("airsync")) return@mapNotNull null
 
                     try {
@@ -70,7 +69,7 @@ object AppUtil {
                 icon = installedApp.icon,
                 isSystemApp = installedApp.isSystemApp
             )
-                ?: // New app, use defaults (enabled)
+                ?: // New app, use defaults
                 installedApp
         }.sortedBy { it.appName.lowercase() }
     }

@@ -11,13 +11,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+/**
+ * Receives notification actions and updates sync state and notifications.
+ */
 class NotificationActionReceiver : BroadcastReceiver() {
     
     companion object {
+        /** Action string for stopping notification sync. */
         const val ACTION_STOP_SYNC = "com.sameerasw.airsync.STOP_SYNC"
         private const val TAG = "NotificationActionReceiver"
     }
     
+    /** Coroutine scope for background operations. */
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     override fun onReceive(context: Context, intent: Intent) {

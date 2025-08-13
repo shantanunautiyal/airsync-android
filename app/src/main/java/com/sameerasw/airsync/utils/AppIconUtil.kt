@@ -72,7 +72,7 @@ object AppIconUtil {
      */
     private fun drawableToBitmap(drawable: Drawable): Bitmap {
         if (drawable is BitmapDrawable && drawable.bitmap != null) {
-            // If it's already a bitmap, scale it to our standard size
+            // If it's already a bitmap, scale it to standard size
             return drawable.bitmap.scale(ICON_SIZE, ICON_SIZE)
         }
 
