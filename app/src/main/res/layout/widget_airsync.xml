@@ -4,137 +4,40 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp"
+    android:padding="16dp"
     android:background="@drawable/widget_background"
-    android:clickable="true">
+    android:clickable="true"
+    android:gravity="center">
 
-    <!-- Header with device name and connection status -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
-
-        <TextView
-            android:id="@+id/widget_device_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="My Android"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@color/widget_primary_text"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/widget_connection_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🟢"
-            android:textSize="12sp"
-            android:layout_marginStart="8dp" />
-
-    </LinearLayout>
-
-    <!-- Battery and volume info row -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
-
-        <TextView
-            android:id="@+id/widget_battery_info"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🔋 85% ⚡"
-            android:textSize="12sp"
-            android:textColor="@color/widget_secondary_text"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/widget_volume_info"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🔊 75%"
-            android:textSize="12sp"
-            android:textColor="@color/widget_secondary_text"
-            android:layout_marginStart="8dp" />
-
-    </LinearLayout>
-
-    <!-- Media info section -->
-    <LinearLayout
-        android:id="@+id/widget_media_section"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginBottom="8dp"
-        android:visibility="visible">
-
-        <TextView
-            android:id="@+id/widget_media_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🎵 Playing"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="@color/widget_primary_text"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginBottom="2dp" />
-
-        <TextView
-            android:id="@+id/widget_media_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Bohemian Rhapsody"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="@color/widget_primary_text"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginBottom="1dp" />
-
-        <TextView
-            android:id="@+id/widget_media_artist"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Queen"
-            android:textSize="11sp"
-            android:textColor="@color/widget_secondary_text"
-            android:maxLines="1"
-            android:ellipsize="end" />
-
-    </LinearLayout>
-
-    <!-- Network info -->
+    <!-- AirSync App Title -->
     <TextView
-        android:id="@+id/widget_network_info"
-        android:layout_width="match_parent"
+        android:id="@+id/widget_app_title"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="📡 192.168.1.100:6996"
-        android:textSize="10sp"
-        android:textColor="@color/widget_secondary_text"
-        android:maxLines="1"
-        android:ellipsize="end"
+        android:text="@string/airsync"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/widget_primary_text"
         android:layout_marginBottom="8dp" />
 
-    <!-- Last sync info -->
+    <!-- Work In Progress Message -->
     <TextView
-        android:id="@+id/widget_last_sync"
-        android:layout_width="match_parent"
+        android:id="@+id/widget_wip_message"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Last sync: 2m ago"
-        android:textSize="9sp"
+        android:text="@string/work_in_progress"
+        android:textSize="14sp"
         android:textColor="@color/widget_secondary_text"
-        android:maxLines="1"
-        android:ellipsize="end"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:id="@+id/widget_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_under_development"
+        android:textSize="12sp"
+        android:textColor="@color/widget_secondary_text"
         android:gravity="center" />
 
 </LinearLayout>

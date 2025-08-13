@@ -2,4 +2,7 @@
     <string name="app_name">AirSync Beta</string>
     <string name="qs_tile_label">AirSync</string>
     <string name="widget_description">Shows AirSync connection status and provides quick actions</string>
+    <string name="airsync">AirSync</string>
+    <string name="work_in_progress">⚠️ Work In Progress</string>
+    <string name="widget_under_development">Widget under development</string>
 </resources>
