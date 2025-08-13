@@ -285,7 +285,7 @@ class DataStoreManager(private val context: Context) {
                     map[key] = json.getString(key)
                 }
                 map
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 mutableMapOf()
             }
 
@@ -324,7 +324,7 @@ class DataStoreManager(private val context: Context) {
                         map[key] = json.getString(key)
                     }
                     map
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     emptyMap()
                 }
 
@@ -372,7 +372,7 @@ class DataStoreManager(private val context: Context) {
                             map[key] = json.getString(key)
                         }
                         map
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         emptyMap()
                     }
 
