@@ -26,19 +26,15 @@ object PermissionUtil {
      * Check if the app is whitelisted from battery optimization
      */
     fun isBatteryOptimizationDisabled(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            powerManager.isIgnoringBatteryOptimizations(context.packageName)
-        } else {
-            true
-        }
+            return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
 
     /**
      * Check if battery optimization permission is required for this Android version
      */
     fun isBatteryOptimizationPermissionRequired(): Boolean {
-        return true
+        return true // for min API level
     }
 
     /**
@@ -46,14 +42,12 @@ object PermissionUtil {
      */
     fun openBatteryOptimizationSettings(context: Context) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(intent)
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = "package:${context.packageName}".toUri()
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
-        } catch (e: Exception) {
+            context.startActivity(intent)
+        } catch (_: Exception) {
             // Fallback to app-specific battery settings
             openAppSpecificBatterySettings(context)
         }
@@ -69,7 +63,7 @@ object PermissionUtil {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Final fallback to general battery optimization settings
             openGeneralBatteryOptimizationSettings(context)
         }
@@ -84,7 +78,7 @@ object PermissionUtil {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Final fallback to general settings
             val intent = Intent(Settings.ACTION_SETTINGS).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -123,48 +117,35 @@ object PermissionUtil {
     /**
      * Check if MANAGE_EXTERNAL_STORAGE permission is granted (Android 11+)
      */
-    fun hasManageExternalStoragePermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
+    fun hasManageExternalStoragePermission(): Boolean {
+            return try {
                 android.os.Environment.isExternalStorageManager()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 false
             }
-        } else {
-            // For older versions, check external storage permission
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
         }
-    }
 
     /**
      * Open MANAGE_EXTERNAL_STORAGE permission settings
      */
     fun openManageExternalStorageSettings(context: Context) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                     data = "package:${context.packageName}".toUri()
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(intent)
-            } else {
-                // Fallback for older versions
+            } catch (_: Exception) {
+                // Fallback to app settings
                 openAppSpecificBatterySettings(context)
             }
-        } catch (e: Exception) {
-            // Fallback to app settings
-            openAppSpecificBatterySettings(context)
         }
-    }
 
     /**
      * Check if wallpaper access is available
      */
-    fun hasWallpaperAccess(context: Context): Boolean {
-        return hasManageExternalStoragePermission(context)
+    fun hasWallpaperAccess(): Boolean {
+        return hasManageExternalStoragePermission()
     }
 
     fun getAllMissingPermissions(context: Context): List<String> {
@@ -186,7 +167,7 @@ object PermissionUtil {
         }
 
         // Check wallpaper access permission (optional)
-        if (!hasWallpaperAccess(context)) {
+        if (!hasWallpaperAccess()) {
             missing.add("Wallpaper Access")
         }
 
@@ -224,7 +205,7 @@ object PermissionUtil {
         }
 
         // Wallpaper access is optional for wallpaper sync feature
-        if (!hasWallpaperAccess(context)) {
+        if (!hasWallpaperAccess()) {
             optional.add("Wallpaper Access")
         }
 

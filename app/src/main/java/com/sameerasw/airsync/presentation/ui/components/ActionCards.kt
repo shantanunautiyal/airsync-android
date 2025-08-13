@@ -459,7 +459,7 @@ fun PermissionStatusCard(
                     }
 
                     // Show wallpaper access
-                    if (!PermissionUtil.hasWallpaperAccess(context)) {
+                    if (!PermissionUtil.hasWallpaperAccess()) {
                         OutlinedButton(
                             onClick = {
                                 PermissionUtil.openManageExternalStorageSettings(context)
