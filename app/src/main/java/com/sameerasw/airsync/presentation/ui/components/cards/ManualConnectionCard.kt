@@ -14,10 +14,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.UiState
+import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 
 @Composable
 fun ManualConnectionCard(
+    isConnected: Boolean,
+    lastConnected: Boolean,
     uiState: UiState,
     onIpChange: (String) -> Unit,
     onPortChange: (String) -> Unit,
@@ -27,12 +30,20 @@ fun ManualConnectionCard(
     onConnect: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val cardShape =if (lastConnected) {
+        RoundedCornerShape(minCornerRadius)
+    } else {
+        RoundedCornerShape(
+            topStart = minCornerRadius,
+            topEnd = minCornerRadius,
+            bottomStart = ExtraCornerRadius,
+            bottomEnd = ExtraCornerRadius
+        )
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(
-             minCornerRadius
-        ),
+        shape = cardShape,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -90,8 +101,11 @@ fun ManualConnectionCard(
                         onClick = onConnect,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(
-                            minCornerRadius
-                    ),
+                            topStart = minCornerRadius,
+                            topEnd = minCornerRadius,
+                            bottomStart = ExtraCornerRadius - minCornerRadius,
+                            bottomEnd = ExtraCornerRadius - minCornerRadius
+                        )
                     ) {
                         Text("Connect")
                     }

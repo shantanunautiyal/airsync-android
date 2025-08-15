@@ -36,7 +36,7 @@ fun ConnectionStatusCard(
     connectedDevice: ConnectedDevice? = null,
     lastConnected: Boolean
 ) {
-    val cardShape = if (!isConnected && lastConnected) {
+    val cardShape = if (!isConnected) {
         RoundedCornerShape(
             topStart = ExtraCornerRadius,
             topEnd = ExtraCornerRadius,

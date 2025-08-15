@@ -32,7 +32,6 @@ import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
-import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.TestNotificationUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
@@ -242,7 +241,7 @@ fun AirSyncMainScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -305,7 +304,7 @@ fun AirSyncMainScreen(
             }
 
             AnimatedVisibility(
-                visible = uiState.missingPermissions.isEmpty() && !uiState.isConnected,
+                visible = !uiState.isConnected,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
@@ -346,6 +345,8 @@ fun AirSyncMainScreen(
             ) {
                 Column {
                     ManualConnectionCard(
+                        isConnected = uiState.isConnected,
+                        lastConnected = uiState.lastConnectedDevice != null,
                         uiState = uiState,
                         onIpChange = { viewModel.updateIpAddress(it) },
                         onPortChange = { viewModel.updatePort(it) },
@@ -392,7 +393,7 @@ fun AirSyncMainScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { settingsExpanded = !settingsExpanded }
-                    .padding(vertical = 8.dp, horizontal = 16.dp)
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
             ) {
                 Text("Settings", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
@@ -410,7 +411,7 @@ fun AirSyncMainScreen(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     // Notification Sync Settings Card
                     NotificationSyncCard(
