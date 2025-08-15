@@ -17,10 +17,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionExplanationDialog
+import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionType
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.PermissionUtil
 
@@ -35,6 +41,9 @@ fun PermissionStatusCard(
     val criticalPermissions = PermissionUtil.getCriticalMissingPermissions(context)
     val optionalPermissions = PermissionUtil.getOptionalMissingPermissions(context)
 
+    // Dialog state management
+    var showDialog by remember { mutableStateOf<PermissionType?>(null) }
+
     if (missingPermissions.isNotEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
@@ -43,8 +52,8 @@ fun PermissionStatusCard(
             ),
             colors = CardDefaults.cardColors(
                 containerColor = if (criticalPermissions.isNotEmpty())
-                    MaterialTheme.colorScheme.errorContainer
-                else MaterialTheme.colorScheme.secondaryContainer
+                    MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHigh
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -61,7 +70,7 @@ fun PermissionStatusCard(
                         else MaterialTheme.colorScheme.onSecondaryContainer
                     )
 
-                    TextButton(onClick = onRefreshPermissions) {
+                    OutlinedButton(onClick = onRefreshPermissions) {
                         Text("Refresh")
                     }
                 }
@@ -71,26 +80,22 @@ fun PermissionStatusCard(
                 // Show critical permissions first
                 if (criticalPermissions.isNotEmpty()) {
                     Text(
-                        "Critical permissions (required for core functionality):",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Recommended permissions:",
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
-                    criticalPermissions.forEach { permission ->
-                        Text(
-                            "• $permission",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
 
-                    Button(
-                        onClick = onGrantPermissions,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Grant Critical Permissions", color = MaterialTheme.colorScheme.onError)
+                    criticalPermissions.forEach { permission ->
+                        when (permission) {
+                            "Notification Access" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Required for syncing notifications",
+                                    onExplainClick = { showDialog = PermissionType.NOTIFICATION_ACCESS },
+                                    isCritical = true
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -103,78 +108,114 @@ fun PermissionStatusCard(
                     }
 
                     Text(
-                        "Optional permissions (recommended for better experience):",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Optional permissions:",
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
 
                     optionalPermissions.forEach { permission ->
                         when (permission) {
+                            "Post Notifications" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Show connection status and alerts",
+                                    onExplainClick = { showDialog = PermissionType.POST_NOTIFICATIONS },
+                                    isCritical = false
+                                )
+                            }
                             "Background App Usage" -> {
-                                Text(
-                                    "• $permission - Prevents Android from killing AirSync in background",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Keep the app alive when inactive",
+                                    onExplainClick = { showDialog = PermissionType.BACKGROUND_USAGE },
+                                    isCritical = false
                                 )
                             }
                             "Wallpaper Access" -> {
-                                Text(
-                                    "• $permission - Enables wallpaper sync to desktop (optional feature)",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Enables wallpaper sync",
+                                    onExplainClick = { showDialog = PermissionType.WALLPAPER_ACCESS },
+                                    isCritical = false
                                 )
                             }
-                            else -> {
-                                Text(
-                                    "• $permission",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Show Android 14+ notification permission
-                    if (PermissionUtil.isNotificationPermissionRequired() &&
-                        !PermissionUtil.isPostNotificationPermissionGranted(context) &&
-                        onRequestNotificationPermission != null) {
-
-                        OutlinedButton(
-                            onClick = onRequestNotificationPermission,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                        ) {
-                            Text("Grant Notification Permission")
-                        }
-                    }
-
-                    // Show battery optimization
-                    if (PermissionUtil.isBatteryOptimizationPermissionRequired() &&
-                        !PermissionUtil.isBatteryOptimizationDisabled(context)) {
-
-                        OutlinedButton(
-                            onClick = {
-                                PermissionUtil.openBatteryOptimizationSettings(context)
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                        ) {
-                            Text("Allow Background Usage")
-                        }
-                    }
-
-                    // Show wallpaper access
-                    if (!PermissionUtil.hasWallpaperAccess()) {
-                        OutlinedButton(
-                            onClick = {
-                                PermissionUtil.openManageExternalStorageSettings(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Enable Wallpaper Sync")
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Show permission explanation dialog
+    showDialog?.let { permissionType ->
+        PermissionExplanationDialog(
+            permissionType = permissionType,
+            onDismiss = { showDialog = null },
+            onGrantPermission = {
+                when (permissionType) {
+                    PermissionType.NOTIFICATION_ACCESS -> {
+                        PermissionUtil.openNotificationListenerSettings(context)
+                    }
+                    PermissionType.POST_NOTIFICATIONS -> {
+                        onRequestNotificationPermission?.invoke()
+                    }
+                    PermissionType.BACKGROUND_USAGE -> {
+                        PermissionUtil.openBatteryOptimizationSettings(context)
+                    }
+                    PermissionType.WALLPAPER_ACCESS -> {
+                        PermissionUtil.openManageExternalStorageSettings(context)
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun PermissionButton(
+    permissionName: String,
+    description: String,
+    onExplainClick: () -> Unit,
+    isCritical: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = permissionName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isCritical)
+                    MaterialTheme.colorScheme.onErrorContainer
+                else
+                    MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isCritical)
+                    MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                else
+                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+            )
+        }
+
+        if (isCritical) {
+            Button(
+                onClick = onExplainClick,
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text("Learn More")
+            }
+        } else {
+            OutlinedButton(
+                onClick = onExplainClick,
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text("Learn More")
             }
         }
     }

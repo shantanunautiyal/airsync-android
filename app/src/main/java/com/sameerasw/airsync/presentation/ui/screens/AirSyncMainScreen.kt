@@ -54,7 +54,6 @@ import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCa
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
-import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.UpdateDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -562,15 +561,6 @@ fun AirSyncMainScreen(
                 )
             }
 
-            if (uiState.showPermissionDialog) {
-                PermissionDialog(
-                    missingPermissions = uiState.missingPermissions,
-                    onDismiss = { viewModel.setPermissionDialogVisible(false) },
-                    onGrantPermissions = {
-                        PermissionUtil.openNotificationListenerSettings(context)
-                        viewModel.setPermissionDialogVisible(false)
-                    }
-                )
         }
 
         // Update Dialog
@@ -591,5 +581,4 @@ fun AirSyncMainScreen(
                 onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() }
             )
         }
-    }
 }
