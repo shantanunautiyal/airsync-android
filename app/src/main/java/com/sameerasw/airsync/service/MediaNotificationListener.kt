@@ -186,6 +186,11 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun processNotificationForSync(sbn: StatusBarNotification) {
         serviceScope.launch {
             try {
+                // Skip notifications from AirSync itself to prevent feedback loops
+                if (sbn.packageName == packageName) {
+                    return@launch
+                }
+
                 // Check if notification sync is enabled
                 val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
                 if (!isSyncEnabled) {
