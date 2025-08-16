@@ -27,6 +27,9 @@ object WebSocketMessageHandler {
 
             when (type) {
                 "clipboardUpdate" -> handleClipboardUpdate(context, data)
+                "fileTransferInit" -> handleFileTransferInit(context, data)
+                "fileChunk" -> handleFileChunk(context, data)
+                "fileTransferComplete" -> handleFileTransferComplete(context, data)
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
@@ -39,6 +42,47 @@ object WebSocketMessageHandler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling incoming message: ${e.message}")
+        }
+    }
+
+    private fun handleFileTransferInit(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val id = data.optString("id", java.util.UUID.randomUUID().toString())
+            val name = data.optString("name")
+            val size = data.optInt("size", 0)
+            val mime = data.optString("mime", "application/octet-stream")
+            val checksum = data.optString("checksum", null)
+
+            val checksumVal = data.optString("checksum", null)
+            FileReceiver.handleInit(context, id, name, size, mime, if (checksumVal.isNullOrBlank()) null else checksumVal)
+            Log.d(TAG, "Started incoming file transfer: $name ($size bytes)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in file init: ${e.message}")
+        }
+    }
+
+    private fun handleFileChunk(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val id = data.optString("id", "default")
+            val index = data.optInt("index", 0)
+            val chunk = data.optString("chunk", "")
+                if (chunk.isNotEmpty()) {
+                FileReceiver.handleChunk(context, id, index, chunk)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in file chunk: ${e.message}")
+        }
+    }
+
+    private fun handleFileTransferComplete(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val id = data.optString("id", "default")
+            FileReceiver.handleComplete(context, id)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in file complete: ${e.message}")
         }
     }
 

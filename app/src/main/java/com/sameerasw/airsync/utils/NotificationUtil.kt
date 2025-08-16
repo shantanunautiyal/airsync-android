@@ -18,6 +18,7 @@ object NotificationUtil {
     private const val CHANNEL_ID = "airsync_status"
     private const val NOTIFICATION_ID = 1001
     private const val TAG = "NotificationUtil"
+    private const val FILE_CHANNEL_ID = "airsync_file_transfer"
 
     fun createNotificationChannel(context: Context) {
         val name = "AirSync Status"
@@ -112,6 +113,68 @@ object NotificationUtil {
 
     fun hideConnectionStatusNotification(context: Context) {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+    }
+
+    // File transfer notifications
+    fun createFileChannel(context: Context) {
+        val name = "File transfers"
+        val descriptionText = "Notifications for file transfers"
+        val importance = NotificationManager.IMPORTANCE_LOW
+        val channel = NotificationChannel(FILE_CHANNEL_ID, name, importance).apply {
+            description = descriptionText
+            setShowBadge(false)
+        }
+
+        val notificationManager: NotificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    fun showFileProgress(context: Context, notifId: Int, fileName: String, percent: Int) {
+        createFileChannel(context)
+        val manager = NotificationManagerCompat.from(context)
+        val notif = NotificationCompat.Builder(context, FILE_CHANNEL_ID)
+            .setContentTitle("Receiving: $fileName")
+            .setContentText("$percent%")
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setProgress(100, percent, false)
+            .setOnlyAlertOnce(true)
+            .build()
+        manager.notify(notifId, notif)
+    }
+
+    fun showFileComplete(context: Context, notifId: Int, fileName: String, verified: Boolean, contentUri: android.net.Uri? = null) {
+        createFileChannel(context)
+        val manager = NotificationManagerCompat.from(context)
+        // Cancel any existing progress notification to ensure it is replaced cleanly
+        manager.cancel(notifId)
+
+        val builder = NotificationCompat.Builder(context, FILE_CHANNEL_ID)
+            .setContentTitle("Received: $fileName")
+            .setContentText(if (verified) "Saved to Downloads" else "Saved to Downloads (checksum mismatch)")
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setProgress(0, 0, false)
+
+        // If we have the content Uri, add an action to open/reveal the file
+        if (contentUri != null) {
+            val openIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, context.contentResolver.getType(contentUri))
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val pending = PendingIntent.getActivity(
+                context,
+                notifId,
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setContentIntent(pending)
+            builder.addAction(android.R.drawable.ic_menu_view, "Open", pending)
+        }
+
+        val notif = builder.build()
+        manager.notify(notifId, notif)
     }
 
     private fun formatLastSeen(timestamp: Long): String {

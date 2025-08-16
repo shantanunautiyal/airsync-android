@@ -8,6 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.FileSender
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -20,6 +21,12 @@ class ShareActivity : ComponentActivity() {
             Intent.ACTION_SEND -> {
                 if (intent.type == "text/plain") {
                     handleTextShare(intent)
+                } else {
+                    // Try to handle file share
+                    val stream = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+                    if (stream != null) {
+                        handleFileShare(stream)
+                    }
                 }
             }
         }
@@ -76,6 +83,45 @@ class ShareActivity : ComponentActivity() {
     private fun showToast(message: String) {
         runOnUiThread {
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun handleFileShare(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            try {
+                val dataStoreManager = DataStoreManager(this@ShareActivity)
+
+                if (!WebSocketUtil.isConnected()) {
+                    val ipAddress = dataStoreManager.getIpAddress().first()
+                    val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
+                    val lastConnectedDevice = dataStoreManager.getLastConnectedDevice().first()
+                    val symmetricKey = lastConnectedDevice?.symmetricKey
+
+                    WebSocketUtil.connect(
+                        context = this@ShareActivity,
+                        ipAddress = ipAddress,
+                        port = port,
+                        symmetricKey = symmetricKey,
+                        onConnectionStatus = { connected ->
+                            if (connected) {
+                                FileSender.sendFile(this@ShareActivity, uri)
+                                showToast("File shared to Mac")
+                            } else {
+                                showToast("Failed to connect to Mac")
+                            }
+                            finish()
+                        },
+                        onMessage = { }
+                    )
+                } else {
+                    FileSender.sendFile(this@ShareActivity, uri)
+                    showToast("File shared to Mac")
+                    finish()
+                }
+            } catch (e: Exception) {
+                showToast("Failed to share file: ${e.message}")
+                finish()
+            }
         }
     }
 }
