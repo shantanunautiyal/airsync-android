@@ -123,4 +123,13 @@ class AirSyncRepositoryImpl(
     override fun getUserManuallyDisconnected(): Flow<Boolean> {
         return dataStoreManager.getUserManuallyDisconnected()
     }
+
+    // Auto-reconnect toggle
+    override suspend fun setAutoReconnectEnabled(enabled: Boolean) {
+        dataStoreManager.setAutoReconnectEnabled(enabled)
+    }
+
+    override fun getAutoReconnectEnabled(): Flow<Boolean> {
+        return dataStoreManager.getAutoReconnectEnabled()
+    }
 }

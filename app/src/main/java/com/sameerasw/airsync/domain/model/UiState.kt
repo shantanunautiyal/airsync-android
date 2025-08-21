@@ -21,5 +21,6 @@ data class UiState(
     val iconSyncMessage: String = "",
     val symmetricKey: String? = null,
     val manualPcName: String = "",
-    val manualIsPlus: Boolean = false
+    val manualIsPlus: Boolean = false,
+    val isAutoReconnectEnabled: Boolean = true
 )

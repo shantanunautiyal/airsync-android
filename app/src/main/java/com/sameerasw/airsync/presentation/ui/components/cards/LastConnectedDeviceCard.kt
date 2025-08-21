@@ -14,6 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -26,7 +27,9 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 @Composable
 fun LastConnectedDeviceCard(
     device: ConnectedDevice,
-    onQuickConnect: () -> Unit
+    onQuickConnect: () -> Unit,
+    isAutoReconnectEnabled: Boolean,
+    onToggleAutoReconnect: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -82,6 +85,20 @@ fun LastConnectedDeviceCard(
                 }
             }
             Text("Last seen $lastConnectedTime", style = MaterialTheme.typography.bodyMedium)
+
+            // Auto re-connect toggle
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Auto re-connect", style = MaterialTheme.typography.bodyMedium)
+                Switch(
+                    checked = isAutoReconnectEnabled,
+                    onCheckedChange = onToggleAutoReconnect
+                )
+            }
 
             Button(
                 onClick = onQuickConnect,

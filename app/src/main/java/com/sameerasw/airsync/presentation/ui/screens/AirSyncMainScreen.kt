@@ -382,7 +382,9 @@ fun AirSyncMainScreen(
                                 viewModel.updateSymmetricKey(device.symmetricKey)
                                 connect()
                             }
-                        }
+                        },
+                        isAutoReconnectEnabled = uiState.isAutoReconnectEnabled,
+                        onToggleAutoReconnect = { enabled -> viewModel.setAutoReconnectEnabled(enabled) }
                     )
                 }
             }

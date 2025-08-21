@@ -33,7 +33,7 @@ object WebSocketMessageHandler {
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
-                "disconnectRequest" -> handleDisconnectRequest()
+                "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "ping" -> handlePing(context)
                 else -> {
@@ -52,10 +52,9 @@ object WebSocketMessageHandler {
             val name = data.optString("name")
             val size = data.optInt("size", 0)
             val mime = data.optString("mime", "application/octet-stream")
-            val checksum = data.optString("checksum", null)
+            val checksumVal = data.optString("checksum", "")
 
-            val checksumVal = data.optString("checksum", null)
-            FileReceiver.handleInit(context, id, name, size, mime, if (checksumVal.isNullOrBlank()) null else checksumVal)
+            FileReceiver.handleInit(context, id, name, size, mime, if (checksumVal.isBlank()) null else checksumVal)
             Log.d(TAG, "Started incoming file transfer: $name ($size bytes)")
         } catch (e: Exception) {
             Log.e(TAG, "Error in file init: ${e.message}")
@@ -267,8 +266,15 @@ object WebSocketMessageHandler {
         }
     }
 
-    private fun handleDisconnectRequest() {
+    private fun handleDisconnectRequest(context: Context) {
         try {
+            // Mark as intentional disconnect to prevent auto-reconnect
+            kotlinx.coroutines.runBlocking {
+                try {
+                    val dataStoreManager = DataStoreManager(context)
+                    dataStoreManager.setUserManuallyDisconnected(true)
+                } catch (_: Exception) { }
+            }
             // Immediately disconnect the WebSocket
             WebSocketUtil.disconnect()
             Log.d(TAG, "WebSocket disconnected as per request")

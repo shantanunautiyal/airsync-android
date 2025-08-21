@@ -22,6 +22,7 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -63,6 +64,11 @@ class AirSyncViewModel(
     private var isNetworkMonitoringActive = false
     private var previousNetworkIp: String? = null
 
+    // Auto-reconnect
+    private var autoReconnectJob: kotlinx.coroutines.Job? = null
+    private var autoReconnectStart: Long = 0L
+    private var appContext: Context? = null
+
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
         viewModelScope.launch {
@@ -71,6 +77,15 @@ class AirSyncViewModel(
                 isConnecting = false,
                 response = if (isConnected) "Connected successfully!" else "Disconnected"
             )
+
+            // Cancel auto-reconnect when connected; schedule when disconnected (if allowed)
+            if (isConnected) {
+                cancelAutoReconnect()
+            } else {
+                appContext?.let { ctx ->
+                    maybeScheduleAutoReconnect(ctx)
+                }
+            }
         }
     }
 
@@ -94,6 +109,7 @@ class AirSyncViewModel(
         isPlus: Boolean = false,
         symmetricKey: String? = null
     ) {
+        appContext = context.applicationContext
         viewModelScope.launch {
             // Load saved values
             val savedIp = initialIp ?: repository.getIpAddress().first()
@@ -104,6 +120,7 @@ class AirSyncViewModel(
             val isDeveloperMode = repository.getDeveloperMode().first()
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
+            val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -143,7 +160,8 @@ class AirSyncViewModel(
                 isDeveloperMode = isDeveloperMode,
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
                 isConnected = currentlyConnected,
-                symmetricKey = symmetricKey ?: lastConnectedSymmetricKey
+                symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
+                isAutoReconnectEnabled = isAutoReconnectEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -158,6 +176,11 @@ class AirSyncViewModel(
                         symmetricKey = symmetricKey
                     )
                 )
+            }
+
+            // If not connected and conditions allow, schedule auto-reconnect
+            if (!currentlyConnected) {
+                maybeScheduleAutoReconnect(context)
             }
         }
     }
@@ -335,6 +358,110 @@ class AirSyncViewModel(
     fun setUserManuallyDisconnected(disconnected: Boolean) {
         viewModelScope.launch {
             repository.setUserManuallyDisconnected(disconnected)
+            if (disconnected) {
+                cancelAutoReconnect()
+            }
+        }
+    }
+
+    fun setAutoReconnectEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
+        viewModelScope.launch {
+            repository.setAutoReconnectEnabled(enabled)
+            if (!enabled) {
+                cancelAutoReconnect()
+            } else {
+                appContext?.let { ctx ->
+                    if (!_uiState.value.isConnected) {
+                        maybeScheduleAutoReconnect(ctx)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelAutoReconnect() {
+        autoReconnectJob?.cancel()
+        autoReconnectJob = null
+        autoReconnectStart = 0L
+    }
+
+    private fun hasNetworkAwareMappingForLastDevice(): ConnectedDevice? {
+        val ourIp = _deviceInfo.value.localIp
+        val last = _uiState.value.lastConnectedDevice ?: return null
+        if (ourIp.isEmpty() || ourIp == "Unknown" || ourIp == "No Wi-Fi") return null
+        // Find matching device by name with mapping for our IP
+        val networkDevice = _networkDevices.value.firstOrNull { it.deviceName == last.name && it.getClientIpForNetwork(ourIp) != null }
+        return networkDevice?.toConnectedDevice(ourIp)
+    }
+
+    fun maybeScheduleAutoReconnect(context: Context) {
+        viewModelScope.launch {
+            try {
+                val autoEnabled = repository.getAutoReconnectEnabled().first()
+                val manuallyDisconnected = repository.getUserManuallyDisconnected().first()
+                if (!autoEnabled || manuallyDisconnected || WebSocketUtil.isConnected()) {
+                    return@launch
+                }
+
+                // Ensure we have latest network devices
+                loadNetworkDevices()
+
+                val targetDevice = hasNetworkAwareMappingForLastDevice() ?: return@launch
+
+                if (autoReconnectJob?.isActive == true) return@launch
+
+                autoReconnectStart = System.currentTimeMillis()
+                _uiState.value = _uiState.value.copy(response = "Will auto reconnect to ${targetDevice.name} if possible")
+
+                autoReconnectJob = viewModelScope.launch {
+                    while (coroutineContext.isActive) {
+                        // Stop conditions
+                        val autoStillEnabled = repository.getAutoReconnectEnabled().first()
+                        val stillManual = repository.getUserManuallyDisconnected().first()
+                        if (WebSocketUtil.isConnected() || !autoStillEnabled || stillManual) {
+                            break
+                        }
+
+                        // Re-resolve mapping in case IP changed
+                        val currentTarget = hasNetworkAwareMappingForLastDevice()
+                        if (currentTarget == null) {
+                            // No longer on a known network for last device; stop trying
+                            break
+                        }
+
+                        // Delay according to elapsed time window
+                        val elapsed = System.currentTimeMillis() - autoReconnectStart
+                        val delayMs = if (elapsed <= 60_000L) 10_000L else 60_000L
+                        delay(delayMs)
+
+                        if (WebSocketUtil.isConnected()) continue
+
+                        // Attempt connection
+                        _uiState.value = _uiState.value.copy(isConnecting = true, response = "Auto reconnecting to ${currentTarget.name}...")
+                        WebSocketUtil.connect(
+                            context = context,
+                            ipAddress = currentTarget.ipAddress,
+                            port = currentTarget.port.toIntOrNull() ?: 6996,
+                            symmetricKey = currentTarget.symmetricKey,
+                            onConnectionStatus = { connected ->
+                                viewModelScope.launch {
+                                    _uiState.value = _uiState.value.copy(isConnecting = false)
+                                    if (connected) {
+                                        _uiState.value = _uiState.value.copy(response = "Auto-reconnected to ${currentTarget.name}")
+                                        repository.updateNetworkDeviceLastConnected(currentTarget.name, System.currentTimeMillis())
+                                        cancelAutoReconnect()
+                                    } else {
+                                        _uiState.value = _uiState.value.copy(response = "Auto-reconnect attempt failed")
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                // no-op
+            }
         }
     }
 
@@ -366,7 +493,7 @@ class AirSyncViewModel(
                                 isPrerelease = currentVersion.contains("BETA", ignoreCase = true),
                                 isDraft = false,
                                 publishedAt = "",
-                                assets = emptyList()
+                                assets = emptyList<com.sameerasw.airsync.domain.model.GitHubAsset>()
                             ),
                             asset = com.sameerasw.airsync.domain.model.GitHubAsset(
                                 name = "current-version",
@@ -395,7 +522,7 @@ class AirSyncViewModel(
                             isPrerelease = false,
                             isDraft = false,
                             publishedAt = "",
-                            assets = emptyList()
+                            assets = emptyList<com.sameerasw.airsync.domain.model.GitHubAsset>()
                         ),
                         asset = com.sameerasw.airsync.domain.model.GitHubAsset(
                             name = "error",
