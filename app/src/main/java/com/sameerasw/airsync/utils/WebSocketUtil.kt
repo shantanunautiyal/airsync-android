@@ -63,6 +63,9 @@ object WebSocketUtil {
         onConnectionStatusChanged = onConnectionStatus
         onMessageReceived = onMessage
 
+        // Reflect "Connecting..." immediately in the persistent notification
+        updatePersistentNotification(context, isConnected = false, isConnecting = true)
+
         try {
             if (client == null) {
                 client = createClient()
@@ -91,7 +94,7 @@ object WebSocketUtil {
 
                     // Update connection status
                     onConnectionStatusChanged?.invoke(true)
-                    updatePersistentNotification(context, true)
+                    updatePersistentNotification(context, isConnected = true, isConnecting = false)
 
                     // Notify all registered listeners about the connection status
                     notifyConnectionStatusListeners(true)
@@ -118,7 +121,7 @@ object WebSocketUtil {
                     Log.d(TAG, "WebSocket closing: $code / $reason")
                     isConnected.set(false)
                     onConnectionStatusChanged?.invoke(false)
-                    updatePersistentNotification(context, false)
+                    updatePersistentNotification(context, isConnected = false, isConnecting = false)
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
@@ -131,7 +134,7 @@ object WebSocketUtil {
 
                     // Update connection status
                     onConnectionStatusChanged?.invoke(false)
-                    updatePersistentNotification(context, false)
+                    updatePersistentNotification(context, isConnected = false, isConnecting = false)
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
@@ -143,6 +146,7 @@ object WebSocketUtil {
             Log.e(TAG, "Failed to create WebSocket: ${e.message}")
             isConnecting.set(false)
             onConnectionStatusChanged?.invoke(false)
+            updatePersistentNotification(context, isConnected = false, isConnecting = false)
         }
     }
 
@@ -209,25 +213,31 @@ object WebSocketUtil {
         return isConnected.get()
     }
 
-    private fun updatePersistentNotification(context: Context, isConnected: Boolean) {
+    private fun updatePersistentNotification(context: Context, isConnected: Boolean, isConnecting: Boolean) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager(context)
-                val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
+                val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
 
-                if (!isSyncEnabled) {
-                    NotificationUtil.hideConnectionStatusNotification(context)
-                    return@launch
-                }
+                val lastDevice = ds.getLastConnectedDevice().first()
+                val deviceName = lastDevice?.name
 
-                val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
-                val lastSyncTime = dataStoreManager.getLastSyncTime().first()
+                val ourIp = com.sameerasw.airsync.utils.DeviceInfoUtil.getWifiIpAddress(context)
+                val all = ds.getAllNetworkDeviceConnections().first()
+                val hasReconnectTarget = if (ourIp != null && lastDevice != null) {
+                    all.firstOrNull { it.deviceName == lastDevice.name && it.getClientIpForNetwork(ourIp) != null } != null
+                } else false
+
+                val autoEnabled = ds.getAutoReconnectEnabled().first()
+                val manual = ds.getUserManuallyDisconnected().first()
+                val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
 
                 NotificationUtil.showConnectionStatusNotification(
                     context = context,
-                    connectedDevice = connectedDevice,
-                    lastSyncTime = lastSyncTime,
-                    isConnected = isConnected
+                    deviceName = deviceName,
+                    isConnected = isConnected,
+                    isConnecting = isConnecting,
+                    isAutoReconnecting = isAutoReconnecting,
+                    hasReconnectTarget = hasReconnectTarget
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating persistent notification: ${e.message}")

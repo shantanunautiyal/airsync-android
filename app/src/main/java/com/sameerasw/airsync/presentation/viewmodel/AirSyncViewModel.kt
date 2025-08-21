@@ -86,6 +86,9 @@ class AirSyncViewModel(
                     maybeScheduleAutoReconnect(ctx)
                 }
             }
+
+            // Update persistent status notification to reflect real-time state
+            appContext?.let { pushStatusNotification(it) }
         }
     }
 
@@ -182,6 +185,9 @@ class AirSyncViewModel(
             if (!currentlyConnected) {
                 maybeScheduleAutoReconnect(context)
             }
+
+            // Push initial status notification
+            pushStatusNotification(context)
         }
     }
 
@@ -255,6 +261,9 @@ class AirSyncViewModel(
             isConnected = isConnected,
             isConnecting = isConnecting
         )
+        appContext?.let { ctx ->
+            viewModelScope.launch { pushStatusNotification(ctx) }
+        }
     }
 
     fun refreshPermissions(context: Context) {
@@ -290,6 +299,9 @@ class AirSyncViewModel(
 
             // Refresh network devices list
             loadNetworkDevices()
+
+            // Update status notification with new device name
+            appContext?.let { pushStatusNotification(it) }
         }
     }
 
@@ -361,6 +373,7 @@ class AirSyncViewModel(
             if (disconnected) {
                 cancelAutoReconnect()
             }
+            appContext?.let { pushStatusNotification(it) }
         }
     }
 
@@ -377,6 +390,7 @@ class AirSyncViewModel(
                     }
                 }
             }
+            appContext?.let { pushStatusNotification(it) }
         }
     }
 
@@ -414,6 +428,9 @@ class AirSyncViewModel(
                 autoReconnectStart = System.currentTimeMillis()
                 _uiState.value = _uiState.value.copy(response = "Will auto reconnect to ${targetDevice.name} if possible")
 
+                // Reflect auto-reconnect waiting state
+                pushStatusNotification(context)
+
                 autoReconnectJob = viewModelScope.launch {
                     while (coroutineContext.isActive) {
                         // Stop conditions
@@ -439,6 +456,7 @@ class AirSyncViewModel(
 
                         // Attempt connection
                         _uiState.value = _uiState.value.copy(isConnecting = true, response = "Auto reconnecting to ${currentTarget.name}...")
+                        // Notification will show Connecting via WebSocketUtil.connect
                         WebSocketUtil.connect(
                             context = context,
                             ipAddress = currentTarget.ipAddress,
@@ -454,6 +472,9 @@ class AirSyncViewModel(
                                     } else {
                                         _uiState.value = _uiState.value.copy(response = "Auto-reconnect attempt failed")
                                     }
+
+                                    // Push status notification after attempt
+                                    appContext?.let { pushStatusNotification(it) }
                                 }
                             }
                         )
@@ -650,6 +671,9 @@ class AirSyncViewModel(
 
             // Update previous IP for next comparison
             previousNetworkIp = currentIp
+
+            // Push status notification after network change
+            pushStatusNotification(context)
         } else if (currentIp == null && networkInfo.isWifi) {
             // Wi-Fi connected but no IP yet, update device info
             _deviceInfo.value = _deviceInfo.value.copy(localIp = "Unknown")
@@ -662,6 +686,8 @@ class AirSyncViewModel(
                 WebSocketUtil.disconnect()
                 setConnectionStatus(isConnected = false, isConnecting = false)
                 setResponse("Disconnected - Wi-Fi lost")
+                // Push status notification for Wi-Fi loss
+                pushStatusNotification(context)
             }
         }
     }
@@ -714,6 +740,35 @@ class AirSyncViewModel(
                     }
                 }
             )
+        }
+    }
+
+    // Build and push the latest status notification
+    private suspend fun pushStatusNotification(context: Context) {
+        try {
+            val last = repository.getLastConnectedDevice().first()
+            val deviceName = last?.name
+            val ourIp = DeviceInfoUtil.getWifiIpAddress(context)
+            val all = repository.getAllNetworkDeviceConnections().first()
+            val hasReconnectTarget = if (ourIp != null && last != null) {
+                all.firstOrNull { it.deviceName == last.name && it.getClientIpForNetwork(ourIp) != null } != null
+            } else false
+            val autoEnabled = repository.getAutoReconnectEnabled().first()
+            val manual = repository.getUserManuallyDisconnected().first()
+            val isConnected = _uiState.value.isConnected
+            val isConnecting = _uiState.value.isConnecting
+            val isAutoReconnecting = !isConnected && !isConnecting && autoEnabled && !manual && hasReconnectTarget
+
+            com.sameerasw.airsync.utils.NotificationUtil.showConnectionStatusNotification(
+                context = context,
+                deviceName = deviceName,
+                isConnected = isConnected,
+                isConnecting = isConnecting,
+                isAutoReconnecting = isAutoReconnecting,
+                hasReconnectTarget = hasReconnectTarget
+            )
+        } catch (_: Exception) {
+            // ignore
         }
     }
 }

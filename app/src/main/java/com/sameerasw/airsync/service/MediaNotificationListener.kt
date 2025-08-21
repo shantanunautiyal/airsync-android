@@ -13,6 +13,7 @@ import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
+import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationUtil
@@ -373,38 +374,42 @@ class MediaNotificationListener : NotificationListenerService() {
                 val success = WebSocketUtil.sendMessage(notificationJson)
                 if (success) {
                     Log.d(TAG, "Notification sent successfully via existing WebSocket connection")
-                    updatePersistentNotification(isConnected = true)
+                    updatePersistentNotification()
                 } else {
                     Log.e(TAG, "Failed to send notification via WebSocket")
-                    updatePersistentNotification(isConnected = false)
+                    updatePersistentNotification()
                 }
             } else {
                 Log.d(TAG, "WebSocket not connected, skipping notification sync")
-                updatePersistentNotification(isConnected = false)
+                updatePersistentNotification()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in sendNotificationToDesktop: ${e.message}")
-            updatePersistentNotification(isConnected = false)
+            updatePersistentNotification()
         }
     }
 
-    private suspend fun updatePersistentNotification(isConnected: Boolean = false) {
+    private suspend fun updatePersistentNotification() {
         try {
-            val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
-            if (!isSyncEnabled) {
-                // Hide notification if sync is disabled
-                NotificationUtil.hideConnectionStatusNotification(this)
-                return
-            }
-
             val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
-            val lastSyncTime = dataStoreManager.getLastSyncTime().first()
+            val deviceName = connectedDevice?.name
+            val isConnected = WebSocketUtil.isConnected()
+
+            val ourIp = DeviceInfoUtil.getWifiIpAddress(this)
+            val all = dataStoreManager.getAllNetworkDeviceConnections().first()
+            val hasReconnectTarget = ourIp != null && all.any { it.getClientIpForNetwork(ourIp!!) != null }
+
+            val autoEnabled = dataStoreManager.getAutoReconnectEnabled().first()
+            val manual = dataStoreManager.getUserManuallyDisconnected().first()
+            val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
 
             NotificationUtil.showConnectionStatusNotification(
                 context = this,
-                connectedDevice = connectedDevice,
-                lastSyncTime = lastSyncTime,
-                isConnected = isConnected
+                deviceName = deviceName,
+                isConnected = isConnected,
+                isConnecting = false,
+                isAutoReconnecting = isAutoReconnecting,
+                hasReconnectTarget = hasReconnectTarget
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error updating persistent notification: ${e.message}")

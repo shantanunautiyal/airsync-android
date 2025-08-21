@@ -9,20 +9,16 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
-import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.service.NotificationActionReceiver
-import java.text.SimpleDateFormat
-import java.util.*
 
 object NotificationUtil {
     private const val CHANNEL_ID = "airsync_status"
     private const val NOTIFICATION_ID = 1001
-    private const val TAG = "NotificationUtil"
     private const val FILE_CHANNEL_ID = "airsync_file_transfer"
 
     fun createNotificationChannel(context: Context) {
         val name = "AirSync Status"
-        val descriptionText = "Shows connection status and last sync time"
+        val descriptionText = "Shows connection status"
         val importance = NotificationManager.IMPORTANCE_LOW
         val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
             description = descriptionText
@@ -34,80 +30,104 @@ object NotificationUtil {
         notificationManager.createNotificationChannel(channel)
     }
 
+    /**
+     * Show the real-time connection status notification with a single dynamic action.
+     * Content contract:
+     * - Title: device name if available, otherwise "AirSync"
+     * - Text: "Connected", "Connecting...", "Trying to re-connect", or "Disconnected"
+     * - One action button based on state:
+     *   - Connected -> "Disconnect"
+     *   - Auto-reconnecting (waiting/trying) -> "Stop"
+     *   - Disconnected with a reconnect target -> "Reconnect"
+     *   - Otherwise -> "Open app"
+     */
     fun showConnectionStatusNotification(
         context: Context,
-        connectedDevice: ConnectedDevice?,
-        lastSyncTime: Long?,
-        isConnected: Boolean = false
+        deviceName: String?,
+        isConnected: Boolean,
+        isConnecting: Boolean,
+        isAutoReconnecting: Boolean,
+        hasReconnectTarget: Boolean
     ) {
         createNotificationChannel(context)
 
-        // Opening the app
-        val openAppIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val openAppPendingIntent = PendingIntent.getActivity(
-            context, 0, openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Stopping notification sync
-        val stopSyncIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-            action = NotificationActionReceiver.ACTION_STOP_SYNC
-        }
-        val stopSyncPendingIntent = PendingIntent.getBroadcast(
-            context, 1, stopSyncIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val title = if (connectedDevice != null) {
-            "Connected to ${connectedDevice.name}"
-        } else {
-            "AirSync Ready"
+        val title = deviceName ?: "AirSync"
+        val content = when {
+            isConnecting -> "Connecting..."
+            isConnected -> "Connected"
+            isAutoReconnecting -> "Trying to re-connect"
+            else -> "Disconnected"
         }
 
-        val content = buildString {
-            if (connectedDevice != null) {
-                append("${connectedDevice.ipAddress}:${connectedDevice.port}")
-                if (lastSyncTime != null) {
-                    append("\nLast seen: ${formatLastSeen(lastSyncTime)}")
-                } else {
-                    append("\nNever synced")
-                }
-            } else {
-                append("Waiting for connection")
+        // Decide action
+        val (actionTitle, pendingIntent) = when {
+            isConnected -> {
+                "Disconnect" to PendingIntent.getBroadcast(
+                    context,
+                    101,
+                    Intent(context, NotificationActionReceiver::class.java).apply {
+                        action = NotificationActionReceiver.ACTION_DISCONNECT
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+            isAutoReconnecting -> {
+                "Stop" to PendingIntent.getBroadcast(
+                    context,
+                    102,
+                    Intent(context, NotificationActionReceiver::class.java).apply {
+                        action = NotificationActionReceiver.ACTION_STOP_AUTORECONNECT
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+            hasReconnectTarget -> {
+                "Reconnect" to PendingIntent.getBroadcast(
+                    context,
+                    103,
+                    Intent(context, NotificationActionReceiver::class.java).apply {
+                        action = NotificationActionReceiver.ACTION_RECONNECT
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+            else -> {
+                "Open app" to PendingIntent.getActivity(
+                    context,
+                    104,
+                    Intent(context, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
             }
         }
 
-        val icon = if (isConnected) {
-            android.R.drawable.ic_dialog_info
-        } else {
-            android.R.drawable.ic_dialog_alert
-        }
-
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setSmallIcon(R.drawable.ic_stat_name)
-            .setContentIntent(openAppPendingIntent)
-            .addAction(
-                android.R.drawable.ic_media_pause,
-                "Stop Sync",
-                stopSyncPendingIntent
-            )
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setShowWhen(true)
-            .setWhen(lastSyncTime ?: System.currentTimeMillis())
-            .build()
+            .setShowWhen(false)
+            .addAction(0, actionTitle, pendingIntent)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    context,
+                    105,
+                    Intent(context, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
 
         try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
         } catch (e: SecurityException) {
-            // notification permission is not granted
-            android.util.Log.w(TAG, "Failed to show notification: ${e.message}")
+            android.util.Log.w("NotificationUtil", "Failed to show status notification: ${e.message}")
         }
     }
 
@@ -115,7 +135,7 @@ object NotificationUtil {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
     }
 
-    // File transfer notifications
+    // File transfer notifications remain unchanged
     fun createFileChannel(context: Context) {
         val name = "File transfers"
         val descriptionText = "Notifications for file transfers"
@@ -146,7 +166,6 @@ object NotificationUtil {
     fun showFileComplete(context: Context, notifId: Int, fileName: String, verified: Boolean, contentUri: android.net.Uri? = null) {
         createFileChannel(context)
         val manager = NotificationManagerCompat.from(context)
-        // Cancel any existing progress notification to ensure it is replaced cleanly
         manager.cancel(notifId)
 
         val builder = NotificationCompat.Builder(context, FILE_CHANNEL_ID)
@@ -157,7 +176,6 @@ object NotificationUtil {
             .setOnlyAlertOnce(true)
             .setProgress(0, 0, false)
 
-        // If we have the content Uri, add an action to open/reveal the file
         if (contentUri != null) {
             val openIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(contentUri, context.contentResolver.getType(contentUri))
@@ -175,24 +193,5 @@ object NotificationUtil {
 
         val notif = builder.build()
         manager.notify(notifId, notif)
-    }
-
-    private fun formatLastSeen(timestamp: Long): String {
-        val now = System.currentTimeMillis()
-        val diffMs = now - timestamp
-        val diffMinutes = diffMs / (1000 * 60)
-        val diffHours = diffMinutes / 60
-        val diffDays = diffHours / 24
-
-        return when {
-            diffMinutes < 1 -> "Just now"
-            diffMinutes < 60 -> "${diffMinutes}m ago"
-            diffHours < 24 -> "${diffHours}h ago"
-            diffDays < 7 -> "${diffDays}d ago"
-            else -> {
-                val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
-                dateFormat.format(Date(timestamp))
-            }
-        }
     }
 }
