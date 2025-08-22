@@ -60,6 +60,16 @@ object JsonUtil {
         return """{"type":"notification","data":{"id":"$id","title":"${escape(title)}","body":"${escape(body)}","app":"${escape(app)}","package":"${escape(packageName)}"$actionsJson}}"""
     }
 
+    /**
+     * Creates a one-line JSON for Android->Mac notification state updates (e.g., dismissals).
+     * If action is not provided, defaults to "dismiss" when dismissed=true.
+     */
+    fun createNotificationUpdateJson(id: String, dismissed: Boolean = true, action: String? = null): String {
+        val safeAction = action ?: if (dismissed) "dismiss" else null
+        val actionPart = safeAction?.let { ",\"action\":\"${escape(it)}\"" } ?: ""
+        return """{"type":"notificationUpdate","data":{"id":"$id","dismissed":$dismissed$actionPart}}"""
+    }
+
     private fun escape(value: String): String {
         return value
             .replace("\\", "\\\\")

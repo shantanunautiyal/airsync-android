@@ -13,7 +13,11 @@ object NotificationDismissalUtil {
     
     // Store active notifications with their IDs for dismissal or actions
     private val activeNotifications = ConcurrentHashMap<String, StatusBarNotification>()
-    
+    // Reverse map from system notification key to our generated ID
+    private val keyToId = ConcurrentHashMap<String, String>()
+    // IDs suppressed from Android->Mac dismissal sync (because dismissal originated from Mac)
+    private val suppressedIds = ConcurrentHashMap.newKeySet<String>()
+
     /**
      * Generate a unique notification ID
      */
@@ -26,12 +30,20 @@ object NotificationDismissalUtil {
      */
     fun storeNotification(id: String, notification: StatusBarNotification) {
         activeNotifications[id] = notification
+        // Keep reverse lookup so we can map sbn.key -> id on removal
+        try {
+            keyToId[notification.key] = id
+        } catch (_: Exception) { }
         Log.d(TAG, "Stored notification with ID: $id")
         
         // Clean up old notifications
-        if (activeNotifications.size > 50) {
-            val oldestKeys = activeNotifications.keys.take(activeNotifications.size - 50)
-            oldestKeys.forEach { activeNotifications.remove(it) }
+        if (activeNotifications.size > 200) {
+            val oldestKeys = activeNotifications.keys.take(activeNotifications.size - 200)
+            oldestKeys.forEach { oldId ->
+                activeNotifications.remove(oldId)?.let { sbn ->
+                    keyToId.remove(sbn.key)
+                }
+            }
         }
     }
     
@@ -44,8 +56,12 @@ object NotificationDismissalUtil {
             if (notification != null) {
                 val service = getNotificationListenerService()
                 if (service != null) {
+                    // Mark suppressed to avoid echo back to Mac when onNotificationRemoved triggers
+                    markSuppressed(notificationId)
                     service.cancelNotification(notification.key)
+                    // Cleanup maps after cancel is requested (onNotificationRemoved may also do this)
                     activeNotifications.remove(notificationId)
+                    keyToId.remove(notification.key)
                     Log.d(TAG, "Successfully dismissed notification: $notificationId")
                     true
                 } else {
@@ -105,7 +121,7 @@ object NotificationDismissalUtil {
                 }
                 // Attach results
                 RemoteInput.addResultsToIntent(remoteInputs, intent, results)
-                try {
+                return try {
                     pendingIntent.send(service, 0, intent)
                     Log.d(TAG, "Sent inline reply for action '$actionName' on $notificationId")
                     true
@@ -115,7 +131,7 @@ object NotificationDismissalUtil {
                 }
             } else {
                 // Simple button action
-                try {
+                return try {
                     pendingIntent.send()
                     Log.d(TAG, "Invoked action '$actionName' on $notificationId")
                     true
@@ -127,6 +143,36 @@ object NotificationDismissalUtil {
         } catch (e: Exception) {
             Log.e(TAG, "Error performing action: ${e.message}")
             false
+        }
+    }
+
+    /**
+     * Lookup generated ID by a system notification key.
+     */
+    fun getIdBySystemKey(systemKey: String): String? = try { keyToId[systemKey] } catch (_: Exception) { null }
+
+    /**
+     * Lookup generated ID by StatusBarNotification
+     */
+    fun getIdForSbn(sbn: StatusBarNotification?): String? {
+        if (sbn == null) return null
+        return getIdBySystemKey(sbn.key)
+    }
+
+    /** Mark an ID as suppressed for outgoing dismissal sync. */
+    fun markSuppressed(notificationId: String) {
+        suppressedIds.add(notificationId)
+    }
+
+    /** Returns true if the ID was suppressed and clears the suppression flag. */
+    fun consumeSuppressed(notificationId: String): Boolean {
+        return suppressedIds.remove(notificationId)
+    }
+
+    /** Remove from caches when we it's gone. */
+    fun removeFromCaches(id: String) {
+        activeNotifications.remove(id)?.let { sbn ->
+            keyToId.remove(sbn.key)
         }
     }
 

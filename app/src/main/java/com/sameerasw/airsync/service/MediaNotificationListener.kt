@@ -8,6 +8,7 @@ import android.media.MediaMetadata
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import android.util.Log
@@ -171,7 +172,22 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
-        Log.d(TAG, "Notification removed: ${sbn?.packageName}")
+        if (sbn != null) handleNotificationRemoval(sbn)
+    }
+
+    // API level variants call the same handler to ensure we catch swipe-away removals
+    override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap) {
+        super.onNotificationRemoved(sbn, rankingMap)
+        handleNotificationRemoval(sbn)
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap, reason: Int) {
+        super.onNotificationRemoved(sbn, rankingMap, reason)
+        handleNotificationRemoval(sbn)
+    }
+
+    private fun handleNotificationRemoval(sbn: StatusBarNotification) {
+        Log.d(TAG, "Notification removed: ${sbn.packageName}")
 
         // Update media info and check for changes
         val previousMediaInfo = currentMediaInfo
@@ -181,6 +197,38 @@ class MediaNotificationListener : NotificationListenerService() {
         if (previousMediaInfo != currentMediaInfo) {
             Log.d(TAG, "Media info changed after notification removal, triggering sync")
             SyncManager.onMediaStateChanged(this)
+        }
+
+        // Send dismissal update to Mac for real removals
+        serviceScope.launch {
+            try {
+                val id = NotificationDismissalUtil.getIdForSbn(sbn)
+                if (id.isNullOrEmpty()) {
+                    // Skip if we cannot map to a known id
+                    return@launch
+                }
+                // If this dismissal was initiated by our own dismiss request, skip echo
+                val wasSuppressed = NotificationDismissalUtil.consumeSuppressed(id)
+                if (wasSuppressed) {
+                    // Clean local caches and ignore
+                    NotificationDismissalUtil.removeFromCaches(id)
+                    return@launch
+                }
+
+                // Build and send update
+                if (WebSocketUtil.isConnected()) {
+                    val update = JsonUtil.toSingleLine(JsonUtil.createNotificationUpdateJson(id, dismissed = true, action = "dismiss"))
+                    val sent = WebSocketUtil.sendMessage(update)
+                    Log.d(TAG, "Sent notificationUpdate for $id: $sent")
+                } else {
+                    Log.d(TAG, "WebSocket not connected; skipping notificationUpdate for $id")
+                }
+
+                // Remove from caches since it's gone now
+                NotificationDismissalUtil.removeFromCaches(id)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending notificationUpdate: ${e.message}")
+            }
         }
     }
 
