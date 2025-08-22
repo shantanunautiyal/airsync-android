@@ -38,6 +38,37 @@ object JsonUtil {
     }
 
     /**
+     * Creates a single-line JSON string for notifications with actions included.
+     * actions: list of objects { name: String, type: "button" | "reply" }
+     */
+    fun createNotificationJson(
+        id: String,
+        title: String,
+        body: String,
+        app: String,
+        packageName: String,
+        actions: List<Pair<String, String>>
+    ): String {
+        val actionsJson = if (actions.isNotEmpty()) {
+            val items = actions.joinToString(",") { (name, type) ->
+                """{"name":"${escape(name)}","type":"${escape(type)}"}"""
+            }
+            ",\"actions\":[${items}]"
+        } else {
+            ""
+        }
+        return """{"type":"notification","data":{"id":"$id","title":"${escape(title)}","body":"${escape(body)}","app":"${escape(app)}","package":"${escape(packageName)}"$actionsJson}}"""
+    }
+
+    private fun escape(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+    }
+
+    /**
      * Creates a single-line JSON string for device status with media playing state
      */
     fun createDeviceStatusJson(
@@ -60,6 +91,13 @@ object JsonUtil {
      */
     fun createNotificationDismissalResponse(id: String, success: Boolean, message: String = ""): String {
         return """{"type":"dismissalResponse","data":{"id":"$id","success":$success,"message":"$message"}}"""
+    }
+
+    /**
+     * Creates a response JSON for notification action result
+     */
+    fun createNotificationActionResponse(id: String, actionName: String, success: Boolean, message: String = ""): String {
+        return """{"type":"notificationActionResponse","data":{"id":"$id","action":"${escape(actionName)}","success":$success,"message":"${escape(message)}"}}"""
     }
 
     /**

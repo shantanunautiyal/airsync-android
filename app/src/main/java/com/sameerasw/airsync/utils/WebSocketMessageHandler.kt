@@ -33,6 +33,7 @@ object WebSocketMessageHandler {
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
+                "notificationAction" -> handleNotificationAction(data)
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "ping" -> handlePing(context)
@@ -217,13 +218,8 @@ object WebSocketMessageHandler {
             // Send updated media state after successful control
             if (success) {
                 // For track skip actions (next/previous), add a delay to allow media player to update
-                if (action == "next" || action == "previous") {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        delay(1200)
-                        SyncManager.onMediaStateChanged(context)
-                    }
-                } else {
-                    // For other actions, sync immediately
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(1200)
                     SyncManager.onMediaStateChanged(context)
                 }
             }
@@ -254,6 +250,43 @@ object WebSocketMessageHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Error handling notification dismissal: ${e.message}")
             sendNotificationDismissalResponse("unknown", false, "Error: ${e.message}")
+        }
+    }
+
+    private fun handleNotificationAction(data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Notification action data is null")
+                sendNotificationActionResponse("unknown", "", false, "No data provided")
+                return
+            }
+
+            val notificationId = data.optString("id")
+            if (notificationId.isEmpty()) {
+                sendNotificationActionResponse(notificationId, "", false, "No notification ID provided")
+                return
+            }
+
+            // We accept either "name" or legacy "action" for action name
+            val actionName = data.optString("name", data.optString("action", "")).ifEmpty { "" }
+            val replyText = data.optString("text", null)
+
+            if (actionName.isEmpty()) {
+                sendNotificationActionResponse(notificationId, actionName, false, "No action name provided")
+                return
+            }
+
+            val success = NotificationDismissalUtil.performNotificationAction(notificationId, actionName, replyText)
+            val message = if (success) {
+                if (replyText != null) "Reply sent" else "Action invoked"
+            } else {
+                "Failed to perform action or notification not found"
+            }
+
+            sendNotificationActionResponse(notificationId, actionName, success, message)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling notification action: ${e.message}")
+            sendNotificationActionResponse("unknown", "", false, "Error: ${e.message}")
         }
     }
 
@@ -300,6 +333,13 @@ object WebSocketMessageHandler {
     private fun sendNotificationDismissalResponse(id: String, success: Boolean, message: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val response = JsonUtil.createNotificationDismissalResponse(id, success, message)
+            WebSocketUtil.sendMessage(response)
+        }
+    }
+
+    private fun sendNotificationActionResponse(id: String, actionName: String, success: Boolean, message: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val response = JsonUtil.createNotificationActionResponse(id, actionName, success, message)
             WebSocketUtil.sendMessage(response)
         }
     }

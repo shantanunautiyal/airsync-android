@@ -244,7 +244,60 @@ class MediaNotificationListener : NotificationListenerService() {
                         return@launch
                     }
 
-                    sendNotificationToDesktop(title, body, appName, sbn)
+                    // Generate unique notification ID
+                    val notificationId = NotificationDismissalUtil.generateNotificationId(
+                        sbn.packageName,
+                        title,
+                        sbn.postTime
+                    )
+
+                    // Store notification for potential dismissal or actions
+                    NotificationDismissalUtil.storeNotification(notificationId, sbn)
+
+                    // Extract actions: button or reply
+                    val actions = mutableListOf<Pair<String, String>>()
+                    try {
+                        val notifActions = notification.actions
+                        if (notifActions != null) {
+                            for (action in notifActions) {
+                                val hasReply = action.remoteInputs?.any { it.allowFreeFormInput } == true
+                                val type = if (hasReply) "reply" else "button"
+                                val name = action.title?.toString() ?: "Action"
+                                actions.add(name to type)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to extract actions: ${e.message}")
+                    }
+
+                    // Create notification JSON with actions
+                    val notificationJson = JsonUtil.toSingleLine(
+                        JsonUtil.createNotificationJson(
+                            id = notificationId,
+                            title = title,
+                            body = body,
+                            app = appName,
+                            packageName = sbn.packageName,
+                            actions = actions
+                        )
+                    )
+
+                    Log.d(TAG, "Preparing to send notification: $notificationJson")
+
+                    if (WebSocketUtil.isConnected()) {
+                        Log.d(TAG, "Sending notification via WebSocket")
+                        val success = WebSocketUtil.sendMessage(notificationJson)
+                        if (success) {
+                            Log.d(TAG, "Notification sent successfully via existing WebSocket connection")
+                            updatePersistentNotification()
+                        } else {
+                            Log.e(TAG, "Failed to send notification via WebSocket")
+                            updatePersistentNotification()
+                        }
+                    } else {
+                        Log.d(TAG, "WebSocket not connected, skipping notification sync")
+                        updatePersistentNotification()
+                    }
                 } else {
                     Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
                 }
@@ -334,58 +387,13 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private suspend fun sendNotificationToDesktop(title: String, body: String, appName: String, sbn: StatusBarNotification) {
+        // replaced by processNotificationForSync path; keep for compatibility if referenced elsewhere
         try {
-            // Get connection settings from DataStore
             val ipAddress = dataStoreManager.getIpAddress().first()
             val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-
-            // Check if user manually disconnected and prevent auto-reconnection
-            val userManuallyDisconnected = dataStoreManager.getUserManuallyDisconnected().first()
-            if (userManuallyDisconnected && !WebSocketUtil.isConnected()) {
-                Log.d(TAG, "User manually disconnected, skipping notification sync and auto-reconnection")
-                return
-            }
-
-            // Generate unique notification ID
-            val notificationId = NotificationDismissalUtil.generateNotificationId(
-                sbn.packageName,
-                title,
-                sbn.postTime
-            )
-
-            // Store notification for potential dismissal
-            NotificationDismissalUtil.storeNotification(notificationId, sbn)
-
-            // Create notification JSON with unique ID
-            val notificationJson = JsonUtil.toSingleLine(
-                JsonUtil.createNotificationJson(
-                    id = notificationId,
-                    title = title,
-                    body = body,
-                    app = appName,
-                    packageName = sbn.packageName
-                )
-            )
-
-            Log.d(TAG, "Preparing to send notification: $notificationJson")
-
-            if (WebSocketUtil.isConnected()) {
-                Log.d(TAG, "Sending notification to $ipAddress:$port via existing WebSocket connection")
-                val success = WebSocketUtil.sendMessage(notificationJson)
-                if (success) {
-                    Log.d(TAG, "Notification sent successfully via existing WebSocket connection")
-                    updatePersistentNotification()
-                } else {
-                    Log.e(TAG, "Failed to send notification via WebSocket")
-                    updatePersistentNotification()
-                }
-            } else {
-                Log.d(TAG, "WebSocket not connected, skipping notification sync")
-                updatePersistentNotification()
-            }
+            Log.d(TAG, "Skipping legacy send path to $ipAddress:$port; using unified processNotificationForSync")
         } catch (e: Exception) {
-            Log.e(TAG, "Error in sendNotificationToDesktop: ${e.message}")
-            updatePersistentNotification()
+            Log.e(TAG, "Error in legacy sendNotificationToDesktop: ${e.message}")
         }
     }
 
