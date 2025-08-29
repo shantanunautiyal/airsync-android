@@ -9,15 +9,11 @@ import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
-import com.sameerasw.airsync.domain.model.UpdateInfo
-import com.sameerasw.airsync.domain.model.NetworkInfo
-import com.sameerasw.airsync.domain.model.UpdateStatus
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
-import com.sameerasw.airsync.utils.UpdateManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -41,21 +37,6 @@ class AirSyncViewModel(
 
     private val _deviceInfo = MutableStateFlow(DeviceInfo())
     val deviceInfo: StateFlow<DeviceInfo> = _deviceInfo.asStateFlow()
-
-    // Update-related state
-    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
-    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
-
-    private val _updateStatus = MutableStateFlow(UpdateStatus.NO_UPDATE)
-    val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
-
-    private val _downloadProgress = MutableStateFlow(0)
-    val downloadProgress: StateFlow<Int> = _downloadProgress.asStateFlow()
-
-    private val _showUpdateDialog = MutableStateFlow(false)
-    val showUpdateDialog: StateFlow<Boolean> = _showUpdateDialog.asStateFlow()
-
-    private var currentDownloadId: Long? = null
 
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
@@ -486,210 +467,18 @@ class AirSyncViewModel(
         }
     }
 
-    fun checkForUpdates(context: Context, showDialogOnUpdate: Boolean = true) {
-        viewModelScope.launch {
-            _updateStatus.value = UpdateStatus.CHECKING
-
-            try {
-                val updateInfo = UpdateManager.checkForUpdate(context)
-
-                if (updateInfo != null) {
-                    _updateInfo.value = updateInfo
-                    _updateStatus.value = UpdateStatus.UPDATE_AVAILABLE
-
-                    if (showDialogOnUpdate) {
-                        _showUpdateDialog.value = true
-                    }
-                } else {
-                    _updateStatus.value = UpdateStatus.NO_UPDATE
-
-                    // Show "up to date" dialog when manually checking
-                    if (showDialogOnUpdate) {
-                        val currentVersion = UpdateManager.getCurrentVersionName(context)
-                        _updateInfo.value = UpdateInfo(
-                            release = com.sameerasw.airsync.domain.model.GitHubRelease(
-                                tagName = "v$currentVersion",
-                                name = "AirSync $currentVersion",
-                                changelog = "You are running the latest version of AirSync!",
-                                isPrerelease = currentVersion.contains("BETA", ignoreCase = true),
-                                isDraft = false,
-                                publishedAt = "",
-                                assets = emptyList<com.sameerasw.airsync.domain.model.GitHubAsset>()
-                            ),
-                            asset = com.sameerasw.airsync.domain.model.GitHubAsset(
-                                name = "current-version",
-                                downloadUrl = "",
-                                size = 0
-                            ),
-                            currentVersion = currentVersion,
-                            newVersion = currentVersion,
-                            isBetaUpdate = currentVersion.contains("BETA", ignoreCase = true),
-                            downloadSize = ""
-                        )
-                        _showUpdateDialog.value = true
-                    }
-                }
-            } catch (_: Exception) {
-                _updateStatus.value = UpdateStatus.ERROR
-
-                // Show error dialog when manually checking
-                if (showDialogOnUpdate) {
-                    val currentVersion = UpdateManager.getCurrentVersionName(context)
-                    _updateInfo.value = UpdateInfo(
-                        release = com.sameerasw.airsync.domain.model.GitHubRelease(
-                            tagName = "v$currentVersion",
-                            name = "Update Check Failed",
-                            changelog = "Failed to check for updates. Please check your internet connection and try again.",
-                            isPrerelease = false,
-                            isDraft = false,
-                            publishedAt = "",
-                            assets = emptyList<com.sameerasw.airsync.domain.model.GitHubAsset>()
-                        ),
-                        asset = com.sameerasw.airsync.domain.model.GitHubAsset(
-                            name = "error",
-                            downloadUrl = "",
-                            size = 0
-                        ),
-                        currentVersion = currentVersion,
-                        newVersion = currentVersion,
-                        isBetaUpdate = false,
-                        downloadSize = ""
-                    )
-                    _showUpdateDialog.value = true
-                }
-            }
-        }
+    fun updateIpAddressFromNetworkAware(device: ConnectedDevice) {
+        // helper if needed in future - kept for compatibility
+        _uiState.value = _uiState.value.copy(
+            ipAddress = device.ipAddress,
+            port = device.port,
+            symmetricKey = device.symmetricKey
+        )
     }
 
-    fun downloadUpdate(context: Context) {
-        val updateInfo = _updateInfo.value ?: return
-
-        viewModelScope.launch {
-            try {
-                _updateStatus.value = UpdateStatus.DOWNLOADING
-                _downloadProgress.value = 0
-
-                val downloadId = UpdateManager.downloadUpdate(context, updateInfo)
-                currentDownloadId = downloadId
-
-                // Monitor download progress
-                monitorDownloadProgress(context, downloadId)
-
-            } catch (_: Exception) {
-                _updateStatus.value = UpdateStatus.ERROR
-            }
-        }
-    }
-
-    private suspend fun monitorDownloadProgress(context: Context, downloadId: Long) {
-        while (_updateStatus.value == UpdateStatus.DOWNLOADING) {
-            delay(500)
-
-            val progress = UpdateManager.getDownloadProgress(context, downloadId)
-            _downloadProgress.value = progress
-
-            if (UpdateManager.isDownloadComplete(context, downloadId)) {
-                _updateStatus.value = UpdateStatus.DOWNLOADED
-                break
-            }
-        }
-    }
-
-    fun dismissUpdateDialog() {
-        _showUpdateDialog.value = false
-        _updateStatus.value = UpdateStatus.NO_UPDATE
-        _updateInfo.value = null
-        currentDownloadId = null
-    }
-
-    fun startNetworkMonitoring(context: Context) {
-        if (isNetworkMonitoringActive) return
-
-        isNetworkMonitoringActive = true
-        previousNetworkIp = _deviceInfo.value.localIp
-
-        viewModelScope.launch {
-            NetworkMonitor.observeNetworkChanges(context)
-                .collect { networkInfo ->
-                    handleNetworkChange(context, networkInfo)
-                }
-        }
-    }
-
-    private suspend fun handleNetworkChange(context: Context, networkInfo: NetworkInfo) {
-        val currentIp = networkInfo.ipAddress
-
-        // Update device info with new IP
-        if (currentIp != null && currentIp != _deviceInfo.value.localIp) {
-            _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
-
-            // Load network devices to check for network-aware connections
-            loadNetworkDevices()
-
-            // Check if we have a network-aware device for this new network
-            val networkAwareDevice = getNetworkAwareLastConnectedDevice()
-
-            if (networkAwareDevice != null) {
-                // Update the UI state with network-aware device info
-                _uiState.value = _uiState.value.copy(
-                    lastConnectedDevice = networkAwareDevice,
-                    ipAddress = networkAwareDevice.ipAddress,
-                    port = networkAwareDevice.port,
-                    symmetricKey = networkAwareDevice.symmetricKey
-                )
-
-                // Save the new connection info
-                repository.saveIpAddress(networkAwareDevice.ipAddress)
-                repository.savePort(networkAwareDevice.port)
-
-                // If we were connected and user didn't manually disconnect, try to reconnect
-                val wasConnected = WebSocketUtil.isConnected()
-                val userManuallyDisconnected = repository.getUserManuallyDisconnected().first()
-
-                if (wasConnected && !userManuallyDisconnected) {
-                    // Attempt automatic reconnection with network-aware device
-                    attemptAutoReconnection(context, networkAwareDevice)
-                }
-            } else {
-                // No network-aware device found, update last connected device info
-                // with current network mapping if we have a previous connection
-                _uiState.value.lastConnectedDevice?.let { lastDevice ->
-                    // Save network mapping for future connections
-                    repository.saveNetworkDeviceConnection(
-                        lastDevice.name,
-                        currentIp,
-                        lastDevice.ipAddress,
-                        lastDevice.port,
-                        lastDevice.isPlus,
-                        lastDevice.symmetricKey
-                    )
-
-                    // Reload network devices
-                    loadNetworkDevices()
-                }
-            }
-
-            // Update previous IP for next comparison
-            previousNetworkIp = currentIp
-
-            // Push status notification after network change
-            pushStatusNotification(context)
-        } else if (currentIp == null && networkInfo.isWifi) {
-            // Wi-Fi connected but no IP yet, update device info
-            _deviceInfo.value = _deviceInfo.value.copy(localIp = "Unknown")
-        } else if (!networkInfo.isWifi) {
-            // Not on Wi-Fi anymore
-            _deviceInfo.value = _deviceInfo.value.copy(localIp = "No Wi-Fi")
-
-            // Disconnect if connected
-            if (WebSocketUtil.isConnected()) {
-                WebSocketUtil.disconnect()
-                setConnectionStatus(isConnected = false, isConnecting = false)
-                setResponse("Disconnected - Wi-Fi lost")
-                // Push status notification for Wi-Fi loss
-                pushStatusNotification(context)
-            }
-        }
+    private suspend fun loadNetworkDevicesForNetworkChange() {
+        // thin wrapper in case logic needs splitting
+        loadNetworkDevices()
     }
 
     private suspend fun attemptAutoReconnection(context: Context, device: ConnectedDevice) {
@@ -771,4 +560,50 @@ class AirSyncViewModel(
             // ignore
         }
     }
+
+    // Start monitoring network changes (Wi-Fi IP) to update mappings and trigger auto-reconnect attempts
+    fun startNetworkMonitoring(context: Context) {
+        if (isNetworkMonitoringActive) return
+        isNetworkMonitoringActive = true
+        previousNetworkIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+
+        viewModelScope.launch {
+            try {
+                NetworkMonitor.observeNetworkChanges(context).collect { networkInfo ->
+                    val currentIp = networkInfo.ipAddress ?: "No Wi-Fi"
+
+                    if (currentIp != previousNetworkIp) {
+                        previousNetworkIp = currentIp
+
+                        // Update local device info
+                        _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
+
+                        // Reload network-aware device mappings
+                        loadNetworkDevicesForNetworkChange()
+
+                        // If we have a mapping for the last connected device, try auto-reconnect
+                        val target = getNetworkAwareLastConnectedDevice()
+                        if (target != null && !_uiState.value.isConnected) {
+                            // Attempt auto-reconnect asynchronously
+                            try {
+                                attemptAutoReconnection(context, target)
+                            } catch (_: Exception) { /* ignore */ }
+                        }
+
+                        // Update persistent status notification
+                        pushStatusNotification(context)
+                    }
+                }
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    fun stopNetworkMonitoring() {
+        isNetworkMonitoringActive = false
+        previousNetworkIp = null
+    }
+
 }
+
