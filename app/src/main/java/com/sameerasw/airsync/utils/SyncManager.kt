@@ -129,9 +129,15 @@ object SyncManager {
                 // 1. Send device info with wallpaper
                 delay(500)
 
-                val deviceName = DeviceInfoUtil.getDeviceName(context)
-                Log.d(TAG, "Using Android device name: $deviceName")
-                dataStoreManager.saveDeviceName(deviceName)
+                // Prefer the persisted device name set in the app. Fall back to system device name only if empty.
+                val persistedName = dataStoreManager.getDeviceName().first().ifBlank { null }
+                val deviceName = persistedName ?: DeviceInfoUtil.getDeviceName(context).also { sysName ->
+                    // Only save system name if no persisted name exists
+                    try {
+                        dataStoreManager.saveDeviceName(sysName)
+                    } catch (_: Exception) { }
+                }
+                Log.d(TAG, "Using device name for sync: $deviceName")
 
                 val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
                 val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
@@ -175,6 +181,36 @@ object SyncManager {
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error in initial sync: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Send updated device info immediately (used when user changes device name in the app).
+     */
+    fun sendDeviceInfoNow(context: Context, name: String? = null) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val ds = DataStoreManager(context)
+                val deviceName = name ?: ds.getDeviceName().first().ifBlank { DeviceInfoUtil.getDeviceName(context) }
+                val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+                val port = ds.getPort().first().toIntOrNull() ?: 6996
+                val version = try {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+                } catch (_: Exception) {
+                    ""
+                }
+
+                val wallpaperBase64 = try { WallpaperUtil.getWallpaperAsBase64(context) } catch (_: Exception) { null }
+                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, wallpaperBase64)
+
+                if (WebSocketUtil.sendMessage(deviceInfoJson)) {
+                    Log.d(TAG, "Sent updated device info: $deviceName")
+                } else {
+                    Log.w(TAG, "Failed to send updated device info for $deviceName")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending updated device info: ${e.message}")
             }
         }
     }

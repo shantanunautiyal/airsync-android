@@ -219,6 +219,16 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.saveDeviceName(name)
         }
+
+        val ctx = appContext
+        if (ctx != null) {
+            // Send updated device info immediately so desktop sees the new name
+            try {
+                com.sameerasw.airsync.utils.SyncManager.sendDeviceInfoNow(ctx, name)
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
     }
 
     fun setLoading(loading: Boolean) {
@@ -467,15 +477,6 @@ class AirSyncViewModel(
         }
     }
 
-    fun updateIpAddressFromNetworkAware(device: ConnectedDevice) {
-        // helper if needed in future - kept for compatibility
-        _uiState.value = _uiState.value.copy(
-            ipAddress = device.ipAddress,
-            port = device.port,
-            symmetricKey = device.symmetricKey
-        )
-    }
-
     private suspend fun loadNetworkDevicesForNetworkChange() {
         // thin wrapper in case logic needs splitting
         loadNetworkDevices()
@@ -600,10 +601,4 @@ class AirSyncViewModel(
         }
     }
 
-    fun stopNetworkMonitoring() {
-        isNetworkMonitoringActive = false
-        previousNetworkIp = null
-    }
-
 }
-
