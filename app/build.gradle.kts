@@ -53,6 +53,9 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
+    implementation ("androidx.compose.material3:material3:1.5.0-alpha03")
+    implementation("androidx.compose.material:material-icons-core:1.7.8")
+
     // DataStore for state persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.datastore:datastore-core:1.1.1")

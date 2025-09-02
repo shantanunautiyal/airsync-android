@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -23,11 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ConnectionStatusCard(
     isConnected: Boolean,
@@ -78,7 +82,7 @@ fun ConnectionStatusCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -88,9 +92,13 @@ fun ConnectionStatusCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val statusText = when {
-                        isConnecting -> "🟡  Connecting..."
-                        isConnected -> "🟢  Syncing"
-                        else -> "🔴  Disconnected"
+                        isConnecting -> "Connecting..."
+                        isConnected -> "  🟢 Syncing"
+                        else -> "  🔴 Disconnected"
+                    }
+
+                    if (isConnecting) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) { LoadingIndicator() }
                     }
 
                     Text(
