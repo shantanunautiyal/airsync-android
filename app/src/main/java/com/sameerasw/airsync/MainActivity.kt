@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -18,6 +19,13 @@ import com.sameerasw.airsync.presentation.ui.screens.NotificationAppsScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import com.sameerasw.airsync.utils.PermissionUtil
 import java.net.URLDecoder
+import androidx.compose.runtime.*
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.core.net.toUri
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 
 class MainActivity : ComponentActivity() {
     
@@ -27,6 +35,7 @@ class MainActivity : ComponentActivity() {
     ) { isGranted ->
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -62,8 +71,57 @@ class MainActivity : ComponentActivity() {
         setContent {
             AirSyncTheme {
                 val navController = rememberNavController()
+                var showAboutDialog by remember { mutableStateOf(false) }
+                val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    topBar = {
+                        LargeTopAppBar(
+                            title = {
+                                Row {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.ic_laptop_24),
+                                        contentDescription = "AirSync Logo",
+                                        modifier = Modifier.size(32.dp),
+                                        contentScale = ContentScale.Fit,
+                                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "AirSync",
+                                        maxLines = 1,
+                                    )
+                                }
+                            },
+                            actions = {
+                                IconButton(
+                                    onClick = {
+                                        val airSyncPlusUrl =
+                                            "https://github.com/sameerasw/airsync-android/issues/new"
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
+                                        startActivity(intent)
+                                    }
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.outline_feedback_24),
+                                        contentDescription = "Feedback"
+                                    )
+                                }
+
+                                IconButton(onClick = { showAboutDialog = true }) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.outline_info_24),
+                                        contentDescription = "About"
+                                    )
+                                }
+                            },
+                            scrollBehavior = scrollBehavior
+                        )
+                    }
+                ) { innerPadding ->
                     NavHost(
                         navController = navController,
                         startDestination = "main",
@@ -82,7 +140,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onRequestNotificationPermission = {
                                     requestNotificationPermission()
-                                }
+                                },
+                                showAboutDialog = showAboutDialog,
+                                onDismissAbout = { showAboutDialog = false }
                             )
                         }
 

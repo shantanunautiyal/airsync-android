@@ -10,7 +10,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -63,7 +62,9 @@ fun AirSyncMainScreen(
     isPlus: Boolean = false,
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
-    onRequestNotificationPermission: () -> Unit = {}
+    onRequestNotificationPermission: () -> Unit = {},
+    showAboutDialog: Boolean = false,
+    onDismissAbout: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -87,9 +88,6 @@ fun AirSyncMainScreen(
     LaunchedEffect(uiState.isConnected) {
         settingsExpanded = !uiState.isConnected
     }
-
-    // State for About dialog
-    var showAboutDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
@@ -225,319 +223,290 @@ fun AirSyncMainScreen(
         }
     }
 
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+
+        AnimatedVisibility(
+            visible = !uiState.isConnected,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(all = 0.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_laptop_24),
-                    contentDescription = "AirSync Logo",
-                    modifier = Modifier.size(32.dp),
-                    contentScale = ContentScale.Fit,
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                )
-
-                Text("AirSync", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(start = 10.dp), color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = {
-                        val airSyncPlusUrl = "https://github.com/sameerasw/airsync-android/issues/new"
-                        val intent = Intent(Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
-                        context.startActivity(intent)
-                    }
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.outline_feedback_24),
-                        contentDescription = "Feedback"
-                    )
+            QrScannerRow(
+                onLaunchScanner = {
+                    launchScanner(context)
                 }
-
-                IconButton(onClick = { showAboutDialog = true }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.outline_info_24),
-                        contentDescription = "About"
-                    )
-                }
-
-            }
-
-            AnimatedVisibility(
-                visible = !uiState.isConnected,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                QrScannerRow(
-                    onLaunchScanner = {
-                        launchScanner(context)
-                    }
-                )
-            }
-
-            // Permission Status Card
-            AnimatedVisibility(
-                visible = uiState.missingPermissions.isNotEmpty(),
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                PermissionStatusCard(
-                    missingPermissions = uiState.missingPermissions,
-                    onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                    onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                    onRequestNotificationPermission = onRequestNotificationPermission
-                )
-            }
-
-            // Connection Status Card
-            ConnectionStatusCard(
-                isConnected = uiState.isConnected,
-                isConnecting = uiState.isConnecting,
-                onDisconnect = { disconnect() },
-                connectedDevice = uiState.lastConnectedDevice,
-                lastConnected = uiState.lastConnectedDevice != null
             )
+        }
 
-            AnimatedVisibility(
-                visible = !uiState.isConnected,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column {
-                    ManualConnectionCard(
-                        isConnected = uiState.isConnected,
-                        lastConnected = uiState.lastConnectedDevice != null,
-                        uiState = uiState,
-                        onIpChange = { viewModel.updateIpAddress(it) },
-                        onPortChange = { viewModel.updatePort(it) },
-                        onPcNameChange = { viewModel.updateManualPcName(it) },
-                        onIsPlusChange = { viewModel.updateManualIsPlus(it) },
-                        onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
-                        onConnect = { viewModel.prepareForManualConnection() }
-                    )
-                }
-            }
+        // Permission Status Card
+        AnimatedVisibility(
+            visible = uiState.missingPermissions.isNotEmpty(),
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            PermissionStatusCard(
+                missingPermissions = uiState.missingPermissions,
+                onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+                onRefreshPermissions = { viewModel.refreshPermissions(context) },
+                onRequestNotificationPermission = onRequestNotificationPermission
+            )
+        }
 
-            // Last Connected Device Section
-            AnimatedVisibility(
-                visible = !uiState.isConnected && uiState.lastConnectedDevice != null,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                uiState.lastConnectedDevice?.let { device ->
-                    LastConnectedDeviceCard(
-                        device = device,
-                        onQuickConnect = {
-                            // Check if we can use network-aware connection first
-                            val networkAwareDevice = viewModel.getNetworkAwareLastConnectedDevice()
-                            if (networkAwareDevice != null) {
-                                // Use network-aware device IP for current network
-                                viewModel.updateIpAddress(networkAwareDevice.ipAddress)
-                                viewModel.updatePort(networkAwareDevice.port)
-                                connect()
-                            } else {
-                                // Fallback to legacy stored device
-                                viewModel.updateIpAddress(device.ipAddress)
-                                viewModel.updatePort(device.port)
-                                viewModel.updateSymmetricKey(device.symmetricKey)
-                                connect()
-                            }
-                        },
-                        isAutoReconnectEnabled = uiState.isAutoReconnectEnabled,
-                        onToggleAutoReconnect = { enabled -> viewModel.setAutoReconnectEnabled(enabled) }
-                    )
-                }
-            }
+        // Connection Status Card
+        ConnectionStatusCard(
+            isConnected = uiState.isConnected,
+            isConnecting = uiState.isConnecting,
+            onDisconnect = { disconnect() },
+            connectedDevice = uiState.lastConnectedDevice,
+            lastConnected = uiState.lastConnectedDevice != null
+        )
 
-            // Advanced Settings Section
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { settingsExpanded = !settingsExpanded }
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
-            ) {
-                Text("Settings", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.weight(1f))
-                Icon(
-                    painter = painterResource(
-                        if (settingsExpanded) R.drawable.outline_expand_circle_up_24 else R.drawable.outline_expand_circle_down_24
-                    ),
-                    contentDescription = if (settingsExpanded) "Collapse" else "Expand"
+        AnimatedVisibility(
+            visible = !uiState.isConnected,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column {
+                ManualConnectionCard(
+                    isConnected = uiState.isConnected,
+                    lastConnected = uiState.lastConnectedDevice != null,
+                    uiState = uiState,
+                    onIpChange = { viewModel.updateIpAddress(it) },
+                    onPortChange = { viewModel.updatePort(it) },
+                    onPcNameChange = { viewModel.updateManualPcName(it) },
+                    onIsPlusChange = { viewModel.updateManualIsPlus(it) },
+                    onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
+                    onConnect = { viewModel.prepareForManualConnection() }
                 )
             }
+        }
 
-            AnimatedVisibility(
-                visible = settingsExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Notification Sync Settings Card
-                    NotificationSyncCard(
-                        isNotificationEnabled = uiState.isNotificationEnabled,
-                        isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
-                        onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
-                        onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                        onManageApps = onNavigateToApps
-                    )
-
-                    // Clipboard Sync Card
-                    ClipboardSyncCard(
-                        isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                        onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) }
-                    )
-
-
-                    DeviceInfoCard(
-                        deviceName = uiState.deviceNameInput,
-                        localIp = deviceInfo.localIp,
-                        onDeviceNameChange = { viewModel.updateDeviceName(it) }
-                    )
-
-                    // Developer Mode Card
-                    AnimatedVisibility(
-                        visible = uiState.isDeveloperModeVisible,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        DeveloperModeCard(
-                            isDeveloperMode = uiState.isDeveloperMode,
-                            onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
-                            isLoading = uiState.isLoading,
-                            onSendDeviceInfo = {
-                                val message = JsonUtil.createDeviceInfoJson(
-                                    deviceInfo.name,
-                                    deviceInfo.localIp,
-                                    uiState.port.toIntOrNull() ?: 6996,
-                                    versionName ?: "2.0.0"
-                                )
-                                sendMessage(message)
-                            },
-                            onSendNotification = {
-                                val testNotification = TestNotificationUtil.generateRandomNotification()
-                                val message = JsonUtil.createNotificationJson(
-                                    testNotification.id,
-                                    testNotification.title,
-                                    testNotification.body,
-                                    testNotification.appName,
-                                    testNotification.packageName
-                                )
-                                sendMessage(message)
-                            },
-                            onSendDeviceStatus = {
-                                val message = DeviceInfoUtil.generateDeviceStatusJson(
-                                    context
-                                )
-                                sendMessage(message)
-                            },
-                            uiState = uiState
+        // Last Connected Device Section
+        AnimatedVisibility(
+            visible = !uiState.isConnected && uiState.lastConnectedDevice != null,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            uiState.lastConnectedDevice?.let { device ->
+                LastConnectedDeviceCard(
+                    device = device,
+                    onQuickConnect = {
+                        // Check if we can use network-aware connection first
+                        val networkAwareDevice = viewModel.getNetworkAwareLastConnectedDevice()
+                        if (networkAwareDevice != null) {
+                            // Use network-aware device IP for current network
+                            viewModel.updateIpAddress(networkAwareDevice.ipAddress)
+                            viewModel.updatePort(networkAwareDevice.port)
+                            connect()
+                        } else {
+                            // Fallback to legacy stored device
+                            viewModel.updateIpAddress(device.ipAddress)
+                            viewModel.updatePort(device.port)
+                            viewModel.updateSymmetricKey(device.symmetricKey)
+                            connect()
+                        }
+                    },
+                    isAutoReconnectEnabled = uiState.isAutoReconnectEnabled,
+                    onToggleAutoReconnect = { enabled ->
+                        viewModel.setAutoReconnectEnabled(
+                            enabled
                         )
                     }
+                )
+            }
+        }
 
+        // Advanced Settings Section
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { settingsExpanded = !settingsExpanded }
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp)
+        ) {
+            Text("Settings", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.weight(1f))
+            Icon(
+                painter = painterResource(
+                    if (settingsExpanded) R.drawable.outline_expand_circle_up_24 else R.drawable.outline_expand_circle_down_24
+                ),
+                contentDescription = if (settingsExpanded) "Collapse" else "Expand"
+            )
+        }
 
+        AnimatedVisibility(
+            visible = settingsExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Notification Sync Settings Card
+                NotificationSyncCard(
+                    isNotificationEnabled = uiState.isNotificationEnabled,
+                    isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
+                    onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
+                    onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
+                    onManageApps = onNavigateToApps
+                )
 
-                    // Manual Icon Sync Button
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.manualSyncAppIcons(context)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = if (uiState.isDeveloperModeVisible) 0.dp else 20.dp),
-                        shape = RoundedCornerShape(
-                            topStart = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
-                            topEnd = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
-                            bottomStart = ExtraCornerRadius,
-                            bottomEnd = ExtraCornerRadius
-                        ),
-                        enabled = uiState.isConnected && !uiState.isIconSyncLoading
-                    ) {
-                        if (uiState.isIconSyncLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
+                // Clipboard Sync Card
+                ClipboardSyncCard(
+                    isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                    onToggleClipboardSync = { enabled ->
+                        viewModel.setClipboardSyncEnabled(
+                            enabled
+                        )
                     }
+                )
 
-                    // Icon Sync Message Display
-                    AnimatedVisibility(
-                        visible = uiState.iconSyncMessage.isNotEmpty(),
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(ExtraCornerRadius),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
-                                    MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.errorContainer
+
+                DeviceInfoCard(
+                    deviceName = uiState.deviceNameInput,
+                    localIp = deviceInfo.localIp,
+                    onDeviceNameChange = { viewModel.updateDeviceName(it) }
+                )
+
+                // Developer Mode Card
+                AnimatedVisibility(
+                    visible = uiState.isDeveloperModeVisible,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    DeveloperModeCard(
+                        isDeveloperMode = uiState.isDeveloperMode,
+                        onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
+                        isLoading = uiState.isLoading,
+                        onSendDeviceInfo = {
+                            val message = JsonUtil.createDeviceInfoJson(
+                                deviceInfo.name,
+                                deviceInfo.localIp,
+                                uiState.port.toIntOrNull() ?: 6996,
+                                versionName ?: "2.0.0"
                             )
+                            sendMessage(message)
+                        },
+                        onSendNotification = {
+                            val testNotification =
+                                TestNotificationUtil.generateRandomNotification()
+                            val message = JsonUtil.createNotificationJson(
+                                testNotification.id,
+                                testNotification.title,
+                                testNotification.body,
+                                testNotification.appName,
+                                testNotification.packageName
+                            )
+                            sendMessage(message)
+                        },
+                        onSendDeviceStatus = {
+                            val message = DeviceInfoUtil.generateDeviceStatusJson(
+                                context
+                            )
+                            sendMessage(message)
+                        },
+                        uiState = uiState
+                    )
+                }
+
+
+                // Manual Icon Sync Button
+                OutlinedButton(
+                    onClick = {
+                        viewModel.manualSyncAppIcons(context)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = if (uiState.isDeveloperModeVisible) 0.dp else 20.dp),
+                    shape = RoundedCornerShape(
+                        topStart = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
+                        topEnd = if (uiState.isDeveloperModeVisible) minCornerRadius else ExtraCornerRadius,
+                        bottomStart = ExtraCornerRadius,
+                        bottomEnd = ExtraCornerRadius
+                    ),
+                    enabled = uiState.isConnected && !uiState.isIconSyncLoading
+                ) {
+                    if (uiState.isIconSyncLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
+                }
+
+                // Icon Sync Message Display
+                AnimatedVisibility(
+                    visible = uiState.iconSyncMessage.isNotEmpty(),
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(ExtraCornerRadius),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
+                                MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Text(
+                                text = uiState.iconSyncMessage,
+                                modifier = Modifier.weight(1f),
+                                color = if (uiState.iconSyncMessage.contains("Successfully"))
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            TextButton(
+                                onClick = { viewModel.clearIconSyncMessage() }
                             ) {
-                                Text(
-                                    text = uiState.iconSyncMessage,
-                                    modifier = Modifier.weight(1f),
-                                    color = if (uiState.iconSyncMessage.contains("Successfully"))
-                                        MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                TextButton(
-                                    onClick = { viewModel.clearIconSyncMessage() }
-                                ) {
-                                    Text("Dismiss")
-                                }
+                                Text("Dismiss")
                             }
                         }
                     }
                 }
             }
-
-
-            // Dialogs
-            if (uiState.isDialogVisible) {
-                ConnectionDialog(
-                    deviceName = deviceInfo.name,
-                    localIp = deviceInfo.localIp,
-                    desktopIp = uiState.ipAddress,
-                    port = uiState.port,
-                    pcName = pcName ?: uiState.lastConnectedDevice?.name,
-                    isPlus = uiState.lastConnectedDevice?.isPlus ?: isPlus,
-                    onDismiss = { viewModel.setDialogVisible(false) },
-                    onConnect = {
-                        viewModel.setDialogVisible(false)
-                        connect()
-                    }
-                )
-            }
-
         }
 
 
-        // About Dialog
-        if (showAboutDialog) {
-            AboutDialog(
-                onDismissRequest = { showAboutDialog = false },
-                onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() }
+        // Dialogs
+        if (uiState.isDialogVisible) {
+            ConnectionDialog(
+                deviceName = deviceInfo.name,
+                localIp = deviceInfo.localIp,
+                desktopIp = uiState.ipAddress,
+                port = uiState.port,
+                pcName = pcName ?: uiState.lastConnectedDevice?.name,
+                isPlus = uiState.lastConnectedDevice?.isPlus ?: isPlus,
+                onDismiss = { viewModel.setDialogVisible(false) },
+                onConnect = {
+                    viewModel.setDialogVisible(false)
+                    connect()
+                }
             )
         }
+
+    }
+
+    // About Dialog - controlled by parent via showAboutDialog
+    if (showAboutDialog) {
+        AboutDialog(
+            onDismissRequest = onDismissAbout,
+            onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() }
+        )
+    }
 }
