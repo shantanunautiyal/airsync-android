@@ -8,14 +8,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +27,7 @@ import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionExplan
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionType
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.QuickSettingsUtil
 
 @Composable
 fun PermissionStatusCard(
@@ -140,6 +139,52 @@ fun PermissionStatusCard(
                                 )
                             }
                         }
+                    }
+                }
+
+                // Non-permission tip: Quick Settings tile
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Tip:",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (criticalPermissions.isNotEmpty())
+                        MaterialTheme.colorScheme.onErrorContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Add Quick Settings Tile",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (criticalPermissions.isNotEmpty())
+                                MaterialTheme.colorScheme.onErrorContainer
+                            else
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "Add AirSync to Quick Settings for one-tap connect/reconnect.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (criticalPermissions.isNotEmpty())
+                                MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                            else
+                                MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { QuickSettingsUtil.requestAddQuickSettingsTile(context) },
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text("Add Tile")
                     }
                 }
             }
