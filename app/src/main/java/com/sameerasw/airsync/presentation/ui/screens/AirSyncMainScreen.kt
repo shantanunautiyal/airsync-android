@@ -352,8 +352,7 @@ fun AirSyncMainScreen(
                     isNotificationEnabled = uiState.isNotificationEnabled,
                     isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
                     onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
-                    onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                    onManageApps = onNavigateToApps
+                    onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                 )
 
                 // Clipboard Sync Card

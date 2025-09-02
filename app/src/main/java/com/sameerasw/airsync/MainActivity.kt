@@ -15,7 +15,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
-import com.sameerasw.airsync.presentation.ui.screens.NotificationAppsScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import com.sameerasw.airsync.utils.PermissionUtil
 import java.net.URLDecoder
@@ -135,22 +134,11 @@ class MainActivity : ComponentActivity() {
                                 pcName = pcName,
                                 isPlus = isPlus,
                                 symmetricKey = symmetricKey,
-                                onNavigateToApps = {
-                                    navController.navigate("notification_apps")
-                                },
                                 onRequestNotificationPermission = {
                                     requestNotificationPermission()
                                 },
                                 showAboutDialog = showAboutDialog,
                                 onDismissAbout = { showAboutDialog = false }
-                            )
-                        }
-
-                        composable("notification_apps") {
-                            NotificationAppsScreen(
-                                onBackClick = {
-                                    navController.popBackStack()
-                                }
                             )
                         }
                     }

@@ -7,14 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -30,8 +24,7 @@ fun NotificationSyncCard(
     isNotificationEnabled: Boolean,
     isNotificationSyncEnabled: Boolean,
     onToggleSync: (Boolean) -> Unit,
-    onGrantPermissions: () -> Unit,
-    onManageApps: () -> Unit = {}
+    onGrantPermissions: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(top=20.dp),
@@ -51,20 +44,7 @@ fun NotificationSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Notification Sync", style = MaterialTheme.typography.titleMedium)
                 }
-                if (isNotificationEnabled) {
-                    IconButton(
-                        onClick = onManageApps,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Manage Apps",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
 
-                }
                 Switch(
                     checked = isNotificationSyncEnabled && isNotificationEnabled,
                     onCheckedChange = { enabled ->
