@@ -286,7 +286,7 @@ object WebSocketMessageHandler {
 
             // We accept either "name" or legacy "action" for action name
             val actionName = data.optString("name", data.optString("action", "")).ifEmpty { "" }
-            val replyText = data.optString("text", null)
+            val replyText = data.optString("text", "")
 
             if (actionName.isEmpty()) {
                 sendNotificationActionResponse(notificationId, actionName, false, "No action name provided")
