@@ -39,7 +39,14 @@ fun ClipboardSyncCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Automatic Clipboard Sync", style = MaterialTheme.typography.titleMedium)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Clipboard Sync", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Unfortunately Google killed automatic sync, You need to manually share the text to AirSync app.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Switch(
                     checked = isClipboardSyncEnabled,
                     onCheckedChange = onToggleClipboardSync
@@ -56,7 +63,7 @@ fun ClipboardSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Continue browsing", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Show a quick Open/Dismiss notification for links received from desktop",
+                        "Prompt to open links shared.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
