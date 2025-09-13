@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadata
+import android.media.Rating
+import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
@@ -36,6 +38,9 @@ class MediaNotificationListener : NotificationListenerService() {
         @Volatile
         private var serviceInstance: MediaNotificationListener? = null
         private const val TAG = "MediaNotificationListener"
+
+        // In-memory cache of like status per track key
+        private val likeStatusCache = LinkedHashMap<String, String>(32, 0.75f, true)
 
         // System packages to ignore
         private val SYSTEM_PACKAGES = setOf(
@@ -86,8 +91,26 @@ class MediaNotificationListener : NotificationListenerService() {
 
                         Log.d(TAG, "Media session - Title: $title, Artist: $artist, Playing: $isPlaying, State: ${playbackState?.state}")
 
-                        // Determine like status from active notifications for this package
-                        val likeStatus = detectLikeStatusForPackage(controller.packageName)
+                        // Determine like status with source; prefer cache over non-rating heuristics
+                        val detection = determineLikeStatusWithSource(context, controller)
+                        var likeStatus = detection.first
+                        val source = detection.second
+
+                        val cached = getCachedLikeStatusFor(controller)
+                        if (likeStatus == "none") {
+                            likeStatus = cached
+                        } else {
+                            if (source == "rating") {
+                                // High confidence: update cache from rating
+                                updateCachedLikeStatusFor(controller, likeStatus)
+                            } else {
+                                // Low confidence (notification/custom): prefer existing cache if present
+                                if (cached != "none") {
+                                    likeStatus = cached
+                                }
+                                // Do NOT overwrite cache from low-confidence sources
+                            }
+                        }
 
                         // Return the first session that has media info or is playing
                         if (title.isNotEmpty() || artist.isNotEmpty() || isPlaying) {
@@ -118,17 +141,72 @@ class MediaNotificationListener : NotificationListenerService() {
             }
         }
 
+        private fun determineLikeStatusWithSource(context: Context, controller: MediaController): Pair<String, String> {
+            try {
+                val md = controller.metadata
+                // 0) Prefer explicit user rating/heart/thumbs metadata if present
+                val userRating: Rating? = try { md?.getRating(MediaMetadata.METADATA_KEY_USER_RATING) } catch (_: Exception) { null }
+                val rating: Rating? = userRating ?: try { md?.getRating(MediaMetadata.METADATA_KEY_RATING) } catch (_: Exception) { null }
+                if (rating != null && rating.isRated) {
+                    when (rating.ratingStyle) {
+                        Rating.RATING_HEART -> {
+                            val liked = try { rating.hasHeart() } catch (_: Exception) { false }
+                            Log.d(TAG, "Like status from HEART rating: $liked")
+                            return if (liked) "liked" to "rating" else "not_liked" to "rating"
+                        }
+                        Rating.RATING_THUMB_UP_DOWN -> {
+                            val up = try { rating.isThumbUp } catch (_: Exception) { false }
+                            Log.d(TAG, "Like status from THUMB rating: $up")
+                            return if (up) "liked" to "rating" else "not_liked" to "rating"
+                        }
+                        else -> Log.d(TAG, "Rating present but not mappable (style=${rating.ratingStyle})")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to read metadata rating: ${e.message}")
+            }
+
+            // 1) Try notification actions first (package scoped)
+            val notifStatus = detectLikeStatusForPackage(controller.packageName)
+            if (notifStatus != "none") return notifStatus to "notification"
+
+            // 2) Inspect custom actions from the session playback state
+            val custom = controller.playbackState?.customActions ?: emptyList()
+            if (custom.isNotEmpty()) {
+                val hasUnlike = custom.any { ca ->
+                    val a = (ca.action ?: "") + " " + (ca.name?.toString() ?: "")
+                    val s = a.lowercase()
+                    s.contains("unlike") || s.contains("remove like") || s.contains("remove from liked") || s.contains("thumbs_down") || s.contains("dislike")
+                }
+                val hasLike = custom.any { ca ->
+                    val a = (ca.action ?: "") + " " + (ca.name?.toString() ?: "")
+                    val s = a.lowercase()
+                    s.contains("like") || s.contains("favorite") || s.contains("favourite") || s.contains("thumbs_up") || s.contains("❤") || s.contains("♥")
+                }
+                if (hasUnlike) return "liked" to "custom"
+                if (hasLike) return "not_liked" to "custom"
+            }
+
+            return "none" to "none"
+        }
+
         private fun detectLikeStatusForPackage(targetPackage: String?): String {
             val service = getInstance() ?: return "none"
             val notifs = try { service.activeNotifications } catch (_: Exception) { emptyArray<StatusBarNotification>() }
             if (notifs.isEmpty()) return "none"
 
-            // Look for notification from the target package first
+            // Look for notification from the target package first, then others
             val candidates = notifs.filter { it.packageName == targetPackage } + notifs.filter { it.packageName != targetPackage }
 
             for (sbn in candidates) {
                 val n = sbn.notification
                 val actions = n.actions ?: continue
+                // Debug log action titles and semantic actions for inspection
+                try {
+                    actions.forEachIndexed { idx, act ->
+                        Log.d(TAG, "Notif action[$idx]: title='${act.title}', semantic=${act.semanticAction}")
+                    }
+                } catch (_: Exception) {}
                 val status = inferLikeStatusFromActions(actions)
                 if (status != null) return status
             }
@@ -136,18 +214,79 @@ class MediaNotificationListener : NotificationListenerService() {
         }
 
         private fun inferLikeStatusFromActions(actions: Array<Notification.Action>): String? {
+            // Priority 1: explicit text indicating Unlike/Remove -> liked
             for (action in actions) {
                 val title = action.title?.toString()?.lowercase()?.trim() ?: ""
                 if (title.isEmpty()) continue
-                // Heuristics: detect presence of like/unlike/favorite
-                if (title.contains("unlike") || title.contains("remove from liked") || title.contains("remove like") || title.contains("liked")) {
+                if (title.contains("unlike") || title.contains("remove from liked") || title.contains("remove like") || title == "liked") {
                     return "liked"
                 }
-                if (title.contains("like") || title.contains("favorite") || title.contains("favourite") || title.contains("❤") || title.contains("♥")) {
+            }
+            // Priority 2: semantic thumbs up/down if titles are missing
+            for (action in actions) {
+                val sem = action.semanticAction
+                if (sem == Notification.Action.SEMANTIC_ACTION_THUMBS_DOWN) {
+                    return "liked" // apps often show "unlike" when already liked
+                }
+            }
+            for (action in actions) {
+                val title = action.title?.toString()?.lowercase()?.trim() ?: ""
+                val sem = action.semanticAction
+                if (title.contains("like") || title.contains("favorite") || title.contains("favourite") ||
+                    title.contains("❤") || title.contains("♥") ||
+                    sem == Notification.Action.SEMANTIC_ACTION_THUMBS_UP) {
                     return "not_liked"
                 }
             }
             return null
+        }
+
+        // Build a track key using most stable metadata available
+        private fun buildTrackKey(controller: MediaController): String? {
+            return try {
+                val pkg = controller.packageName ?: return null
+                val md = controller.metadata ?: return null
+                val mediaId = md.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
+                val title = md.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+                val artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+                val album = md.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
+                val base = if (!mediaId.isNullOrEmpty()) mediaId else listOf(title, artist, album).joinToString("|")
+                if (base.isBlank()) null else "$pkg|$base"
+            } catch (_: Exception) { null }
+        }
+
+        private fun getCachedLikeStatusFor(controller: MediaController): String {
+            val key = buildTrackKey(controller) ?: return "none"
+            synchronized(likeStatusCache) {
+                return likeStatusCache[key] ?: "none"
+            }
+        }
+
+        private fun updateCachedLikeStatusFor(controller: MediaController, status: String) {
+            val key = buildTrackKey(controller) ?: return
+            synchronized(likeStatusCache) {
+                likeStatusCache[key] = status
+                // Trim cache to 100 entries
+                if (likeStatusCache.size > 100) {
+                    val it = likeStatusCache.entries.iterator()
+                    if (it.hasNext()) {
+                        it.next()
+                        it.remove()
+                    }
+                }
+            }
+        }
+
+        // Public helpers for other components
+        fun setCachedLikeStatusForCurrent(context: Context, status: String): Boolean {
+            return try {
+                val msm = context.getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+                val componentName = ComponentName(context, MediaNotificationListener::class.java)
+                val sessions = try { msm.getActiveSessions(componentName) } catch (_: Exception) { emptyList() }
+                val controller = sessions.firstOrNull { it.playbackState?.actions != 0L } ?: return false
+                updateCachedLikeStatusFor(controller, status)
+                true
+            } catch (_: Exception) { false }
         }
     }
 

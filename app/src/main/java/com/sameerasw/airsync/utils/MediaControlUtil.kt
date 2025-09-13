@@ -105,11 +105,27 @@ object MediaControlUtil {
      */
     fun toggleLike(context: Context): Boolean {
         return try {
+            val controller = getActiveMediaController(context)
+            // 1) Try MediaSession custom actions first (more reliable on some apps)
+            if (controller != null) {
+                val currentStatus = try { MediaNotificationListener.getMediaInfo(context).likeStatus } catch (_: Exception) { "none" }
+                val preferUnlike = currentStatus == "liked"
+                if (performCustomLikeAction(controller, preferUnlike)) {
+                    val newStatus = if (preferUnlike) "not_liked" else "liked"
+                    MediaNotificationListener.setCachedLikeStatusForCurrent(context, newStatus)
+                    return true
+                }
+                if (performCustomLikeAction(controller, !preferUnlike)) {
+                    val newStatus = if (!preferUnlike) "not_liked" else "liked"
+                    MediaNotificationListener.setCachedLikeStatusForCurrent(context, newStatus)
+                    return true
+                }
+            }
+
             val service = MediaNotificationListener.getInstance() ?: run {
                 Log.w(TAG, "Notification listener not available; cannot toggle like")
                 return false
             }
-            val controller = getActiveMediaController(context)
             val packageName = try { controller?.packageName } catch (_: Exception) { null }
 
             val active = try { service.activeNotifications } catch (_: Exception) { emptyArray() }
@@ -128,10 +144,17 @@ object MediaControlUtil {
 
             for (sbn in candidates) {
                 val actions = sbn.notification.actions ?: continue
-                val action = findLikeAction(actions, preferUnlike)
-                    ?: findLikeAction(actions, !preferUnlike)
-                if (action != null) {
-                    return sendAction(action.actionIntent)
+                val act1 = findLikeAction(actions, preferUnlike)
+                if (act1 != null && sendAction(act1.actionIntent)) {
+                    val newStatus = if (preferUnlike) "not_liked" else "liked"
+                    MediaNotificationListener.setCachedLikeStatusForCurrent(context, newStatus)
+                    return true
+                }
+                val act2 = findLikeAction(actions, !preferUnlike)
+                if (act2 != null && sendAction(act2.actionIntent)) {
+                    val newStatus = if (!preferUnlike) "not_liked" else "liked"
+                    MediaNotificationListener.setCachedLikeStatusForCurrent(context, newStatus)
+                    return true
                 }
             }
 
@@ -146,12 +169,60 @@ object MediaControlUtil {
     /**
      * Try to perform a direct 'like' action when available.
      */
-    fun like(context: Context): Boolean = performSpecificLikeAction(context, preferUnlike = false)
+    fun like(context: Context): Boolean {
+        val controller = getActiveMediaController(context)
+        if (controller != null && performCustomLikeAction(controller, preferUnlike = false)) {
+            MediaNotificationListener.setCachedLikeStatusForCurrent(context, "liked")
+            return true
+        }
+        if (performSpecificLikeAction(context, preferUnlike = false)) {
+            MediaNotificationListener.setCachedLikeStatusForCurrent(context, "liked")
+            return true
+        }
+        return false
+    }
 
     /**
      * Try to perform a direct 'unlike' action when available.
      */
-    fun unlike(context: Context): Boolean = performSpecificLikeAction(context, preferUnlike = true)
+    fun unlike(context: Context): Boolean {
+        val controller = getActiveMediaController(context)
+        if (controller != null && performCustomLikeAction(controller, preferUnlike = true)) {
+            MediaNotificationListener.setCachedLikeStatusForCurrent(context, "not_liked")
+            return true
+        }
+        if (performSpecificLikeAction(context, preferUnlike = true)) {
+            MediaNotificationListener.setCachedLikeStatusForCurrent(context, "not_liked")
+            return true
+        }
+        return false
+    }
+
+    private fun performCustomLikeAction(controller: MediaController, preferUnlike: Boolean): Boolean {
+        return try {
+            val customs = controller.playbackState?.customActions ?: emptyList()
+            if (customs.isEmpty()) return false
+            val match = if (preferUnlike) {
+                customs.firstOrNull { ca ->
+                    val s = ((ca.action ?: "") + " " + (ca.name?.toString() ?: "")).lowercase()
+                    s.contains("unlike") || s.contains("remove like") || s.contains("remove from liked") || s.contains("thumbs_down") || s.contains("dislike")
+                }
+            } else {
+                customs.firstOrNull { ca ->
+                    val s = ((ca.action ?: "") + " " + (ca.name?.toString() ?: "")).lowercase()
+                    s.contains("like") || s.contains("favorite") || s.contains("favourite") || s.contains("thumbs_up") || s.contains("❤") || s.contains("♥")
+                }
+            }
+            if (match != null) {
+                controller.transportControls.sendCustomAction(match.action, null)
+                Log.d(TAG, "Sent custom like action: ${match.action}")
+                true
+            } else false
+        } catch (e: Exception) {
+            Log.w(TAG, "Custom like action failed: ${e.message}")
+            false
+        }
+    }
 
     private fun performSpecificLikeAction(context: Context, preferUnlike: Boolean): Boolean {
         return try {
@@ -175,42 +246,25 @@ object MediaControlUtil {
     }
 
     private fun findLikeAction(actions: Array<Notification.Action>, preferUnlike: Boolean): Notification.Action? {
-        // Heuristics: match action titles for like/unlike/favorite
-        val likePredicates = listOf<(String) -> Boolean>(
-            { it.contains("like") },
-            { it.contains("favorite") },
-            { it.contains("favourite") },
-            { it.contains("❤") },
-            { it.contains("♥") }
+        // Heuristics: match action titles and semantic thumbs up/down
+        val likePredicates = listOf<(Notification.Action) -> Boolean>(
+            { a -> a.title?.toString()?.lowercase()?.contains("like") == true },
+            { a -> a.title?.toString()?.lowercase()?.contains("favorite") == true },
+            { a -> a.title?.toString()?.lowercase()?.contains("favourite") == true },
+            { a -> a.title?.toString()?.contains("❤") == true || a.title?.toString()?.contains("♥") == true },
+            { a -> a.semanticAction == Notification.Action.SEMANTIC_ACTION_THUMBS_UP }
         )
-        val unlikePredicates = listOf<(String) -> Boolean>(
-            { it.contains("unlike") },
-            { it.contains("remove from liked") },
-            { it.contains("remove like") },
-            { it.contains("liked") && it.startsWith("un") }
+        val unlikePredicates = listOf<(Notification.Action) -> Boolean>(
+            { a -> a.title?.toString()?.lowercase()?.contains("unlike") == true },
+            { a -> a.title?.toString()?.lowercase()?.contains("remove from liked") == true },
+            { a -> a.title?.toString()?.lowercase()?.contains("remove like") == true },
+            { a -> a.semanticAction == Notification.Action.SEMANTIC_ACTION_THUMBS_DOWN }
         )
         val candidates = actions.toList()
         return if (preferUnlike) {
-            candidates.firstOrNull { titleMatches(it, unlikePredicates) }
+            candidates.firstOrNull { act -> unlikePredicates.any { it(act) } }
         } else {
-            candidates.firstOrNull { titleMatches(it, likePredicates) }
-        }
-    }
-
-    private fun titleMatches(action: Notification.Action, preds: List<(String) -> Boolean>): Boolean {
-        val title = action.title?.toString()?.lowercase()?.trim() ?: return false
-        return preds.any { it(title) }
-    }
-
-    private fun sendAction(pi: PendingIntent?): Boolean {
-        return try {
-            if (pi == null) return false
-            pi.send()
-            Log.d(TAG, "Sent like/unlike action via PendingIntent")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to send like/unlike action: ${e.message}")
-            false
+            candidates.firstOrNull { act -> likePredicates.any { it(act) } }
         }
     }
 
@@ -255,6 +309,18 @@ object MediaControlUtil {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error sending media button event: ${e.message}")
+            false
+        }
+    }
+
+    private fun sendAction(pi: PendingIntent?): Boolean {
+        return try {
+            if (pi == null) return false
+            pi.send()
+            Log.d(TAG, "Sent like/unlike action via PendingIntent")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send like/unlike action: ${e.message}")
             false
         }
     }
