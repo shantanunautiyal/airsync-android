@@ -122,6 +122,8 @@ object WebSocketUtil {
                     isConnected.set(false)
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, isConnected = false, isConnecting = false)
+                    // Clear continue browsing notifs on disconnect
+                    try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
@@ -135,6 +137,8 @@ object WebSocketUtil {
                     // Update connection status
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, isConnected = false, isConnecting = false)
+                    // Clear continue browsing notifs on failure
+                    try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
@@ -147,6 +151,7 @@ object WebSocketUtil {
             isConnecting.set(false)
             onConnectionStatusChanged?.invoke(false)
             updatePersistentNotification(context, isConnected = false, isConnecting = false)
+            try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
         }
     }
 
@@ -178,7 +183,7 @@ object WebSocketUtil {
         }
     }
 
-    fun disconnect() {
+    fun disconnect(context: Context? = null) {
         Log.d(TAG, "Disconnecting WebSocket")
         isConnected.set(false)
         isConnecting.set(false)
@@ -189,6 +194,11 @@ object WebSocketUtil {
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
         onConnectionStatusChanged?.invoke(false)
+
+        // Clear continue browsing notifications if possible
+        context?.let {
+            try { NotificationUtil.clearContinueBrowsingNotifications(it) } catch (_: Exception) {}
+        }
 
         // Notify listeners about the disconnection
         notifyConnectionStatusListeners(false)
@@ -229,16 +239,20 @@ object WebSocketUtil {
 
                 val autoEnabled = ds.getAutoReconnectEnabled().first()
                 val manual = ds.getUserManuallyDisconnected().first()
-                val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
 
-                NotificationUtil.showConnectionStatusNotification(
-                    context = context,
-                    deviceName = deviceName,
-                    isConnected = isConnected,
-                    isConnecting = isConnecting,
-                    isAutoReconnecting = isAutoReconnecting,
-                    hasReconnectTarget = hasReconnectTarget
-                )
+                val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
+                if (shouldShow) {
+                    NotificationUtil.showConnectionStatusNotification(
+                        context = context,
+                        deviceName = deviceName,
+                        isConnected = isConnected,
+                        isConnecting = isConnecting,
+                        isAutoReconnecting = true,
+                        hasReconnectTarget = hasReconnectTarget
+                    )
+                } else {
+                    NotificationUtil.hideConnectionStatusNotification(context)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating persistent notification: ${e.message}")
             }

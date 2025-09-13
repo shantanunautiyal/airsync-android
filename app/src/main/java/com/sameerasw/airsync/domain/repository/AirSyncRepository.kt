@@ -48,6 +48,10 @@ interface AirSyncRepository {
     suspend fun setClipboardSyncEnabled(enabled: Boolean)
     fun getClipboardSyncEnabled(): Flow<Boolean>
 
+    // Continue Browsing settings
+    suspend fun setContinueBrowsingEnabled(enabled: Boolean)
+    fun getContinueBrowsingEnabled(): Flow<Boolean>
+
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>

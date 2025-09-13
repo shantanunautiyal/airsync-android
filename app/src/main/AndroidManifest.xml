@@ -48,6 +48,11 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="airsync" />
             </intent-filter>
+
+            <!-- Long-press Quick Settings tile should open this activity -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
         </activity>
 
         <!-- Share target activity for text sharing -->
@@ -114,6 +119,12 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.sameerasw.airsync.STOP_SYNC" />
+                <!-- Status notification actions -->
+                <action android:name="com.sameerasw.airsync.DISCONNECT" />
+                <action android:name="com.sameerasw.airsync.RECONNECT" />
+                <action android:name="com.sameerasw.airsync.STOP_AUTORECONNECT" />
+                <!-- Continue Browsing actions -->
+                <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
             </intent-filter>
         </receiver>
     </application>

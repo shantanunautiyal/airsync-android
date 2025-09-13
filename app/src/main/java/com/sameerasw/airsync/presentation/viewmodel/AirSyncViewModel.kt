@@ -12,6 +12,7 @@ import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.NetworkMonitor
+import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
@@ -105,6 +106,7 @@ class AirSyncViewModel(
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
+            val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -145,7 +147,8 @@ class AirSyncViewModel(
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
-                isAutoReconnectEnabled = isAutoReconnectEnabled
+                isAutoReconnectEnabled = isAutoReconnectEnabled,
+                isContinueBrowsingEnabled = isContinueBrowsingEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -547,16 +550,21 @@ class AirSyncViewModel(
             val manual = repository.getUserManuallyDisconnected().first()
             val isConnected = _uiState.value.isConnected
             val isConnecting = _uiState.value.isConnecting
-            val isAutoReconnecting = !isConnected && !isConnecting && autoEnabled && !manual && hasReconnectTarget
 
-            com.sameerasw.airsync.utils.NotificationUtil.showConnectionStatusNotification(
-                context = context,
-                deviceName = deviceName,
-                isConnected = isConnected,
-                isConnecting = isConnecting,
-                isAutoReconnecting = isAutoReconnecting,
-                hasReconnectTarget = hasReconnectTarget
-            )
+            val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
+            if (shouldShow) {
+                val isAutoReconnecting = true // show notification during both waiting and connecting
+                NotificationUtil.showConnectionStatusNotification(
+                    context = context,
+                    deviceName = deviceName,
+                    isConnected = isConnected,
+                    isConnecting = isConnecting,
+                    isAutoReconnecting = isAutoReconnecting,
+                    hasReconnectTarget = hasReconnectTarget
+                )
+            } else {
+                NotificationUtil.hideConnectionStatusNotification(context)
+            }
         } catch (_: Exception) {
             // ignore
         }
@@ -598,6 +606,13 @@ class AirSyncViewModel(
             } catch (_: Exception) {
                 // ignore
             }
+        }
+    }
+
+    fun setContinueBrowsingEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isContinueBrowsingEnabled = enabled)
+        viewModelScope.launch {
+            repository.setContinueBrowsingEnabled(enabled)
         }
     }
 

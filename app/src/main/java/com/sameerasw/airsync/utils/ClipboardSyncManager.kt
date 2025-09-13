@@ -3,6 +3,7 @@ package com.sameerasw.airsync.utils
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import android.util.Patterns
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -107,17 +108,39 @@ object ClipboardSyncManager {
         }
     }
 
+    private fun isLinkOnly(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        val matcher = Patterns.WEB_URL.matcher(trimmed)
+        return matcher.matches()
+    }
+
     /**
      * Handle clipboard update received from desktop
      */
     fun handleClipboardUpdate(context: Context, text: String) {
         try {
             lastReceivedText = text
-            val success = ClipboardUtil.setClipboardText(context, text)
-            if (success) {
-                Log.d(TAG, "Clipboard updated from desktop: ${text.take(50)}...")
+
+            // Always update clipboard with the full received text
+            val updated = ClipboardUtil.setClipboardText(context, text)
+            if (updated) {
+                Log.d(TAG, "Clipboard updated from desktop: ${text.take(200)}")
             } else {
                 Log.w(TAG, "Failed to update clipboard from desktop")
+            }
+
+            // Check Continue Browsing setting and show notification only if the text is a pure link
+            val dataStoreManager = DataStoreManager(context)
+            syncScope.launch {
+                val continueEnabled = try { dataStoreManager.getContinueBrowsingEnabled().first() } catch (_: Exception) { true }
+                // Only for Plus and while connected
+                val isConnected = WebSocketUtil.isConnected()
+                val last = try { dataStoreManager.getLastConnectedDevice().first() } catch (_: Exception) { null }
+                val isPlus = last?.isPlus == true
+                if (continueEnabled && isConnected && isPlus && isLinkOnly(text)) {
+                    NotificationUtil.showContinueBrowsingLink(context, text.trim())
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling clipboard update: ${e.message}")

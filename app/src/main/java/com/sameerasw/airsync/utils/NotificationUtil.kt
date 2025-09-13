@@ -1,20 +1,27 @@
 package com.sameerasw.airsync.utils
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.service.NotificationActionReceiver
+import androidx.core.net.toUri
 
 object NotificationUtil {
     private const val CHANNEL_ID = "airsync_status"
     private const val NOTIFICATION_ID = 1001
     private const val FILE_CHANNEL_ID = "airsync_file_transfer"
+    // New: Continue Browsing channel
+    private const val CONTINUE_CHANNEL_ID = "airsync_continue_browsing"
 
     fun createNotificationChannel(context: Context) {
         val name = "AirSync Status"
@@ -25,6 +32,19 @@ object NotificationUtil {
             setShowBadge(false)
         }
 
+        val notificationManager: NotificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    private fun createContinueBrowsingChannel(context: Context) {
+        val name = "Continue browsing"
+        val descriptionText = "Quick open links received from desktop"
+        val importance = NotificationManager.IMPORTANCE_DEFAULT
+        val channel = NotificationChannel(CONTINUE_CHANNEL_ID, name, importance).apply {
+            description = descriptionText
+            setShowBadge(true)
+        }
         val notificationManager: NotificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
@@ -150,6 +170,7 @@ object NotificationUtil {
         notificationManager.createNotificationChannel(channel)
     }
 
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun showFileProgress(context: Context, notifId: Int, fileName: String, percent: Int) {
         createFileChannel(context)
         val manager = NotificationManagerCompat.from(context)
@@ -163,7 +184,8 @@ object NotificationUtil {
         manager.notify(notifId, notif)
     }
 
-    fun showFileComplete(context: Context, notifId: Int, fileName: String, verified: Boolean, contentUri: android.net.Uri? = null) {
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    fun showFileComplete(context: Context, notifId: Int, fileName: String, verified: Boolean, contentUri: Uri? = null) {
         createFileChannel(context)
         val manager = NotificationManagerCompat.from(context)
         manager.cancel(notifId)
@@ -193,5 +215,66 @@ object NotificationUtil {
 
         val notif = builder.build()
         manager.notify(notifId, notif)
+    }
+
+    // New: Continue Browsing notifications
+    fun showContinueBrowsingLink(context: Context, url: String) {
+        createContinueBrowsingChannel(context)
+        val manager = NotificationManagerCompat.from(context)
+        val notifId = (url.hashCode() and 0x7fffffff) // stable positive ID per URL
+
+        // Normalize only for the open intent (keep text as-is)
+        val trimmed = url.trim()
+        val normalized = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "http://$trimmed"
+
+        val openIntent = Intent(Intent.ACTION_VIEW, normalized.toUri())
+        val openPending = PendingIntent.getActivity(
+            context,
+            notifId,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val dismissIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_CONTINUE_BROWSING_DISMISS
+            putExtra("notif_id", notifId)
+        }
+        val dismissPending = PendingIntent.getBroadcast(
+            context,
+            notifId + 1,
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CONTINUE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.outline_open_in_browser_24)
+            .setContentTitle("Continue browsing")
+            .setContentText(trimmed)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(trimmed))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(openPending)
+            .addAction(android.R.drawable.ic_menu_view, "Open", openPending)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending)
+
+        try {
+            manager.notify(notifId, builder.build())
+        } catch (e: SecurityException) {
+            android.util.Log.w("NotificationUtil", "Failed to show continue-browsing notification: ${e.message}")
+        }
+    }
+
+    fun clearContinueBrowsingNotifications(context: Context) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.activeNotifications?.forEach { sbn ->
+                if (sbn.notification.channelId == CONTINUE_CHANNEL_ID) {
+                    nm.cancel(sbn.id)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NotificationUtil", "Failed to clear continue-browsing notifications: ${e.message}")
+        }
     }
 }

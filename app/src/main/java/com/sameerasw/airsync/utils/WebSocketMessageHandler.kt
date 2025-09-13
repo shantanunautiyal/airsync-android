@@ -207,6 +207,19 @@ object WebSocketMessageHandler {
                     success = MediaControlUtil.stop(context)
                     message = if (success) "Playback stopped" else "Failed to stop playback"
                 }
+                // New: toggle like controls
+                "toggleLike" -> {
+                    success = MediaControlUtil.toggleLike(context)
+                    message = if (success) "Like toggled" else "Failed to toggle like"
+                }
+                "like" -> {
+                    success = MediaControlUtil.like(context)
+                    message = if (success) "Liked" else "Failed to like"
+                }
+                "unlike" -> {
+                    success = MediaControlUtil.unlike(context)
+                    message = if (success) "Unliked" else "Failed to unlike"
+                }
                 else -> {
                     Log.w(TAG, "Unknown media control action: $action")
                     message = "Unknown action: $action"
@@ -219,7 +232,11 @@ object WebSocketMessageHandler {
             if (success) {
                 // For track skip actions (next/previous), add a delay to allow media player to update
                 CoroutineScope(Dispatchers.IO).launch {
-                    delay(1200)
+                    val delayMs = when (action) {
+                        "next", "previous" -> 1200L
+                        else -> 400L // smaller delay for like/others
+                    }
+                    delay(delayMs)
                     SyncManager.onMediaStateChanged(context)
                 }
             }
@@ -404,16 +421,14 @@ object WebSocketMessageHandler {
                     )
                     WebSocketUtil.sendMessage(responseMessage)
                 }
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling toggle app notification: ${e.message}")
-
-                // Send error response
                 val packageName = data?.optString("package") ?: ""
+                val newState = data?.optString("state")?.toBoolean() ?: false
                 val responseMessage = JsonUtil.createToggleAppNotificationResponse(
                     packageName = packageName,
                     success = false,
-                    newState = false,
+                    newState = newState,
                     message = "Error: ${e.message}"
                 )
                 WebSocketUtil.sendMessage(responseMessage)

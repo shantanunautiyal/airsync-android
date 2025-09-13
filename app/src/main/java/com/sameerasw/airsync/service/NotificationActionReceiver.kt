@@ -26,6 +26,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_DISCONNECT = "com.sameerasw.airsync.DISCONNECT"
         const val ACTION_RECONNECT = "com.sameerasw.airsync.RECONNECT"
         const val ACTION_STOP_AUTORECONNECT = "com.sameerasw.airsync.STOP_AUTORECONNECT"
+        // New: Continue Browsing dismiss action
+        const val ACTION_CONTINUE_BROWSING_DISMISS = "com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS"
         private const val TAG = "NotificationActionReceiver"
     }
 
@@ -56,6 +58,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         // Mark manual disconnect and disconnect socket
                         ds.setUserManuallyDisconnected(true)
                         WebSocketUtil.disconnect()
+                        // Clear Continue Browsing notifications on disconnect
+                        NotificationUtil.clearContinueBrowsingNotifications(context)
                         // Update notification to Disconnected with appropriate action
                         updateStatusNotification(context, isConnecting = false)
                     } catch (e: Exception) {
@@ -132,6 +136,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
                 }
             }
+            ACTION_CONTINUE_BROWSING_DISMISS -> {
+                val notifId = intent.getIntExtra("notif_id", -1)
+                if (notifId != -1) {
+                    try {
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                        nm.cancel(notifId)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to cancel continue-browsing notif: ${e.message}")
+                    }
+                }
+            }
         }
     }
 
@@ -147,8 +162,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
         } else false
         val autoEnabled = ds.getAutoReconnectEnabled().first()
         val manual = ds.getUserManuallyDisconnected().first()
-        val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
-        showStatus(context, deviceName, isConnected, isConnecting, isAutoReconnecting, hasReconnectTarget)
+        val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
+        if (shouldShow) {
+            showStatus(context, deviceName, isConnected, isConnecting, true, hasReconnectTarget)
+        } else {
+            NotificationUtil.hideConnectionStatusNotification(context)
+        }
     }
 
     private fun showStatus(
@@ -159,13 +178,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
         isAutoReconnecting: Boolean,
         hasReconnectTarget: Boolean
     ) {
-        NotificationUtil.showConnectionStatusNotification(
-            context = context,
-            deviceName = deviceName,
-            isConnected = isConnected,
-            isConnecting = isConnecting,
-            isAutoReconnecting = isAutoReconnecting,
-            hasReconnectTarget = hasReconnectTarget
-        )
+        // Only show while actively trying (connecting) or waiting/trying to auto-reconnect.
+        // Hide in all other states, especially when connected.
+        if (!isConnected && (isConnecting || isAutoReconnecting)) {
+            NotificationUtil.showConnectionStatusNotification(
+                context = context,
+                deviceName = deviceName,
+                isConnected = isConnected,
+                isConnecting = isConnecting,
+                isAutoReconnecting = isAutoReconnecting,
+                hasReconnectTarget = hasReconnectTarget
+            )
+        } else {
+            NotificationUtil.hideConnectionStatusNotification(context)
+        }
     }
 }

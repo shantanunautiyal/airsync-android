@@ -131,7 +131,7 @@ object DeviceInfoUtil {
                 0
             }
 
-            // Get media information
+            // Get media information including like status
             val mediaInfo = MediaNotificationListener.getMediaInfo(context)
             Log.d("DeviceInfoUtil", "Retrieved media info: $mediaInfo")
 
@@ -141,11 +141,12 @@ object DeviceInfoUtil {
                 artist = mediaInfo.artist.ifEmpty { "" },
                 volume = volumePercent,
                 isMuted = isMuted,
-                albumArt = mediaInfo.albumArt
+                albumArt = mediaInfo.albumArt,
+                likeStatus = mediaInfo.likeStatus
             )
         } catch (e: Exception) {
             Log.e("DeviceInfoUtil", "Error getting audio info: ${e.message}")
-            AudioInfo(false, "", "", 0, true, null)
+            AudioInfo(false, "", "", 0, true, null, "none")
         }
     }
 
@@ -162,7 +163,8 @@ object DeviceInfoUtil {
             artist = audioInfo.artist,
             volume = audioInfo.volume,
             isMuted = audioInfo.isMuted,
-            albumArt = audioInfo.albumArt
+            albumArt = audioInfo.albumArt,
+            likeStatus = audioInfo.likeStatus
         )
     }
 }
