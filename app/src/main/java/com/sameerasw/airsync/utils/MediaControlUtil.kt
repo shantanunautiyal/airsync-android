@@ -1,5 +1,7 @@
 package com.sameerasw.airsync.utils
 
+import android.app.Notification
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.media.session.MediaController
@@ -94,6 +96,120 @@ object MediaControlUtil {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in stop: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Toggle like status by invoking the Like/Unlike action in the active media notification.
+     */
+    fun toggleLike(context: Context): Boolean {
+        return try {
+            val service = MediaNotificationListener.getInstance() ?: run {
+                Log.w(TAG, "Notification listener not available; cannot toggle like")
+                return false
+            }
+            val controller = getActiveMediaController(context)
+            val packageName = try { controller?.packageName } catch (_: Exception) { null }
+
+            val active = try { service.activeNotifications } catch (_: Exception) { emptyArray() }
+            if (active.isEmpty()) {
+                Log.w(TAG, "No active notifications for media; cannot toggle like")
+                return false
+            }
+
+            // Determine current like status to pick the opposite action
+            val currentStatus = try { MediaNotificationListener.getMediaInfo(context).likeStatus } catch (_: Exception) { "none" }
+            val preferUnlike = currentStatus == "liked"
+
+            val candidates = if (packageName != null) {
+                active.filter { it.packageName == packageName } + active.filter { it.packageName != packageName }
+            } else active.toList()
+
+            for (sbn in candidates) {
+                val actions = sbn.notification.actions ?: continue
+                val action = findLikeAction(actions, preferUnlike)
+                    ?: findLikeAction(actions, !preferUnlike)
+                if (action != null) {
+                    return sendAction(action.actionIntent)
+                }
+            }
+
+            Log.w(TAG, "No like/unlike action found in active notifications")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error toggling like: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Try to perform a direct 'like' action when available.
+     */
+    fun like(context: Context): Boolean = performSpecificLikeAction(context, preferUnlike = false)
+
+    /**
+     * Try to perform a direct 'unlike' action when available.
+     */
+    fun unlike(context: Context): Boolean = performSpecificLikeAction(context, preferUnlike = true)
+
+    private fun performSpecificLikeAction(context: Context, preferUnlike: Boolean): Boolean {
+        return try {
+            val service = MediaNotificationListener.getInstance() ?: return false
+            val controller = getActiveMediaController(context)
+            val packageName = try { controller?.packageName } catch (_: Exception) { null }
+            val active = try { service.activeNotifications } catch (_: Exception) { emptyArray() }
+            val candidates = if (packageName != null) {
+                active.filter { it.packageName == packageName } + active.filter { it.packageName != packageName }
+            } else active.toList()
+            for (sbn in candidates) {
+                val actions = sbn.notification.actions ?: continue
+                val action = findLikeAction(actions, preferUnlike)
+                if (action != null) return sendAction(action.actionIntent)
+            }
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error performing specific like action: ${e.message}")
+            false
+        }
+    }
+
+    private fun findLikeAction(actions: Array<Notification.Action>, preferUnlike: Boolean): Notification.Action? {
+        // Heuristics: match action titles for like/unlike/favorite
+        val likePredicates = listOf<(String) -> Boolean>(
+            { it.contains("like") },
+            { it.contains("favorite") },
+            { it.contains("favourite") },
+            { it.contains("❤") },
+            { it.contains("♥") }
+        )
+        val unlikePredicates = listOf<(String) -> Boolean>(
+            { it.contains("unlike") },
+            { it.contains("remove from liked") },
+            { it.contains("remove like") },
+            { it.contains("liked") && it.startsWith("un") }
+        )
+        val candidates = actions.toList()
+        return if (preferUnlike) {
+            candidates.firstOrNull { titleMatches(it, unlikePredicates) }
+        } else {
+            candidates.firstOrNull { titleMatches(it, likePredicates) }
+        }
+    }
+
+    private fun titleMatches(action: Notification.Action, preds: List<(String) -> Boolean>): Boolean {
+        val title = action.title?.toString()?.lowercase()?.trim() ?: return false
+        return preds.any { it(title) }
+    }
+
+    private fun sendAction(pi: PendingIntent?): Boolean {
+        return try {
+            if (pi == null) return false
+            pi.send()
+            Log.d(TAG, "Sent like/unlike action via PendingIntent")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send like/unlike action: ${e.message}")
             false
         }
     }

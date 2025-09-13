@@ -74,13 +74,14 @@ object SyncManager {
 
                 var shouldSync = forceSync
 
-                // Check if audio info changed (playing state, track, or volume)
+                // Check if audio info changed (playing state, track, volume, mute, or like status)
                 lastAudioInfo?.let { last ->
                     if (last.isPlaying != currentAudio.isPlaying ||
                         last.title != currentAudio.title ||
                         last.artist != currentAudio.artist ||
                         last.volume != currentAudio.volume ||
-                        last.isMuted != currentAudio.isMuted) {
+                        last.isMuted != currentAudio.isMuted ||
+                        last.likeStatus != currentAudio.likeStatus) {
                         shouldSync = true
                         Log.d(TAG, "Audio info changed, syncing device status")
                     }

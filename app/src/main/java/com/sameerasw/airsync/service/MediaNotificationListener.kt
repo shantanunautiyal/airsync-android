@@ -86,13 +86,17 @@ class MediaNotificationListener : NotificationListenerService() {
 
                         Log.d(TAG, "Media session - Title: $title, Artist: $artist, Playing: $isPlaying, State: ${playbackState?.state}")
 
+                        // Determine like status from active notifications for this package
+                        val likeStatus = detectLikeStatusForPackage(controller.packageName)
+
                         // Return the first session that has media info or is playing
                         if (title.isNotEmpty() || artist.isNotEmpty() || isPlaying) {
                             return MediaInfo(
                                 isPlaying = isPlaying,
                                 title = title,
                                 artist = artist,
-                                albumArt = albumArtBase64
+                                albumArt = albumArtBase64,
+                                likeStatus = likeStatus
                             )
                         }
                     }
@@ -107,11 +111,43 @@ class MediaNotificationListener : NotificationListenerService() {
                 }
 
                 Log.d(TAG, "No media info found")
-                MediaInfo(false, "", "", null)
+                MediaInfo(false, "", "", null, "none")
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting media info: ${e.message}")
-                MediaInfo(false, "", "", null)
+                MediaInfo(false, "", "", null, "none")
             }
+        }
+
+        private fun detectLikeStatusForPackage(targetPackage: String?): String {
+            val service = getInstance() ?: return "none"
+            val notifs = try { service.activeNotifications } catch (_: Exception) { emptyArray<StatusBarNotification>() }
+            if (notifs.isEmpty()) return "none"
+
+            // Look for notification from the target package first
+            val candidates = notifs.filter { it.packageName == targetPackage } + notifs.filter { it.packageName != targetPackage }
+
+            for (sbn in candidates) {
+                val n = sbn.notification
+                val actions = n.actions ?: continue
+                val status = inferLikeStatusFromActions(actions)
+                if (status != null) return status
+            }
+            return "none"
+        }
+
+        private fun inferLikeStatusFromActions(actions: Array<Notification.Action>): String? {
+            for (action in actions) {
+                val title = action.title?.toString()?.lowercase()?.trim() ?: ""
+                if (title.isEmpty()) continue
+                // Heuristics: detect presence of like/unlike/favorite
+                if (title.contains("unlike") || title.contains("remove from liked") || title.contains("remove like") || title.contains("liked")) {
+                    return "liked"
+                }
+                if (title.contains("like") || title.contains("favorite") || title.contains("favourite") || title.contains("❤") || title.contains("♥")) {
+                    return "not_liked"
+                }
+            }
+            return null
         }
     }
 
@@ -155,7 +191,7 @@ class MediaNotificationListener : NotificationListenerService() {
         sbn?.let { notification ->
             Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getString(Notification.EXTRA_TITLE)}")
 
-            // Update media info and check for changes
+            // Update media info and check for changes (includes like status)
             val previousMediaInfo = currentMediaInfo
             updateMediaInfo()
 
