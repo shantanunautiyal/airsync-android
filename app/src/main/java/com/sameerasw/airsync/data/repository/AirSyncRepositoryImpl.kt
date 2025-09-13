@@ -116,6 +116,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getClipboardSyncEnabled()
     }
 
+    override suspend fun setContinueBrowsingEnabled(enabled: Boolean) {
+        dataStoreManager.setContinueBrowsingEnabled(enabled)
+    }
+
+    override fun getContinueBrowsingEnabled(): Flow<Boolean> {
+        return dataStoreManager.getContinueBrowsingEnabled()
+    }
+
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
         dataStoreManager.setUserManuallyDisconnected(disconnected)
     }

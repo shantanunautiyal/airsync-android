@@ -26,6 +26,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_DISCONNECT = "com.sameerasw.airsync.DISCONNECT"
         const val ACTION_RECONNECT = "com.sameerasw.airsync.RECONNECT"
         const val ACTION_STOP_AUTORECONNECT = "com.sameerasw.airsync.STOP_AUTORECONNECT"
+        // New: Continue Browsing dismiss action
+        const val ACTION_CONTINUE_BROWSING_DISMISS = "com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS"
         private const val TAG = "NotificationActionReceiver"
     }
 
@@ -56,6 +58,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         // Mark manual disconnect and disconnect socket
                         ds.setUserManuallyDisconnected(true)
                         WebSocketUtil.disconnect()
+                        // Clear Continue Browsing notifications on disconnect
+                        NotificationUtil.clearContinueBrowsingNotifications(context)
                         // Update notification to Disconnected with appropriate action
                         updateStatusNotification(context, isConnecting = false)
                     } catch (e: Exception) {
@@ -129,6 +133,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         updateStatusNotification(context, isConnecting = false)
                     } catch (e: Exception) {
                         Log.e(TAG, "Error stopping auto-reconnect: ${e.message}")
+                    }
+                }
+            }
+            ACTION_CONTINUE_BROWSING_DISMISS -> {
+                val notifId = intent.getIntExtra("notif_id", -1)
+                if (notifId != -1) {
+                    try {
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                        nm.cancel(notifId)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to cancel continue-browsing notif: ${e.message}")
                     }
                 }
             }

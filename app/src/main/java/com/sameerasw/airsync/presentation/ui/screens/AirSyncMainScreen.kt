@@ -154,7 +154,7 @@ fun AirSyncMainScreen(
                     viewModel.setResponse("Received: $response")
                     // Handle clipboard updates from desktop
                     try {
-                        val json = JSONObject(response)
+                        val json = org.json.JSONObject(response)
                         if (json.optString("type") == "clipboardUpdate") {
                             val data = json.optJSONObject("data")
                             val text = data?.optString("text")
@@ -171,7 +171,7 @@ fun AirSyncMainScreen(
     }
 
     fun disconnect() {
-        WebSocketUtil.disconnect()
+        WebSocketUtil.disconnect(context)
         viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
         viewModel.setResponse("Disconnected")
 
@@ -363,7 +363,9 @@ fun AirSyncMainScreen(
                         viewModel.setClipboardSyncEnabled(
                             enabled
                         )
-                    }
+                    },
+                    isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
+                    onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) }
                 )
 
 

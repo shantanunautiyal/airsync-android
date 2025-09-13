@@ -20,6 +20,9 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 fun ClipboardSyncCard(
     isClipboardSyncEnabled: Boolean,
     onToggleClipboardSync: (Boolean) -> Unit,
+    // New props for Continue Browsing
+    isContinueBrowsingEnabled: Boolean,
+    onToggleContinueBrowsing: (Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -40,6 +43,27 @@ fun ClipboardSyncCard(
                 Switch(
                     checked = isClipboardSyncEnabled,
                     onCheckedChange = onToggleClipboardSync
+                )
+            }
+            // Continue Browsing toggle displayed under clipboard sync
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Continue browsing", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Show a quick Open/Dismiss notification for links received from desktop",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isContinueBrowsingEnabled,
+                    onCheckedChange = onToggleContinueBrowsing
                 )
             }
         }

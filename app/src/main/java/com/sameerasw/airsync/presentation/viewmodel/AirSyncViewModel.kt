@@ -105,6 +105,7 @@ class AirSyncViewModel(
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
+            val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -145,7 +146,8 @@ class AirSyncViewModel(
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
-                isAutoReconnectEnabled = isAutoReconnectEnabled
+                isAutoReconnectEnabled = isAutoReconnectEnabled,
+                isContinueBrowsingEnabled = isContinueBrowsingEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -598,6 +600,13 @@ class AirSyncViewModel(
             } catch (_: Exception) {
                 // ignore
             }
+        }
+    }
+
+    fun setContinueBrowsingEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isContinueBrowsingEnabled = enabled)
+        viewModelScope.launch {
+            repository.setContinueBrowsingEnabled(enabled)
         }
     }
 
