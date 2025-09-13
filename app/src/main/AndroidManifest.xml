@@ -48,6 +48,11 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="airsync" />
             </intent-filter>
+
+            <!-- Long-press Quick Settings tile should open this activity -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
         </activity>
 
         <!-- Share target activity for text sharing -->

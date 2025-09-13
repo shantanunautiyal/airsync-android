@@ -162,8 +162,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
         } else false
         val autoEnabled = ds.getAutoReconnectEnabled().first()
         val manual = ds.getUserManuallyDisconnected().first()
-        val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
-        showStatus(context, deviceName, isConnected, isConnecting, isAutoReconnecting, hasReconnectTarget)
+        val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
+        if (shouldShow) {
+            showStatus(context, deviceName, isConnected, isConnecting, true, hasReconnectTarget)
+        } else {
+            NotificationUtil.hideConnectionStatusNotification(context)
+        }
     }
 
     private fun showStatus(

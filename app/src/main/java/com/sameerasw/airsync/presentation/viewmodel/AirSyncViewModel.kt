@@ -12,6 +12,7 @@ import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.NetworkMonitor
+import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
@@ -549,16 +550,21 @@ class AirSyncViewModel(
             val manual = repository.getUserManuallyDisconnected().first()
             val isConnected = _uiState.value.isConnected
             val isConnecting = _uiState.value.isConnecting
-            val isAutoReconnecting = !isConnected && !isConnecting && autoEnabled && !manual && hasReconnectTarget
 
-            com.sameerasw.airsync.utils.NotificationUtil.showConnectionStatusNotification(
-                context = context,
-                deviceName = deviceName,
-                isConnected = isConnected,
-                isConnecting = isConnecting,
-                isAutoReconnecting = isAutoReconnecting,
-                hasReconnectTarget = hasReconnectTarget
-            )
+            val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
+            if (shouldShow) {
+                val isAutoReconnecting = true // show notification during both waiting and connecting
+                NotificationUtil.showConnectionStatusNotification(
+                    context = context,
+                    deviceName = deviceName,
+                    isConnected = isConnected,
+                    isConnecting = isConnecting,
+                    isAutoReconnecting = isAutoReconnecting,
+                    hasReconnectTarget = hasReconnectTarget
+                )
+            } else {
+                NotificationUtil.hideConnectionStatusNotification(context)
+            }
         } catch (_: Exception) {
             // ignore
         }

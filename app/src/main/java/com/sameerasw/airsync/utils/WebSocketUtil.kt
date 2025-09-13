@@ -239,16 +239,20 @@ object WebSocketUtil {
 
                 val autoEnabled = ds.getAutoReconnectEnabled().first()
                 val manual = ds.getUserManuallyDisconnected().first()
-                val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
 
-                NotificationUtil.showConnectionStatusNotification(
-                    context = context,
-                    deviceName = deviceName,
-                    isConnected = isConnected,
-                    isConnecting = isConnecting,
-                    isAutoReconnecting = isAutoReconnecting,
-                    hasReconnectTarget = hasReconnectTarget
-                )
+                val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
+                if (shouldShow) {
+                    NotificationUtil.showConnectionStatusNotification(
+                        context = context,
+                        deviceName = deviceName,
+                        isConnected = isConnected,
+                        isConnecting = isConnecting,
+                        isAutoReconnecting = true,
+                        hasReconnectTarget = hasReconnectTarget
+                    )
+                } else {
+                    NotificationUtil.hideConnectionStatusNotification(context)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating persistent notification: ${e.message}")
             }
