@@ -108,18 +108,6 @@ object ClipboardSyncManager {
         }
     }
 
-    private fun extractFirstUrl(text: String): String? {
-        val matcher = Patterns.WEB_URL.matcher(text)
-        return if (matcher.find()) {
-            var url = matcher.group()
-            // Ensure scheme is present; if not, prepend http://
-            if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                url = "http://$url"
-            }
-            url
-        } else null
-    }
-
     private fun isLinkOnly(text: String): Boolean {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false

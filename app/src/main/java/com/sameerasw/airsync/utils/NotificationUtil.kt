@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.service.NotificationActionReceiver
+import androidx.core.net.toUri
 
 object NotificationUtil {
     private const val CHANNEL_ID = "airsync_status"
@@ -37,18 +38,16 @@ object NotificationUtil {
     }
 
     private fun createContinueBrowsingChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Continue browsing"
-            val descriptionText = "Quick open links received from desktop"
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
-            val channel = NotificationChannel(CONTINUE_CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-                setShowBadge(true)
-            }
-            val notificationManager: NotificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        val name = "Continue browsing"
+        val descriptionText = "Quick open links received from desktop"
+        val importance = NotificationManager.IMPORTANCE_DEFAULT
+        val channel = NotificationChannel(CONTINUE_CHANNEL_ID, name, importance).apply {
+            description = descriptionText
+            setShowBadge(true)
         }
+        val notificationManager: NotificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
     }
 
     /**
@@ -228,7 +227,7 @@ object NotificationUtil {
         val trimmed = url.trim()
         val normalized = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "http://$trimmed"
 
-        val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse(normalized))
+        val openIntent = Intent(Intent.ACTION_VIEW, normalized.toUri())
         val openPending = PendingIntent.getActivity(
             context,
             notifId,
@@ -269,15 +268,10 @@ object NotificationUtil {
     fun clearContinueBrowsingNotifications(context: Context) {
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                nm.activeNotifications?.forEach { sbn ->
-                    if (sbn.notification.channelId == CONTINUE_CHANNEL_ID) {
-                        nm.cancel(sbn.id)
-                    }
+            nm.activeNotifications?.forEach { sbn ->
+                if (sbn.notification.channelId == CONTINUE_CHANNEL_ID) {
+                    nm.cancel(sbn.id)
                 }
-            } else {
-                // Fallback: best effort
-                NotificationManagerCompat.from(context).cancelAll()
             }
         } catch (e: Exception) {
             android.util.Log.w("NotificationUtil", "Failed to clear continue-browsing notifications: ${e.message}")

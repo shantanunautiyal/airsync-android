@@ -178,13 +178,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
         isAutoReconnecting: Boolean,
         hasReconnectTarget: Boolean
     ) {
-        NotificationUtil.showConnectionStatusNotification(
-            context = context,
-            deviceName = deviceName,
-            isConnected = isConnected,
-            isConnecting = isConnecting,
-            isAutoReconnecting = isAutoReconnecting,
-            hasReconnectTarget = hasReconnectTarget
-        )
+        // Only show while actively trying (connecting) or waiting/trying to auto-reconnect.
+        // Hide in all other states, especially when connected.
+        if (!isConnected && (isConnecting || isAutoReconnecting)) {
+            NotificationUtil.showConnectionStatusNotification(
+                context = context,
+                deviceName = deviceName,
+                isConnected = isConnected,
+                isConnecting = isConnecting,
+                isAutoReconnecting = isAutoReconnecting,
+                hasReconnectTarget = hasReconnectTarget
+            )
+        } else {
+            NotificationUtil.hideConnectionStatusNotification(context)
+        }
     }
 }
