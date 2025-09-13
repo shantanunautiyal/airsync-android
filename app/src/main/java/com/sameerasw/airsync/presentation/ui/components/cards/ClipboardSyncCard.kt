@@ -3,10 +3,12 @@ package com.sameerasw.airsync.presentation.ui.components.cards
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -20,9 +22,12 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 fun ClipboardSyncCard(
     isClipboardSyncEnabled: Boolean,
     onToggleClipboardSync: (Boolean) -> Unit,
-    // New props for Continue Browsing
+    // Continue Browsing props
     isContinueBrowsingEnabled: Boolean,
     onToggleContinueBrowsing: (Boolean) -> Unit,
+    // New: control the UI enabled state and subtitle for Continue Browsing
+    isContinueBrowsingToggleEnabled: Boolean,
+    continueBrowsingSubtitle: String,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -63,14 +68,30 @@ fun ClipboardSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Continue browsing", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Prompt to open links shared.",
+                        continueBrowsingSubtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // Status badge
+                Card(
+                    colors = CardDefaults.cardColors(
+                            MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    modifier = Modifier.padding(start = 16.dp)
+                ) {
+                    Text(
+                        text = "PLUS",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color =  MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Spacer(modifier = Modifier.padding(end = 8.dp))
                 Switch(
                     checked = isContinueBrowsingEnabled,
-                    onCheckedChange = onToggleContinueBrowsing
+                    onCheckedChange = onToggleContinueBrowsing,
+                    enabled = isContinueBrowsingToggleEnabled
                 )
             }
         }

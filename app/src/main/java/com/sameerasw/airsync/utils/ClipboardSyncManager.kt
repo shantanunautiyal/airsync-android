@@ -146,7 +146,11 @@ object ClipboardSyncManager {
             val dataStoreManager = DataStoreManager(context)
             syncScope.launch {
                 val continueEnabled = try { dataStoreManager.getContinueBrowsingEnabled().first() } catch (_: Exception) { true }
-                if (continueEnabled && isLinkOnly(text)) {
+                // Only for Plus and while connected
+                val isConnected = WebSocketUtil.isConnected()
+                val last = try { dataStoreManager.getLastConnectedDevice().first() } catch (_: Exception) { null }
+                val isPlus = last?.isPlus == true
+                if (continueEnabled && isConnected && isPlus && isLinkOnly(text)) {
                     NotificationUtil.showContinueBrowsingLink(context, text.trim())
                 }
             }
