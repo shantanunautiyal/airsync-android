@@ -51,6 +51,12 @@ class MediaNotificationListener : NotificationListenerService() {
             "com.android.vending"
         )
 
+        // Only attach like status for these media apps
+        private val ALLOWED_PACKAGES = setOf(
+            "com.google.android.apps.youtube.music", // YouTube Music
+            "com.spotify.music" // Spotify
+        )
+
         fun getInstance(): MediaNotificationListener? {
             return serviceInstance
         }
@@ -91,25 +97,13 @@ class MediaNotificationListener : NotificationListenerService() {
 
                         Log.d(TAG, "Media session - Title: $title, Artist: $artist, Playing: $isPlaying, State: ${playbackState?.state}")
 
-                        // Determine like status with source; prefer cache over non-rating heuristics
-                        val detection = determineLikeStatusWithSource(context, controller)
-                        var likeStatus = detection.first
-                        val source = detection.second
+                        // Determine like status; apply app filter and strict positive-only like detection
+                        val (detectedStatus, source) = determineLikeStatusWithSource(context, controller)
+                        var likeStatus = detectedStatus
 
-                        val cached = getCachedLikeStatusFor(controller)
-                        if (likeStatus == "none") {
-                            likeStatus = cached
-                        } else {
-                            if (source == "rating") {
-                                // High confidence: update cache from rating
-                                updateCachedLikeStatusFor(controller, likeStatus)
-                            } else {
-                                // Low confidence (notification/custom): prefer existing cache if present
-                                if (cached != "none") {
-                                    likeStatus = cached
-                                }
-                                // Do NOT overwrite cache from low-confidence sources
-                            }
+                        // If filtered by app, force none and skip cache
+                        if (source == "appfilter") {
+                            likeStatus = "none"
                         }
 
                         // Return the first session that has media info or is playing
@@ -142,52 +136,44 @@ class MediaNotificationListener : NotificationListenerService() {
         }
 
         private fun determineLikeStatusWithSource(context: Context, controller: MediaController): Pair<String, String> {
+            // Enforce package filter first
+            val pkg = controller.packageName
+            if (pkg.isNullOrEmpty() || !ALLOWED_PACKAGES.contains(pkg)) {
+                return "none" to "appfilter"
+            }
+
             try {
                 val md = controller.metadata
-                // 0) Prefer explicit user rating/heart/thumbs metadata if present
+                // Prefer explicit user rating/heart/thumbs metadata if present
                 val userRating: Rating? = try { md?.getRating(MediaMetadata.METADATA_KEY_USER_RATING) } catch (_: Exception) { null }
                 val rating: Rating? = userRating ?: try { md?.getRating(MediaMetadata.METADATA_KEY_RATING) } catch (_: Exception) { null }
-                if (rating != null && rating.isRated) {
-                    when (rating.ratingStyle) {
-                        Rating.RATING_HEART -> {
-                            val liked = try { rating.hasHeart() } catch (_: Exception) { false }
-                            Log.d(TAG, "Like status from HEART rating: $liked")
-                            return if (liked) "liked" to "rating" else "not_liked" to "rating"
+                if (rating != null) {
+                    if (rating.isRated) {
+                        when (rating.ratingStyle) {
+                            Rating.RATING_HEART -> {
+                                val liked = try { rating.hasHeart() } catch (_: Exception) { false }
+                                Log.d(TAG, "Like from HEART rating: $liked")
+                                return if (liked) "liked" to "rating" else "not_liked" to "rating"
+                            }
+                            Rating.RATING_THUMB_UP_DOWN -> {
+                                val up = try { rating.isThumbUp } catch (_: Exception) { false }
+                                Log.d(TAG, "Like from THUMB rating: $up")
+                                return if (up) "liked" to "rating" else "not_liked" to "rating"
+                            }
+                            else -> Log.d(TAG, "Rating present but not mappable (style=${rating.ratingStyle})")
                         }
-                        Rating.RATING_THUMB_UP_DOWN -> {
-                            val up = try { rating.isThumbUp } catch (_: Exception) { false }
-                            Log.d(TAG, "Like status from THUMB rating: $up")
-                            return if (up) "liked" to "rating" else "not_liked" to "rating"
-                        }
-                        else -> Log.d(TAG, "Rating present but not mappable (style=${rating.ratingStyle})")
+                    } else {
+                        // Not rated counts as not_liked per requirement
+                        Log.d(TAG, "Rating present but not rated -> not_liked")
+                        return "not_liked" to "rating"
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to read metadata rating: ${e.message}")
             }
 
-            // 1) Try notification actions first (package scoped)
-            val notifStatus = detectLikeStatusForPackage(controller.packageName)
-            if (notifStatus != "none") return notifStatus to "notification"
-
-            // 2) Inspect custom actions from the session playback state
-            val custom = controller.playbackState?.customActions ?: emptyList()
-            if (custom.isNotEmpty()) {
-                val hasUnlike = custom.any { ca ->
-                    val a = (ca.action ?: "") + " " + (ca.name?.toString() ?: "")
-                    val s = a.lowercase()
-                    s.contains("unlike") || s.contains("remove like") || s.contains("remove from liked") || s.contains("thumbs_down") || s.contains("dislike")
-                }
-                val hasLike = custom.any { ca ->
-                    val a = (ca.action ?: "") + " " + (ca.name?.toString() ?: "")
-                    val s = a.lowercase()
-                    s.contains("like") || s.contains("favorite") || s.contains("favourite") || s.contains("thumbs_up") || s.contains("❤") || s.contains("♥")
-                }
-                if (hasUnlike) return "liked" to "custom"
-                if (hasLike) return "not_liked" to "custom"
-            }
-
-            return "none" to "none"
+            // For allowed apps: if no positive rating, treat as not_liked
+            return "not_liked" to "rating"
         }
 
         private fun detectLikeStatusForPackage(targetPackage: String?): String {
