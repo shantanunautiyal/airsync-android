@@ -91,6 +91,9 @@ class AirSyncViewModel(
         super.onCleared()
         // Unregister the connection status listener when ViewModel is cleared
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
+
+        // Clean up Mac media session
+        MacDeviceStatusManager.cleanup()
     }
 
     fun initializeState(
