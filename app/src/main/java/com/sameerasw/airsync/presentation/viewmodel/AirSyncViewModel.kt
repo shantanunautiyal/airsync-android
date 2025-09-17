@@ -11,6 +11,7 @@ import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.PermissionUtil
@@ -77,6 +78,13 @@ class AirSyncViewModel(
     init {
         // Register for WebSocket connection status updates
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+
+        // Observe Mac device status updates
+        viewModelScope.launch {
+            MacDeviceStatusManager.macDeviceStatus.collect { macStatus ->
+                _uiState.value = _uiState.value.copy(macDeviceStatus = macStatus)
+            }
+        }
     }
 
     override fun onCleared() {

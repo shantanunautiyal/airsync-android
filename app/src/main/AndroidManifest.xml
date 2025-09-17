@@ -127,6 +127,19 @@
                 <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
             </intent-filter>
         </receiver>
+
+        <!-- Mac Media Action Receiver -->
+        <receiver
+            android:name=".utils.MacMediaActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sameerasw.airsync.MAC_MEDIA_play" />
+                <action android:name="com.sameerasw.airsync.MAC_MEDIA_pause" />
+                <action android:name="com.sameerasw.airsync.MAC_MEDIA_next" />
+                <action android:name="com.sameerasw.airsync.MAC_MEDIA_previous" />
+                <action android:name="com.sameerasw.airsync.MAC_MEDIA_stop" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <queries>

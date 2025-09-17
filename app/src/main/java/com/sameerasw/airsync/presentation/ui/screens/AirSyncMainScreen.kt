@@ -48,6 +48,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCa
 import com.sameerasw.airsync.presentation.ui.components.cards.QrScannerRow
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
+import com.sameerasw.airsync.presentation.ui.components.cards.MacDeviceStatusCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 
@@ -265,6 +266,11 @@ fun AirSyncMainScreen(
             onDisconnect = { disconnect() },
             connectedDevice = uiState.lastConnectedDevice,
             lastConnected = uiState.lastConnectedDevice != null
+        )
+
+        // Mac Device Status Card - shows when connected and Mac sends status updates
+        MacDeviceStatusCard(
+            macStatus = uiState.macDeviceStatus
         )
 
         AnimatedVisibility(

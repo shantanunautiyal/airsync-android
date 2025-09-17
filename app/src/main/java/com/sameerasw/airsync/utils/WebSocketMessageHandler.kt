@@ -37,6 +37,7 @@ object WebSocketMessageHandler {
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "ping" -> handlePing(context)
+                "status" -> handleMacDeviceStatus(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -330,6 +331,53 @@ object WebSocketMessageHandler {
             Log.d(TAG, "WebSocket disconnected as per request")
         } catch (e: Exception) {
             Log.e(TAG, "Error handling disconnect request: ${e.message}")
+        }
+    }
+
+    private fun handleMacDeviceStatus(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Mac device status data is null")
+                return
+            }
+
+            Log.d(TAG, "Received Mac device status: ${data.toString()}")
+
+            // Parse battery information
+            val battery = data.optJSONObject("battery")
+            val batteryLevel = battery?.optInt("level", 0) ?: 0
+            val isCharging = battery?.optBoolean("isCharging", false) ?: false
+
+            // Parse music information
+            val music = data.optJSONObject("music")
+            val isPlaying = music?.optBoolean("isPlaying", false) ?: false
+            val title = music?.optString("title", "") ?: ""
+            val artist = music?.optString("artist", "") ?: ""
+            val volume = music?.optInt("volume", 50) ?: 50
+            val isMuted = music?.optBoolean("isMuted", false) ?: false
+            val albumArt = music?.optString("albumArt", "") ?: ""
+            val likeStatus = music?.optString("likeStatus", "none") ?: "none"
+
+            val isPaired = data.optBoolean("isPaired", true)
+
+            // Update the Mac device status manager
+            MacDeviceStatusManager.updateStatus(
+                context = context,
+                batteryLevel = batteryLevel,
+                isCharging = isCharging,
+                isPaired = isPaired,
+                isPlaying = isPlaying,
+                title = title,
+                artist = artist,
+                volume = volume,
+                isMuted = isMuted,
+                albumArt = albumArt,
+                likeStatus = likeStatus
+            )
+
+            Log.d(TAG, "Mac device status updated successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling Mac device status: ${e.message}")
         }
     }
 
