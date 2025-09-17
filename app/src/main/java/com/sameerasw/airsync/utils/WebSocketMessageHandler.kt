@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
+import com.sameerasw.airsync.service.MediaNotificationListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -13,6 +14,9 @@ import org.json.JSONObject
 
 object WebSocketMessageHandler {
     private const val TAG = "WebSocketMessageHandler"
+
+    // Track if we're currently receiving playing media from Mac to prevent feedback loop
+    private var isReceivingPlayingMedia = false
 
     /**
      * Handle incoming WebSocket messages from Mac
@@ -287,7 +291,7 @@ object WebSocketMessageHandler {
 
             // We accept either "name" or legacy "action" for action name
             val actionName = data.optString("name", data.optString("action", "")).ifEmpty { "" }
-            val replyText = data.optString("text", null)
+            val replyText = data.optString("text", "")
 
             if (actionName.isEmpty()) {
                 sendNotificationActionResponse(notificationId, actionName, false, "No action name provided")
@@ -296,7 +300,7 @@ object WebSocketMessageHandler {
 
             val success = NotificationDismissalUtil.performNotificationAction(notificationId, actionName, replyText)
             val message = if (success) {
-                if (replyText != null) "Reply sent" else "Action invoked"
+                if (replyText.isNotEmpty()) "Reply sent" else "Action invoked"
             } else {
                 "Failed to perform action or notification not found"
             }
@@ -360,7 +364,15 @@ object WebSocketMessageHandler {
 
             val isPaired = data.optBoolean("isPaired", true)
 
-            // Update the Mac device status manager
+            // Pause/resume media listener based on Mac media playback status
+            val hasActiveMedia = isPlaying && (title.isNotEmpty() || artist.isNotEmpty())
+            if (hasActiveMedia) {
+                MediaNotificationListener.pauseMediaListener()
+            } else {
+                MediaNotificationListener.resumeMediaListener()
+            }
+
+            // Update the Mac device status manager with all media info
             MacDeviceStatusManager.updateStatus(
                 context = context,
                 batteryLevel = batteryLevel,
@@ -379,6 +391,11 @@ object WebSocketMessageHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Error handling Mac device status: ${e.message}")
         }
+    }
+
+    // Helper method to check if we should send media controls to prevent feedback loop
+    fun shouldSendMediaControl(): Boolean {
+        return !isReceivingPlayingMedia
     }
 
     private fun sendVolumeControlResponse(action: String, success: Boolean, message: String) {

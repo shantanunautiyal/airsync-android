@@ -39,6 +39,10 @@ class MediaNotificationListener : NotificationListenerService() {
         private var serviceInstance: MediaNotificationListener? = null
         private const val TAG = "MediaNotificationListener"
 
+        // Flag to pause media listener when receiving playing media from Mac
+        @Volatile
+        private var isMediaListenerPaused = false
+
         // In-memory cache of like status per track key
         private val likeStatusCache = LinkedHashMap<String, String>(32, 0.75f, true)
 
@@ -274,6 +278,16 @@ class MediaNotificationListener : NotificationListenerService() {
                 true
             } catch (_: Exception) { false }
         }
+
+        fun pauseMediaListener() {
+            isMediaListenerPaused = true
+            Log.d(TAG, "Media listener paused - receiving playing media from Mac")
+        }
+
+        fun resumeMediaListener() {
+            isMediaListenerPaused = false
+            Log.d(TAG, "Media listener resumed")
+        }
     }
 
     private val serviceJob = Job()
@@ -316,17 +330,22 @@ class MediaNotificationListener : NotificationListenerService() {
         sbn?.let { notification ->
             Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getString(Notification.EXTRA_TITLE)}")
 
-            // Update media info and check for changes (includes like status)
-            val previousMediaInfo = currentMediaInfo
-            updateMediaInfo()
+            // Skip media processing if media listener is paused (receiving Mac media)
+            if (!isMediaListenerPaused) {
+                // Update media info and check for changes (includes like status)
+                val previousMediaInfo = currentMediaInfo
+                updateMediaInfo()
 
-            // If media info changed, trigger sync
-            if (previousMediaInfo != currentMediaInfo) {
-                Log.d(TAG, "Media info changed, triggering sync")
-                SyncManager.onMediaStateChanged(this)
+                // If media info changed, trigger sync
+                if (previousMediaInfo != currentMediaInfo) {
+                    Log.d(TAG, "Media info changed, triggering sync")
+                    SyncManager.onMediaStateChanged(this)
+                }
+            } else {
+                Log.d(TAG, "Media listener paused - skipping media state change processing")
             }
 
-            // Process notification for sync
+            // Always process notification for sync (non-media notifications)
             processNotificationForSync(notification)
         }
     }
@@ -350,14 +369,19 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun handleNotificationRemoval(sbn: StatusBarNotification) {
         Log.d(TAG, "Notification removed: ${sbn.packageName}")
 
-        // Update media info and check for changes
-        val previousMediaInfo = currentMediaInfo
-        updateMediaInfo()
+        // Skip media processing if media listener is paused (receiving Mac media)
+        if (!isMediaListenerPaused) {
+            // Update media info and check for changes
+            val previousMediaInfo = currentMediaInfo
+            updateMediaInfo()
 
-        // If media info changed, trigger sync
-        if (previousMediaInfo != currentMediaInfo) {
-            Log.d(TAG, "Media info changed after notification removal, triggering sync")
-            SyncManager.onMediaStateChanged(this)
+            // If media info changed, trigger sync
+            if (previousMediaInfo != currentMediaInfo) {
+                Log.d(TAG, "Media info changed after notification removal, triggering sync")
+                SyncManager.onMediaStateChanged(this)
+            }
+        } else {
+            Log.d(TAG, "Media listener paused - skipping media state change processing after removal")
         }
 
         // Send dismissal update to Mac for real removals

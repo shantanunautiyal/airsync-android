@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
+import com.sameerasw.airsync.utils.WebSocketMessageHandler
 
 class MacMediaPlayerService : Service() {
     companion object {
@@ -301,6 +302,12 @@ class MacMediaPlayerService : Service() {
 
     private fun sendMacMediaControl(action: String) {
         try {
+            // Check if we should send media control to prevent feedback loop
+            if (!WebSocketMessageHandler.shouldSendMediaControl()) {
+                Log.d(TAG, "Skipping media control '$action' - currently receiving playing media from Mac")
+                return
+            }
+
             val controlJson = """{"type":"macMediaControl","data":{"action":"$action"}}"""
             com.sameerasw.airsync.utils.WebSocketUtil.sendMessage(controlJson)
             Log.d(TAG, "Sent Mac media control: $action")
