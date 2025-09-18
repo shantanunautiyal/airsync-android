@@ -43,6 +43,7 @@ object WebSocketMessageHandler {
                 "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
+                "macInfo" -> handleMacInfo(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -391,6 +392,70 @@ object WebSocketMessageHandler {
             Log.d(TAG, "Mac device status updated successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error handling Mac device status: ${e.message}")
+        }
+    }
+
+    private fun handleMacInfo(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "macInfo data is null")
+                    return@launch
+                }
+
+                val macName = data.optString("name", "")
+                val isPlus = data.optBoolean("isPlusSubscription", false)
+                val savedAppPackagesJson = data.optJSONArray("savedAppPackages")
+                val savedPackages = mutableSetOf<String>()
+                if (savedAppPackagesJson != null) {
+                    for (i in 0 until savedAppPackagesJson.length()) {
+                        val pkg = savedAppPackagesJson.optString(i)
+                        if (!pkg.isNullOrBlank()) savedPackages.add(pkg)
+                    }
+                }
+
+                // Update last connected device info with Mac name and Plus flag
+                try {
+                    val ds = DataStoreManager(context)
+                    val last = ds.getLastConnectedDevice().first()
+                    if (last != null) {
+                        ds.saveLastConnectedDevice(
+                            last.copy(
+                                name = if (macName.isNotBlank()) macName else last.name,
+                                isPlus = isPlus,
+                                lastConnected = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Unable to update connected device info from macInfo: ${e.message}")
+                }
+
+                // Build Android launcher package list (lightweight)
+                val androidPackages = try {
+                    AppUtil.getLauncherPackageNames(context)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to get launcher package names: ${e.message}")
+                    emptyList()
+                }
+
+                // Decide which packages to sync icons for
+                val packagesToSync: List<String> = if (savedPackages.isEmpty()) {
+                    // Mac has none; send all
+                    androidPackages
+                } else {
+                    androidPackages.filter { it !in savedPackages }
+                }
+
+                if (packagesToSync.isEmpty()) {
+                    Log.d(TAG, "macInfo: No new apps to sync; skipping icon extraction")
+                } else {
+                    Log.d(TAG, "macInfo: syncing icons for ${packagesToSync.size} apps")
+                    SyncManager.sendOptimizedAppIcons(context, packagesToSync)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling macInfo: ${e.message}")
+            }
         }
     }
 

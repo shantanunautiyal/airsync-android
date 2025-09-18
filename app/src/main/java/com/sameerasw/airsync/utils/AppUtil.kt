@@ -74,6 +74,26 @@ object AppUtil {
         }.sortedBy { it.appName.lowercase() }
     }
 
+    /**
+     * Get launcher app package names only (lightweight - avoids loading icons/labels)
+     */
+    fun getLauncherPackageNames(context: Context): List<String> {
+        return try {
+            val pm = context.packageManager
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            pm.queryIntentActivities(mainIntent, 0)
+                .map { it.activityInfo.applicationInfo.packageName }
+                .filter { !it.contains("airsync") }
+                .distinct()
+                .sorted()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting launcher package names: ${e.message}")
+            emptyList()
+        }
+    }
+
     private fun isSystemApp(appInfo: ApplicationInfo): Boolean {
         return appInfo.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
     }
