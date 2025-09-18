@@ -26,7 +26,9 @@ data class NetworkDeviceConnection(
                 port = this.port,
                 lastConnected = this.lastConnected,
                 isPlus = this.isPlus,
-                symmetricKey = this.symmetricKey
+                symmetricKey = this.symmetricKey,
+                model = this.model,
+                deviceType = this.deviceType
             )
         } else null
     }

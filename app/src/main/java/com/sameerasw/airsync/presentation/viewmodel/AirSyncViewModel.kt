@@ -1,6 +1,7 @@
 package com.sameerasw.airsync.presentation.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sameerasw.airsync.data.local.DataStoreManager
@@ -96,6 +97,42 @@ class AirSyncViewModel(
         MacDeviceStatusManager.cleanup()
     }
 
+    private fun startObservingDeviceChanges(context: Context) {
+        val dataStoreManager = DataStoreManager(context)
+        
+        // Observe both last connected device and network devices for real-time updates
+        viewModelScope.launch {
+            dataStoreManager.getLastConnectedDevice().collect { device ->
+                Log.d("AirSyncViewModel", "Last connected device changed: ${device?.name}, isPlus: ${device?.isPlus}")
+                updateDisplayedDevice(context)
+            }
+        }
+        
+        viewModelScope.launch {
+            dataStoreManager.getAllNetworkDeviceConnections().collect { networkDevices ->
+                Log.d("AirSyncViewModel", "Network devices changed: ${networkDevices.size} devices")
+                _networkDevices.value = networkDevices
+                updateDisplayedDevice(context)
+            }
+        }
+    }
+
+    private fun updateDisplayedDevice(context: Context) {
+        viewModelScope.launch {
+            // Get current network IP for network-aware device lookup
+            val currentIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+            _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
+            
+            // Use network-aware device if available for current network, otherwise use the stored device
+            val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+            val storedDevice = repository.getLastConnectedDevice().first()
+            val deviceToShow = networkAwareDevice ?: storedDevice
+            
+            Log.d("AirSyncViewModel", "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}")
+            _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
+        }
+    }
+
     fun initializeState(
         context: Context,
         initialIp: String? = null,
@@ -185,6 +222,9 @@ class AirSyncViewModel(
 
             // Push initial status notification
             pushStatusNotification(context)
+
+            // Start observing device changes for real-time updates
+            startObservingDeviceChanges(context)
         }
     }
 

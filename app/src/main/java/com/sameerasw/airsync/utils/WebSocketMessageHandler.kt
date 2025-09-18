@@ -406,6 +406,9 @@ object WebSocketMessageHandler {
 
                 val macName = data.optString("name", "")
                 val isPlus = data.optBoolean("isPlusSubscription", false)
+                
+                Log.d(TAG, "Processing macInfo - name: '$macName', isPlus: $isPlus")
+                
                 val savedAppPackagesJson = data.optJSONArray("savedAppPackages")
                 val savedPackages = mutableSetOf<String>()
                 if (savedAppPackagesJson != null) {
@@ -420,13 +423,61 @@ object WebSocketMessageHandler {
                     val ds = DataStoreManager(context)
                     val last = ds.getLastConnectedDevice().first()
                     if (last != null) {
+                        // Extract model and device type from macInfo
+                        val model = data.optString("model", "").ifBlank { null }
+                        val deviceType = when {
+                            data.has("type") -> data.optString("type", "").ifBlank { null }
+                            data.has("deviceType") -> data.optString("deviceType", "").ifBlank { null }
+                            else -> null
+                        }
+
+                        Log.d(TAG, "Updating device: name='${if (macName.isNotBlank()) macName else last.name}', isPlus=$isPlus, model='$model', type='$deviceType'")
+
                         ds.saveLastConnectedDevice(
                             last.copy(
                                 name = if (macName.isNotBlank()) macName else last.name,
                                 isPlus = isPlus,
-                                lastConnected = System.currentTimeMillis()
+                                lastConnected = System.currentTimeMillis(),
+                                model = model,
+                                deviceType = deviceType
                             )
                         )
+                        
+                        Log.d(TAG, "Device info updated successfully in storage")
+                        
+                        // Also update the network-aware device storage if possible
+                        try {
+                            val ourIp = DeviceInfoUtil.getWifiIpAddress(context) ?: ""
+                            val clientIp = last.ipAddress
+                            val port = last.port
+                            val symmetricKey = last.symmetricKey
+
+                            if (clientIp.isNotBlank() && ourIp.isNotBlank()) {
+                                ds.saveNetworkDeviceConnection(
+                                    deviceName = if (macName.isNotBlank()) macName else last.name,
+                                    ourIp = ourIp,
+                                    clientIp = clientIp,
+                                    port = port,
+                                    isPlus = isPlus,
+                                    symmetricKey = symmetricKey,
+                                    model = model,
+                                    deviceType = deviceType
+                                )
+                                Log.d(TAG, "Network device info also updated successfully")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Unable to update network device info from macInfo: ${e.message}")
+                        }
+                        
+                        // Force update the last connected timestamp for network device as well
+                        try {
+                            if (macName.isNotBlank()) {
+                                ds.updateNetworkDeviceLastConnected(macName, System.currentTimeMillis())
+                                Log.d(TAG, "Network device timestamp updated")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Unable to update network device timestamp: ${e.message}")
+                        }
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Unable to update connected device info from macInfo: ${e.message}")

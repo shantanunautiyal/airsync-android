@@ -29,6 +29,8 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
         private val LAST_CONNECTED_PC_PLUS = booleanPreferencesKey("last_connected_pc_plus")
         private val LAST_CONNECTED_SYMMETRIC_KEY = stringPreferencesKey("last_connected_symmetric_key")
+        private val LAST_CONNECTED_MODEL = stringPreferencesKey("last_connected_model")
+        private val LAST_CONNECTED_DEVICE_TYPE = stringPreferencesKey("last_connected_device_type")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
@@ -180,6 +182,12 @@ class DataStoreManager(private val context: Context) {
             device.symmetricKey?.let {
                 preferences[LAST_CONNECTED_SYMMETRIC_KEY] = it
             }
+            device.model?.let {
+                preferences[LAST_CONNECTED_MODEL] = it
+            }
+            device.deviceType?.let {
+                preferences[LAST_CONNECTED_DEVICE_TYPE] = it
+            }
             preferences[ICON_SYNC_COUNT] = device.iconSyncCount.toString()
             device.lastIconSyncDate?.let {
                 preferences[LAST_ICON_SYNC_DATE] = it
@@ -198,6 +206,8 @@ class DataStoreManager(private val context: Context) {
             val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
             val isPlus = preferences[LAST_CONNECTED_PC_PLUS] ?: false
             val symmetricKey = preferences[LAST_CONNECTED_SYMMETRIC_KEY]
+            val model = preferences[LAST_CONNECTED_MODEL]
+            val deviceType = preferences[LAST_CONNECTED_DEVICE_TYPE]
             val lastSyncTime = preferences[LAST_SYNC_TIME]?.toLongOrNull()
             val iconSyncCount = preferences[ICON_SYNC_COUNT]?.toIntOrNull() ?: 0
             val lastIconSyncDate = preferences[LAST_ICON_SYNC_DATE]
@@ -212,7 +222,9 @@ class DataStoreManager(private val context: Context) {
                     isPlus = isPlus,
                     iconSyncCount = iconSyncCount,
                     lastIconSyncDate = lastIconSyncDate,
-                    symmetricKey = symmetricKey
+                    symmetricKey = symmetricKey,
+                    model = model,
+                    deviceType = deviceType
                 )
             } else {
                 null
