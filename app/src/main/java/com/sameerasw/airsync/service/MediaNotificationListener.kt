@@ -105,6 +105,13 @@ class MediaNotificationListener : NotificationListenerService() {
 
                 if (activeSessions.isNotEmpty()) {
                     for (controller in activeSessions) {
+                        try {
+                            if (controller.packageName == context.packageName) {
+                                Log.d(TAG, "Skipping own media session from package: ${controller.packageName}")
+                                continue
+                            }
+                        } catch (_: Exception) { }
+
                         val metadata = controller.metadata
                         val playbackState = controller.playbackState
 
