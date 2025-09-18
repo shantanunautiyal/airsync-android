@@ -16,6 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.sameerasw.airsync.utils.MacDeviceStatusManager
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
 
 class AirSyncTileService : TileService() {
 
@@ -26,13 +29,23 @@ class AirSyncTileService : TileService() {
         private const val TAG = "AirSyncTileService"
     }
 
+    // Keep a reference to unregister properly
+    private val connectionStatusListener: (Boolean) -> Unit = { _ ->
+        serviceScope.launch {
+            updateTileState()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         dataStoreManager = DataStoreManager(this)
 
         // Register for connection status updates
-        WebSocketUtil.registerConnectionStatusListener { isConnected ->
-            serviceScope.launch {
+        WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+
+        // Observe Mac device status to refresh tile when battery/charging changes
+        serviceScope.launch {
+            MacDeviceStatusManager.macDeviceStatus.collectLatest {
                 updateTileState()
             }
         }
@@ -40,7 +53,8 @@ class AirSyncTileService : TileService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        WebSocketUtil.unregisterConnectionStatusListener { }
+        WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
+        serviceScope.cancel()
     }
 
     override fun onStartListening() {
@@ -119,6 +133,9 @@ class AirSyncTileService : TileService() {
             val isConnected = WebSocketUtil.isConnected()
             val lastDevice = dataStoreManager.getLastConnectedDevice().first()
 
+            // Read latest Mac device status for battery/charging
+            val macStatus = MacDeviceStatusManager.macDeviceStatus.value
+
             qsTile?.apply {
                 icon = Icon.createWithResource(this@AirSyncTileService, R.drawable.ic_laptop_24)
 
@@ -126,7 +143,12 @@ class AirSyncTileService : TileService() {
                     // Connected state
                     state = Tile.STATE_ACTIVE
                     label = lastDevice.name
-                    subtitle = "Connected"
+
+                    // Show battery percent (and Charging) if available; otherwise fallback to "Connected"
+                    subtitle = macStatus?.let { status ->
+                        val pct = status.battery.level.coerceIn(0, 100)
+                        if (status.battery.isCharging) "$pct% Charging" else "$pct%"
+                    } ?: "Connected"
                 } else if (lastDevice != null) {
                     // Disconnected but has last device
                     state = Tile.STATE_INACTIVE
