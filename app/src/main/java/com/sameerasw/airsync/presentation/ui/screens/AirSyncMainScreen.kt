@@ -365,7 +365,9 @@ fun AirSyncMainScreen(
                     isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
                     onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
                     isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
-                    continueBrowsingSubtitle = "Prompt to open shared links with AirSync+"
+                    continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                    isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                    onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) }
                 )
 
 

@@ -69,12 +69,15 @@ object SyncManager {
     fun checkAndSyncDeviceStatus(context: Context, forceSync: Boolean = false) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val currentAudio = DeviceInfoUtil.getAudioInfo(context)
+                val dataStoreManager = DataStoreManager(context)
+                val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
+
+                val currentAudio = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
                 val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
 
                 var shouldSync = forceSync
 
-                // Check if audio info changed (playing state, track, volume, mute, or like status)
+                // Check if audio-related info changed
                 lastAudioInfo?.let { last ->
                     if (last.isPlaying != currentAudio.isPlaying ||
                         last.title != currentAudio.title ||
@@ -158,12 +161,13 @@ object SyncManager {
 
                 delay(250)
 
-                // 2. Send device status
+                // 2. Send device status (respect now playing setting)
+                val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
                 val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
                 if (WebSocketUtil.sendMessage(statusJson)) {
                     Log.d(TAG, "Device status sent")
                     // Update  cache
-                    lastAudioInfo = DeviceInfoUtil.getAudioInfo(context)
+                    lastAudioInfo = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
                     lastBatteryInfo = DeviceInfoUtil.getBatteryInfo(context)
                 } else {
                     Log.e(TAG, "Failed to send device status")

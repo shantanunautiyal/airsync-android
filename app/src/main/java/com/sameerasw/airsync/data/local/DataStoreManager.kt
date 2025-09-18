@@ -39,6 +39,8 @@ class DataStoreManager(private val context: Context) {
         private val AUTO_RECONNECT_ENABLED = booleanPreferencesKey("auto_reconnect_enabled")
         // New: Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
+        // New: Send now playing toggle
+        private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
 
         // Network-aware device connections
         private val NETWORK_DEVICES_PREFIX = "network_device_"
@@ -139,6 +141,19 @@ class DataStoreManager(private val context: Context) {
     fun getContinueBrowsingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[CONTINUE_BROWSING_ENABLED] != false // Default to enabled
+        }
+    }
+
+    // New: Send now playing toggle
+    suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SEND_NOW_PLAYING_ENABLED] = enabled
+        }
+    }
+
+    fun getSendNowPlayingEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[SEND_NOW_PLAYING_ENABLED] != false // Default to enabled
         }
     }
 

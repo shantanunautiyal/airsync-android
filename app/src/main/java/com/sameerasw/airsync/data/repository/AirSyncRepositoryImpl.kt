@@ -124,6 +124,15 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getContinueBrowsingEnabled()
     }
 
+    // New: Send now playing setting
+    override suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
+        dataStoreManager.setSendNowPlayingEnabled(enabled)
+    }
+
+    override fun getSendNowPlayingEnabled(): Flow<Boolean> {
+        return dataStoreManager.getSendNowPlayingEnabled()
+    }
+
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
         dataStoreManager.setUserManuallyDisconnected(disconnected)
     }

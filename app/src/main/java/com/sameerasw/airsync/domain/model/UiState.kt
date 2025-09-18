@@ -24,6 +24,7 @@ data class UiState(
     val manualIsPlus: Boolean = false,
     val isAutoReconnectEnabled: Boolean = true,
     val isContinueBrowsingEnabled: Boolean = true,
+    val isSendNowPlayingEnabled: Boolean = true,
     // Mac device status
     val macDeviceStatus: MacDeviceStatus? = null
 )

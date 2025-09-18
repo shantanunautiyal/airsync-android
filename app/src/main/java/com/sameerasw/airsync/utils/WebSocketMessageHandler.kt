@@ -40,6 +40,7 @@ object WebSocketMessageHandler {
                 "notificationAction" -> handleNotificationAction(data)
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
+                "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
                 else -> {
@@ -497,6 +498,33 @@ object WebSocketMessageHandler {
                     message = "Error: ${e.message}"
                 )
                 WebSocketUtil.sendMessage(responseMessage)
+            }
+        }
+    }
+
+    private fun handleToggleNowPlaying(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "toggleNowPlaying data is null")
+                    val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "No data provided")
+                    WebSocketUtil.sendMessage(resp)
+                    return@launch
+                }
+                // Accept either boolean or string "true"/"false"
+                val hasBoolean = data.has("state") && (data.opt("state") is Boolean)
+                val newState = if (hasBoolean) data.optBoolean("state") else data.optString("state").toBoolean()
+
+                val ds = DataStoreManager(context)
+                ds.setSendNowPlayingEnabled(newState)
+                MediaNotificationListener.setNowPlayingEnabled(context, newState)
+
+                val resp = JsonUtil.createToggleNowPlayingResponse(true, newState, "Now playing set to $newState")
+                WebSocketUtil.sendMessage(resp)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling toggleNowPlaying: ${e.message}")
+                val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
+                WebSocketUtil.sendMessage(resp)
             }
         }
     }

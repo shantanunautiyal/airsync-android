@@ -163,4 +163,12 @@ object JsonUtil {
     ): String {
         return """{"type":"toggleAppNotifResponse","data":{"package":"$packageName","success":$success,"newState":$newState,"message":"$message"}}"""
     }
+
+    /**
+     * Creates a response JSON for toggleNowPlaying command
+     */
+    fun createToggleNowPlayingResponse(success: Boolean, newState: Boolean?, message: String = ""): String {
+        val statePart = newState?.let { ",\"state\":$it" } ?: ""
+        return """{"type":"toggleNowPlayingResponse","data":{"success":$success$statePart,"message":"${escape(message)}"}}"""
+    }
 }

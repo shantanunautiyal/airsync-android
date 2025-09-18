@@ -28,6 +28,9 @@ fun ClipboardSyncCard(
     // New: control the UI enabled state and subtitle for Continue Browsing
     isContinueBrowsingToggleEnabled: Boolean,
     continueBrowsingSubtitle: String,
+    // New: Send now playing props
+    isSendNowPlayingEnabled: Boolean,
+    onToggleSendNowPlaying: (Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -92,6 +95,28 @@ fun ClipboardSyncCard(
                     checked = isContinueBrowsingEnabled,
                     onCheckedChange = onToggleContinueBrowsing,
                     enabled = isContinueBrowsingToggleEnabled
+                )
+            }
+
+            // Send now playing toggle under Continue Browsing
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Send now playing", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Share media playback details (title, artist, artwork) with desktop",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isSendNowPlayingEnabled,
+                    onCheckedChange = onToggleSendNowPlaying
                 )
             }
         }

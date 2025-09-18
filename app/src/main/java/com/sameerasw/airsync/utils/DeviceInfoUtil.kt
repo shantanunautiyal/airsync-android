@@ -119,7 +119,7 @@ object DeviceInfoUtil {
         }
     }
 
-    fun getAudioInfo(context: Context): AudioInfo {
+    fun getAudioInfo(context: Context, includeNowPlaying: Boolean = true): AudioInfo {
         return try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -129,6 +129,19 @@ object DeviceInfoUtil {
                 (currentVolume * 100 / maxVolume)
             } else {
                 0
+            }
+
+            if (!includeNowPlaying) {
+                // Skip querying media sessions; return only volume/mute info
+                return AudioInfo(
+                    isPlaying = false,
+                    title = "",
+                    artist = "",
+                    volume = volumePercent,
+                    isMuted = isMuted,
+                    albumArt = null,
+                    likeStatus = "none"
+                )
             }
 
             // Get media information including like status

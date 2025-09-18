@@ -52,6 +52,10 @@ interface AirSyncRepository {
     suspend fun setContinueBrowsingEnabled(enabled: Boolean)
     fun getContinueBrowsingEnabled(): Flow<Boolean>
 
+    // Send now playing settings
+    suspend fun setSendNowPlayingEnabled(enabled: Boolean)
+    fun getSendNowPlayingEnabled(): Flow<Boolean>
+
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>
