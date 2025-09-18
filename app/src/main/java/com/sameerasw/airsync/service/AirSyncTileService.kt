@@ -146,8 +146,13 @@ class AirSyncTileService : TileService() {
 
                     // Show battery percent (and Charging) if available; otherwise fallback to "Connected"
                     subtitle = macStatus?.let { status ->
-                        val pct = status.battery.level.coerceIn(0, 100)
-                        if (status.battery.isCharging) "$pct% Charging" else "$pct%"
+                        val level = status.battery.level
+                        if (level >= 0) {
+                            val pct = level.coerceIn(0, 100)
+                            if (status.battery.isCharging) "$pct% Charging" else "$pct%"
+                        } else {
+                            "Connected"
+                        }
                     } ?: "Connected"
                 } else if (lastDevice != null) {
                     // Disconnected but has last device
