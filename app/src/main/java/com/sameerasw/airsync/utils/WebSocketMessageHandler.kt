@@ -439,19 +439,29 @@ object WebSocketMessageHandler {
                     emptyList()
                 }
 
-                // Decide which packages to sync icons for
-                val packagesToSync: List<String> = if (savedPackages.isEmpty()) {
-                    // Mac has none; send all
-                    androidPackages
-                } else {
-                    androidPackages.filter { it !in savedPackages }
+                // Decide how to sync icons based on differences between Android and Mac package lists
+                val androidSet = androidPackages.toSet()
+                val savedSet = savedPackages.toSet()
+
+                if (savedSet.isEmpty()) {
+                    // Mac has none; send full current Android list
+                    Log.d(TAG, "macInfo: Mac has no saved packages; syncing full list of ${androidPackages.size} apps")
+                    SyncManager.sendOptimizedAppIcons(context, androidPackages)
+                    return@launch
                 }
 
-                if (packagesToSync.isEmpty()) {
-                    Log.d(TAG, "macInfo: No new apps to sync; skipping icon extraction")
-                } else {
-                    Log.d(TAG, "macInfo: syncing icons for ${packagesToSync.size} apps")
+                val newOnAndroid = androidSet - savedSet // apps present on Android but not on Mac
+                val missingOnAndroid = savedSet - androidSet // apps present on Mac but uninstalled on Android
+
+                if (newOnAndroid.isNotEmpty() || missingOnAndroid.isNotEmpty()) {
+                    Log.d(
+                        TAG,
+                        "macInfo: App list changed (new=${newOnAndroid.size}, missing=${missingOnAndroid.size}); syncing full list of ${androidPackages.size} apps"
+                    )
+                    // Send the full current Android list so desktop can add new and remove missing
                     SyncManager.sendOptimizedAppIcons(context, androidPackages)
+                } else {
+                    Log.d(TAG, "macInfo: No app list changes; skipping icon extraction")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling macInfo: ${e.message}")
