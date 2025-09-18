@@ -31,7 +31,7 @@ interface AirSyncRepository {
     fun getLastConnectedDevice(): Flow<ConnectedDevice?>
 
     // Network-aware device connections
-    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?)
+    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?, model: String? = null, deviceType: String? = null)
     fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?>
     fun getAllNetworkDeviceConnections(): Flow<List<NetworkDeviceConnection>>
     suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long)

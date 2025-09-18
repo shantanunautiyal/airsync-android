@@ -3,6 +3,7 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.service.MediaNotificationListener
 import kotlinx.coroutines.CoroutineScope

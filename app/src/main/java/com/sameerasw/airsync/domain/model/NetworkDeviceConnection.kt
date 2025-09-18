@@ -6,7 +6,10 @@ data class NetworkDeviceConnection(
     val port: String,
     val lastConnected: Long,
     val isPlus: Boolean,
-    val symmetricKey: String? = null
+    val symmetricKey: String? = null,
+    // New: device model and type information reported by the desktop
+    val model: String? = null,
+    val deviceType: String? = null
 ) {
     // get client IP for current network
     fun getClientIpForNetwork(ourIp: String): String? {
