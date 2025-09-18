@@ -35,8 +35,6 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import androidx.core.net.toUri
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
@@ -367,7 +365,9 @@ fun AirSyncMainScreen(
                     isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
                     onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
                     isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
-                    continueBrowsingSubtitle = "Prompt to open shared links with AirSync+"
+                    continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                    isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                    onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) }
                 )
 
 

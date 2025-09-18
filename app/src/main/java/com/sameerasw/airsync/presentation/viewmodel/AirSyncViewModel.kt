@@ -1,6 +1,7 @@
 package com.sameerasw.airsync.presentation.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sameerasw.airsync.data.local.DataStoreManager
@@ -11,6 +12,7 @@ import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.PermissionUtil
@@ -77,12 +79,58 @@ class AirSyncViewModel(
     init {
         // Register for WebSocket connection status updates
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+
+        // Observe Mac device status updates
+        viewModelScope.launch {
+            MacDeviceStatusManager.macDeviceStatus.collect { macStatus ->
+                _uiState.value = _uiState.value.copy(macDeviceStatus = macStatus)
+            }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         // Unregister the connection status listener when ViewModel is cleared
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
+
+        // Clean up Mac media session
+        MacDeviceStatusManager.cleanup()
+    }
+
+    private fun startObservingDeviceChanges(context: Context) {
+        val dataStoreManager = DataStoreManager(context)
+        
+        // Observe both last connected device and network devices for real-time updates
+        viewModelScope.launch {
+            dataStoreManager.getLastConnectedDevice().collect { device ->
+                Log.d("AirSyncViewModel", "Last connected device changed: ${device?.name}, isPlus: ${device?.isPlus}")
+                updateDisplayedDevice(context)
+            }
+        }
+        
+        viewModelScope.launch {
+            dataStoreManager.getAllNetworkDeviceConnections().collect { networkDevices ->
+                Log.d("AirSyncViewModel", "Network devices changed: ${networkDevices.size} devices")
+                _networkDevices.value = networkDevices
+                updateDisplayedDevice(context)
+            }
+        }
+    }
+
+    private fun updateDisplayedDevice(context: Context) {
+        viewModelScope.launch {
+            // Get current network IP for network-aware device lookup
+            val currentIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+            _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
+            
+            // Use network-aware device if available for current network, otherwise use the stored device
+            val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+            val storedDevice = repository.getLastConnectedDevice().first()
+            val deviceToShow = networkAwareDevice ?: storedDevice
+            
+            Log.d("AirSyncViewModel", "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}")
+            _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
+        }
     }
 
     fun initializeState(
@@ -107,6 +155,7 @@ class AirSyncViewModel(
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
+            val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -148,7 +197,8 @@ class AirSyncViewModel(
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
                 isAutoReconnectEnabled = isAutoReconnectEnabled,
-                isContinueBrowsingEnabled = isContinueBrowsingEnabled
+                isContinueBrowsingEnabled = isContinueBrowsingEnabled,
+                isSendNowPlayingEnabled = isSendNowPlayingEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -172,6 +222,9 @@ class AirSyncViewModel(
 
             // Push initial status notification
             pushStatusNotification(context)
+
+            // Start observing device changes for real-time updates
+            startObservingDeviceChanges(context)
         }
     }
 
@@ -613,6 +666,17 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isContinueBrowsingEnabled = enabled)
         viewModelScope.launch {
             repository.setContinueBrowsingEnabled(enabled)
+        }
+    }
+
+    fun setSendNowPlayingEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isSendNowPlayingEnabled = enabled)
+        viewModelScope.launch {
+            repository.setSendNowPlayingEnabled(enabled)
+            appContext?.let { ctx ->
+                // Update media listener immediate behavior and sync status
+                com.sameerasw.airsync.service.MediaNotificationListener.setNowPlayingEnabled(ctx, enabled)
+            }
         }
     }
 

@@ -31,7 +31,7 @@ interface AirSyncRepository {
     fun getLastConnectedDevice(): Flow<ConnectedDevice?>
 
     // Network-aware device connections
-    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?)
+    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?, model: String? = null, deviceType: String? = null)
     fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?>
     fun getAllNetworkDeviceConnections(): Flow<List<NetworkDeviceConnection>>
     suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long)
@@ -51,6 +51,10 @@ interface AirSyncRepository {
     // Continue Browsing settings
     suspend fun setContinueBrowsingEnabled(enabled: Boolean)
     fun getContinueBrowsingEnabled(): Flow<Boolean>
+
+    // Send now playing settings
+    suspend fun setSendNowPlayingEnabled(enabled: Boolean)
+    fun getSendNowPlayingEnabled(): Flow<Boolean>
 
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)

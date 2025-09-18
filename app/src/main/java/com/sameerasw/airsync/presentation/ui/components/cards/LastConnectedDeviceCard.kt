@@ -74,6 +74,14 @@ fun LastConnectedDeviceCard(
 
             Text("${device.ipAddress}:${device.port}", style = MaterialTheme.typography.bodyMedium)
 
+            // Display device model and type if available
+            device.model?.let { model ->
+                Text("Model: $model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            device.deviceType?.let { type ->
+                Text("Type: $type", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             val lastConnectedTime = remember(device.lastConnected) {
                 val currentTime = System.currentTimeMillis()
                 val diffMinutes = (currentTime - device.lastConnected) / (1000 * 60)

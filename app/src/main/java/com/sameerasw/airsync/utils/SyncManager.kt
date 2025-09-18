@@ -69,12 +69,15 @@ object SyncManager {
     fun checkAndSyncDeviceStatus(context: Context, forceSync: Boolean = false) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val currentAudio = DeviceInfoUtil.getAudioInfo(context)
+                val dataStoreManager = DataStoreManager(context)
+                val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
+
+                val currentAudio = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
                 val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
 
                 var shouldSync = forceSync
 
-                // Check if audio info changed (playing state, track, volume, mute, or like status)
+                // Check if audio-related info changed
                 lastAudioInfo?.let { last ->
                     if (last.isPlaying != currentAudio.isPlaying ||
                         last.title != currentAudio.title ||
@@ -158,25 +161,20 @@ object SyncManager {
 
                 delay(250)
 
-                // 2. Send device status
+                // 2. Send device status (respect now playing setting)
+                val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
                 val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
                 if (WebSocketUtil.sendMessage(statusJson)) {
                     Log.d(TAG, "Device status sent")
                     // Update  cache
-                    lastAudioInfo = DeviceInfoUtil.getAudioInfo(context)
+                    lastAudioInfo = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
                     lastBatteryInfo = DeviceInfoUtil.getBatteryInfo(context)
                 } else {
                     Log.e(TAG, "Failed to send device status")
                 }
 
-                delay(250)
-
-                // 3. Send app icons (only if under daily limit)
-                if (shouldSyncIconsAutomatically(context)) {
-                    sendAppIcons(context, isManualSync = false)
-                } else {
-                    Log.d(TAG, "Skipping automatic icon sync - daily limit reached")
-                }
+                // 3. Defer icon sync to macInfo handler to avoid unnecessary extraction
+                Log.d(TAG, "Deferring app icon sync until macInfo arrives (to compare package lists first)")
 
                 Log.d(TAG, "Initial sync sequence completed")
 
@@ -362,6 +360,69 @@ object SyncManager {
         } catch (e: Exception) {
             Log.e(TAG, "Error sending app icons: ${e.message}")
             onResult?.invoke(false, "Error: ${e.message}")
+        }
+    }
+
+    /**
+     * Send optimized app icons for a subset of packages (triggered by macInfo)
+     */
+    fun sendOptimizedAppIcons(context: Context, packageNames: List<String>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!WebSocketUtil.isConnected()) {
+                    Log.w(TAG, "Not connected; cannot send optimized app icons")
+                    return@launch
+                }
+
+                if (packageNames.isEmpty()) {
+                    Log.d(TAG, "No packages to sync icons for")
+                    return@launch
+                }
+
+                val pm = context.packageManager
+                val apps = mutableListOf<com.sameerasw.airsync.domain.model.NotificationApp>()
+
+                packageNames.forEach { pkg ->
+                    try {
+                        val ai = pm.getApplicationInfo(pkg, 0)
+                        val appName = pm.getApplicationLabel(ai).toString()
+                        val isSystem = (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                                (ai.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                        apps.add(
+                            com.sameerasw.airsync.domain.model.NotificationApp(
+                                packageName = pkg,
+                                appName = appName,
+                                isEnabled = true,
+                                isSystemApp = isSystem,
+                                lastUpdated = System.currentTimeMillis()
+                            )
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Skipping package $pkg (not found or inaccessible): ${e.message}")
+                    }
+                }
+
+                if (apps.isEmpty()) {
+                    Log.w(TAG, "No valid apps resolved for optimized icon sync")
+                    return@launch
+                }
+
+                // Extract icons only for required packages
+                val iconMap = AppIconUtil.getAppIconsAsBase64(context, apps.map { it.packageName })
+                if (iconMap.isEmpty()) {
+                    Log.w(TAG, "Icon extraction returned empty for optimized sync")
+                    return@launch
+                }
+
+                val appIconsJson = JsonUtil.createAppIconsJson(apps, iconMap)
+                if (WebSocketUtil.sendMessage(appIconsJson)) {
+                    Log.d(TAG, "✅ Optimized app icons sent: ${iconMap.size}")
+                } else {
+                    Log.e(TAG, "Failed to send optimized app icons")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in sendOptimizedAppIcons: ${e.message}")
+            }
         }
     }
 

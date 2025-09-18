@@ -29,6 +29,8 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_TIMESTAMP = stringPreferencesKey("last_connected_timestamp")
         private val LAST_CONNECTED_PC_PLUS = booleanPreferencesKey("last_connected_pc_plus")
         private val LAST_CONNECTED_SYMMETRIC_KEY = stringPreferencesKey("last_connected_symmetric_key")
+        private val LAST_CONNECTED_MODEL = stringPreferencesKey("last_connected_model")
+        private val LAST_CONNECTED_DEVICE_TYPE = stringPreferencesKey("last_connected_device_type")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
@@ -39,6 +41,8 @@ class DataStoreManager(private val context: Context) {
         private val AUTO_RECONNECT_ENABLED = booleanPreferencesKey("auto_reconnect_enabled")
         // New: Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
+        // New: Send now playing toggle
+        private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
 
         // Network-aware device connections
         private val NETWORK_DEVICES_PREFIX = "network_device_"
@@ -142,6 +146,19 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
+    // New: Send now playing toggle
+    suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SEND_NOW_PLAYING_ENABLED] = enabled
+        }
+    }
+
+    fun getSendNowPlayingEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[SEND_NOW_PLAYING_ENABLED] != false // Default to enabled
+        }
+    }
+
     //  auto-reconnect toggle
     suspend fun setAutoReconnectEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
@@ -165,6 +182,12 @@ class DataStoreManager(private val context: Context) {
             device.symmetricKey?.let {
                 preferences[LAST_CONNECTED_SYMMETRIC_KEY] = it
             }
+            device.model?.let {
+                preferences[LAST_CONNECTED_MODEL] = it
+            }
+            device.deviceType?.let {
+                preferences[LAST_CONNECTED_DEVICE_TYPE] = it
+            }
             preferences[ICON_SYNC_COUNT] = device.iconSyncCount.toString()
             device.lastIconSyncDate?.let {
                 preferences[LAST_ICON_SYNC_DATE] = it
@@ -183,6 +206,8 @@ class DataStoreManager(private val context: Context) {
             val timestamp = preferences[LAST_CONNECTED_TIMESTAMP]
             val isPlus = preferences[LAST_CONNECTED_PC_PLUS] ?: false
             val symmetricKey = preferences[LAST_CONNECTED_SYMMETRIC_KEY]
+            val model = preferences[LAST_CONNECTED_MODEL]
+            val deviceType = preferences[LAST_CONNECTED_DEVICE_TYPE]
             val lastSyncTime = preferences[LAST_SYNC_TIME]?.toLongOrNull()
             val iconSyncCount = preferences[ICON_SYNC_COUNT]?.toIntOrNull() ?: 0
             val lastIconSyncDate = preferences[LAST_ICON_SYNC_DATE]
@@ -197,7 +222,9 @@ class DataStoreManager(private val context: Context) {
                     isPlus = isPlus,
                     iconSyncCount = iconSyncCount,
                     lastIconSyncDate = lastIconSyncDate,
-                    symmetricKey = symmetricKey
+                    symmetricKey = symmetricKey,
+                    model = model,
+                    deviceType = deviceType
                 )
             } else {
                 null
@@ -303,7 +330,7 @@ class DataStoreManager(private val context: Context) {
     }
 
     // Network-aware device connections
-    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?) {
+    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?, model: String? = null, deviceType: String? = null) {
         context.dataStore.edit { preferences ->
             // Load existing connections for this device
             val existingConnectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
@@ -331,6 +358,12 @@ class DataStoreManager(private val context: Context) {
             symmetricKey?.let {
                 preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_symmetric_key")] = it
             }
+            model?.let {
+                preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_model")] = it
+            }
+            deviceType?.let {
+                preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_type")] = it
+            }
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = System.currentTimeMillis().toString()
             preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] = updatedJson
         }
@@ -342,6 +375,8 @@ class DataStoreManager(private val context: Context) {
             val port = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")]
             val isPlus = preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] ?: false
             val symmetricKey = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_symmetric_key")]
+            val model = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_model")]
+            val deviceType = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_type")]
             val lastConnected = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")]?.toLongOrNull() ?: 0L
             val connectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
 
@@ -363,7 +398,9 @@ class DataStoreManager(private val context: Context) {
                     port = port,
                     lastConnected = lastConnected,
                     isPlus = isPlus,
-                    symmetricKey = symmetricKey
+                    symmetricKey = symmetricKey,
+                    model = model,
+                    deviceType = deviceType
                 )
             } else {
                 null
@@ -390,6 +427,8 @@ class DataStoreManager(private val context: Context) {
                 val port = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_port")]
                 val isPlus = preferences[booleanPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_plus")] ?: false
                 val symmetricKey = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_symmetric_key")]
+                val model = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_model")]
+                val deviceType = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_type")]
                 val lastConnected = preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")]?.toLongOrNull() ?: 0L
                 val connectionsJson = preferences[stringPreferencesKey("${NETWORK_CONNECTIONS_PREFIX}${deviceName}")] ?: "{}"
 
@@ -412,7 +451,9 @@ class DataStoreManager(private val context: Context) {
                             port = port,
                             lastConnected = lastConnected,
                             isPlus = isPlus,
-                            symmetricKey = symmetricKey
+                            symmetricKey = symmetricKey,
+                            model = model,
+                            deviceType = deviceType
                         )
                     )
                 }

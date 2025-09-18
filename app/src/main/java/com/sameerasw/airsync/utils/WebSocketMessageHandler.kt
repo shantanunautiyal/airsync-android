@@ -3,7 +3,9 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
+import com.sameerasw.airsync.service.MediaNotificationListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -13,6 +15,9 @@ import org.json.JSONObject
 
 object WebSocketMessageHandler {
     private const val TAG = "WebSocketMessageHandler"
+
+    // Track if we're currently receiving playing media from Mac to prevent feedback loop
+    private var isReceivingPlayingMedia = false
 
     /**
      * Handle incoming WebSocket messages from Mac
@@ -36,7 +41,10 @@ object WebSocketMessageHandler {
                 "notificationAction" -> handleNotificationAction(data)
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
+                "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
                 "ping" -> handlePing(context)
+                "status" -> handleMacDeviceStatus(context, data)
+                "macInfo" -> handleMacInfo(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -295,7 +303,7 @@ object WebSocketMessageHandler {
 
             val success = NotificationDismissalUtil.performNotificationAction(notificationId, actionName, replyText)
             val message = if (success) {
-                if (replyText != null) "Reply sent" else "Action invoked"
+                if (replyText.isNotEmpty()) "Reply sent" else "Action invoked"
             } else {
                 "Failed to perform action or notification not found"
             }
@@ -331,6 +339,191 @@ object WebSocketMessageHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Error handling disconnect request: ${e.message}")
         }
+    }
+
+    private fun handleMacDeviceStatus(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Mac device status data is null")
+                return
+            }
+
+            Log.d(TAG, "Received Mac device status: ${data.toString()}")
+
+            // Parse battery information
+            val battery = data.optJSONObject("battery")
+            val batteryLevel = battery?.optInt("level", 0) ?: 0
+            val isCharging = battery?.optBoolean("isCharging", false) ?: false
+
+            // Parse music information
+            val music = data.optJSONObject("music")
+            val isPlaying = music?.optBoolean("isPlaying", false) ?: false
+            val title = music?.optString("title", "") ?: ""
+            val artist = music?.optString("artist", "") ?: ""
+            val volume = music?.optInt("volume", 50) ?: 50
+            val isMuted = music?.optBoolean("isMuted", false) ?: false
+            val albumArt = music?.optString("albumArt", "") ?: ""
+            val likeStatus = music?.optString("likeStatus", "none") ?: "none"
+
+            val isPaired = data.optBoolean("isPaired", true)
+
+            // Pause/resume media listener based on Mac media playback status
+            val hasActiveMedia = isPlaying && (title.isNotEmpty() || artist.isNotEmpty())
+            if (hasActiveMedia) {
+                MediaNotificationListener.pauseMediaListener()
+            } else {
+                MediaNotificationListener.resumeMediaListener()
+            }
+
+            // Update the Mac device status manager with all media info
+            MacDeviceStatusManager.updateStatus(
+                context = context,
+                batteryLevel = batteryLevel,
+                isCharging = isCharging,
+                isPaired = isPaired,
+                isPlaying = isPlaying,
+                title = title,
+                artist = artist,
+                volume = volume,
+                isMuted = isMuted,
+                albumArt = albumArt,
+                likeStatus = likeStatus
+            )
+
+            Log.d(TAG, "Mac device status updated successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling Mac device status: ${e.message}")
+        }
+    }
+
+    private fun handleMacInfo(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "macInfo data is null")
+                    return@launch
+                }
+
+                val macName = data.optString("name", "")
+                val isPlus = data.optBoolean("isPlusSubscription", false)
+                
+                Log.d(TAG, "Processing macInfo - name: '$macName', isPlus: $isPlus")
+                
+                val savedAppPackagesJson = data.optJSONArray("savedAppPackages")
+                val savedPackages = mutableSetOf<String>()
+                if (savedAppPackagesJson != null) {
+                    for (i in 0 until savedAppPackagesJson.length()) {
+                        val pkg = savedAppPackagesJson.optString(i)
+                        if (!pkg.isNullOrBlank()) savedPackages.add(pkg)
+                    }
+                }
+
+                // Update last connected device info with Mac name and Plus flag
+                try {
+                    val ds = DataStoreManager(context)
+                    val last = ds.getLastConnectedDevice().first()
+                    if (last != null) {
+                        // Extract model and device type from macInfo
+                        val model = data.optString("model", "").ifBlank { null }
+                        val deviceType = when {
+                            data.has("type") -> data.optString("type", "").ifBlank { null }
+                            data.has("deviceType") -> data.optString("deviceType", "").ifBlank { null }
+                            else -> null
+                        }
+
+                        Log.d(TAG, "Updating device: name='${if (macName.isNotBlank()) macName else last.name}', isPlus=$isPlus, model='$model', type='$deviceType'")
+
+                        ds.saveLastConnectedDevice(
+                            last.copy(
+                                name = if (macName.isNotBlank()) macName else last.name,
+                                isPlus = isPlus,
+                                lastConnected = System.currentTimeMillis(),
+                                model = model,
+                                deviceType = deviceType
+                            )
+                        )
+                        
+                        Log.d(TAG, "Device info updated successfully in storage")
+                        
+                        // Also update the network-aware device storage if possible
+                        try {
+                            val ourIp = DeviceInfoUtil.getWifiIpAddress(context) ?: ""
+                            val clientIp = last.ipAddress
+                            val port = last.port
+                            val symmetricKey = last.symmetricKey
+
+                            if (clientIp.isNotBlank() && ourIp.isNotBlank()) {
+                                ds.saveNetworkDeviceConnection(
+                                    deviceName = if (macName.isNotBlank()) macName else last.name,
+                                    ourIp = ourIp,
+                                    clientIp = clientIp,
+                                    port = port,
+                                    isPlus = isPlus,
+                                    symmetricKey = symmetricKey,
+                                    model = model,
+                                    deviceType = deviceType
+                                )
+                                Log.d(TAG, "Network device info also updated successfully")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Unable to update network device info from macInfo: ${e.message}")
+                        }
+                        
+                        // Force update the last connected timestamp for network device as well
+                        try {
+                            if (macName.isNotBlank()) {
+                                ds.updateNetworkDeviceLastConnected(macName, System.currentTimeMillis())
+                                Log.d(TAG, "Network device timestamp updated")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Unable to update network device timestamp: ${e.message}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Unable to update connected device info from macInfo: ${e.message}")
+                }
+
+                // Build Android launcher package list (lightweight)
+                val androidPackages = try {
+                    AppUtil.getLauncherPackageNames(context)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to get launcher package names: ${e.message}")
+                    emptyList()
+                }
+
+                // Decide how to sync icons based on differences between Android and Mac package lists
+                val androidSet = androidPackages.toSet()
+                val savedSet = savedPackages.toSet()
+
+                if (savedSet.isEmpty()) {
+                    // Mac has none; send full current Android list
+                    Log.d(TAG, "macInfo: Mac has no saved packages; syncing full list of ${androidPackages.size} apps")
+                    SyncManager.sendOptimizedAppIcons(context, androidPackages)
+                    return@launch
+                }
+
+                val newOnAndroid = androidSet - savedSet // apps present on Android but not on Mac
+                val missingOnAndroid = savedSet - androidSet // apps present on Mac but uninstalled on Android
+
+                if (newOnAndroid.isNotEmpty() || missingOnAndroid.isNotEmpty()) {
+                    Log.d(
+                        TAG,
+                        "macInfo: App list changed (new=${newOnAndroid.size}, missing=${missingOnAndroid.size}); syncing full list of ${androidPackages.size} apps"
+                    )
+                    // Send the full current Android list so desktop can add new and remove missing
+                    SyncManager.sendOptimizedAppIcons(context, androidPackages)
+                } else {
+                    Log.d(TAG, "macInfo: No app list changes; skipping icon extraction")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling macInfo: ${e.message}")
+            }
+        }
+    }
+
+    // Helper method to check if we should send media controls to prevent feedback loop
+    fun shouldSendMediaControl(): Boolean {
+        return !isReceivingPlayingMedia
     }
 
     private fun sendVolumeControlResponse(action: String, success: Boolean, message: String) {
@@ -432,6 +625,33 @@ object WebSocketMessageHandler {
                     message = "Error: ${e.message}"
                 )
                 WebSocketUtil.sendMessage(responseMessage)
+            }
+        }
+    }
+
+    private fun handleToggleNowPlaying(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "toggleNowPlaying data is null")
+                    val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "No data provided")
+                    WebSocketUtil.sendMessage(resp)
+                    return@launch
+                }
+                // Accept either boolean or string "true"/"false"
+                val hasBoolean = data.has("state") && (data.opt("state") is Boolean)
+                val newState = if (hasBoolean) data.optBoolean("state") else data.optString("state").toBoolean()
+
+                val ds = DataStoreManager(context)
+                ds.setSendNowPlayingEnabled(newState)
+                MediaNotificationListener.setNowPlayingEnabled(context, newState)
+
+                val resp = JsonUtil.createToggleNowPlayingResponse(true, newState, "Now playing set to $newState")
+                WebSocketUtil.sendMessage(resp)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling toggleNowPlaying: ${e.message}")
+                val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
+                WebSocketUtil.sendMessage(resp)
             }
         }
     }

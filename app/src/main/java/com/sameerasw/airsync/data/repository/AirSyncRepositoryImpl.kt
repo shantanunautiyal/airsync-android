@@ -76,8 +76,8 @@ class AirSyncRepositoryImpl(
     }
 
     // Network-aware device connections
-    override suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?) {
-        dataStoreManager.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus, symmetricKey)
+    override suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?, model: String?, deviceType: String?) {
+        dataStoreManager.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus, symmetricKey, model, deviceType)
     }
 
     override fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?> {
@@ -122,6 +122,15 @@ class AirSyncRepositoryImpl(
 
     override fun getContinueBrowsingEnabled(): Flow<Boolean> {
         return dataStoreManager.getContinueBrowsingEnabled()
+    }
+
+    // New: Send now playing setting
+    override suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
+        dataStoreManager.setSendNowPlayingEnabled(enabled)
+    }
+
+    override fun getSendNowPlayingEnabled(): Flow<Boolean> {
+        return dataStoreManager.getSendNowPlayingEnabled()
     }
 
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {

@@ -18,6 +18,10 @@
     <!-- Permission for downloading updates -->
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
 
+    <!-- Media playback permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -87,6 +91,13 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+        </service>
+
+        <!-- Mac Media Player Service - creates native Android media player UI -->
+        <service
+            android:name=".service.MacMediaPlayerService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
         </service>
 
         <!-- Quick Settings Tile Service -->

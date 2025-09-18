@@ -73,6 +73,9 @@ dependencies {
     // JSON parsing for GitHub API
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // Media session support for Mac media player
+    implementation("androidx.media:media:1.7.0")
+
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)
 
