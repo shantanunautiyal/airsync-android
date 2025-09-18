@@ -451,7 +451,7 @@ object WebSocketMessageHandler {
                     Log.d(TAG, "macInfo: No new apps to sync; skipping icon extraction")
                 } else {
                     Log.d(TAG, "macInfo: syncing icons for ${packagesToSync.size} apps")
-                    SyncManager.sendOptimizedAppIcons(context, packagesToSync)
+                    SyncManager.sendOptimizedAppIcons(context, androidPackages)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling macInfo: ${e.message}")
