@@ -24,8 +24,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_STOP_SYNC = "com.sameerasw.airsync.STOP_SYNC"
         // New dynamic actions for status notification
         const val ACTION_DISCONNECT = "com.sameerasw.airsync.DISCONNECT"
-        const val ACTION_RECONNECT = "com.sameerasw.airsync.RECONNECT"
-        const val ACTION_STOP_AUTORECONNECT = "com.sameerasw.airsync.STOP_AUTORECONNECT"
+    const val ACTION_RECONNECT = "com.sameerasw.airsync.RECONNECT"
         // New: Continue Browsing dismiss action
         const val ACTION_CONTINUE_BROWSING_DISMISS = "com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS"
         private const val TAG = "NotificationActionReceiver"
@@ -139,18 +138,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
                 }
             }
-            ACTION_STOP_AUTORECONNECT -> {
-                scope.launch {
-                    try {
-                        val ds = DataStoreManager(context)
-                        ds.setUserManuallyDisconnected(true)
-                        // If connected, leave as-is; purpose is to stop auto-reconnect attempts
-                        updateStatusNotification(context, isConnecting = false)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error stopping auto-reconnect: ${e.message}")
-                    }
-                }
-            }
             ACTION_CONTINUE_BROWSING_DISMISS -> {
                 val notifId = intent.getIntExtra("notif_id", -1)
                 if (notifId != -1) {
@@ -175,11 +162,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val hasReconnectTarget = if (ourIp != null && lastDevice != null) {
             all.firstOrNull { it.deviceName == lastDevice.name && it.getClientIpForNetwork(ourIp) != null } != null
         } else false
-        val autoEnabled = ds.getAutoReconnectEnabled().first()
         val manual = ds.getUserManuallyDisconnected().first()
-        val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
-        if (shouldShow) {
-            showStatus(context, deviceName, isConnected, isConnecting, true, hasReconnectTarget)
+        // Show only while connecting; otherwise hide
+        if (!isConnected && isConnecting) {
+            showStatus(context, deviceName, isConnected, isConnecting, false, hasReconnectTarget)
         } else {
             NotificationUtil.hideConnectionStatusNotification(context)
         }
@@ -193,15 +179,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
         isAutoReconnecting: Boolean,
         hasReconnectTarget: Boolean
     ) {
-        // Only show while actively trying (connecting) or waiting/trying to auto-reconnect.
-        // Hide in all other states, especially when connected.
-        if (!isConnected && (isConnecting || isAutoReconnecting)) {
+        // Only show while actively connecting. Hide in all other states.
+        if (!isConnected && isConnecting) {
             NotificationUtil.showConnectionStatusNotification(
                 context = context,
                 deviceName = deviceName,
                 isConnected = isConnected,
                 isConnecting = isConnecting,
-                isAutoReconnecting = isAutoReconnecting,
+                isAutoReconnecting = false,
                 hasReconnectTarget = hasReconnectTarget
             )
         } else {

@@ -94,7 +94,7 @@ object WebSocketUtil {
         onMessageReceived = onMessage
 
         // Reflect "Connecting..." immediately in the persistent notification
-        updatePersistentNotification(context, isConnected = false, isConnecting = true)
+    updatePersistentNotification(context, isConnected = false, isConnecting = true)
 
         try {
             if (client == null) {
@@ -318,18 +318,16 @@ object WebSocketUtil {
                 val hasReconnectTarget = if (ourIp != null && lastDevice != null) {
                     all.firstOrNull { it.deviceName == lastDevice.name && it.getClientIpForNetwork(ourIp) != null } != null
                 } else false
-
-                val autoEnabled = ds.getAutoReconnectEnabled().first()
                 val manual = ds.getUserManuallyDisconnected().first()
 
-                val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
-                if (shouldShow) {
+                // Show only when actively connecting; otherwise hide
+                if (!isConnected && isConnecting && !manual) {
                     NotificationUtil.showConnectionStatusNotification(
                         context = context,
                         deviceName = deviceName,
                         isConnected = isConnected,
                         isConnecting = isConnecting,
-                        isAutoReconnecting = true,
+                        isAutoReconnecting = false,
                         hasReconnectTarget = hasReconnectTarget
                     )
                 } else {

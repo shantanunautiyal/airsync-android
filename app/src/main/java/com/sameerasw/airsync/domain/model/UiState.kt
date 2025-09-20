@@ -22,7 +22,6 @@ data class UiState(
     val symmetricKey: String? = null,
     val manualPcName: String = "",
     val manualIsPlus: Boolean = false,
-    val isAutoReconnectEnabled: Boolean = true,
     val isContinueBrowsingEnabled: Boolean = true,
     val isSendNowPlayingEnabled: Boolean = true,
     // Mac device status

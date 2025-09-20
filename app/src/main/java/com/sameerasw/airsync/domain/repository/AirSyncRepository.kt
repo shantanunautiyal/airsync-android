@@ -60,7 +60,4 @@ interface AirSyncRepository {
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>
 
-    // Auto-reconnect toggle
-    suspend fun setAutoReconnectEnabled(enabled: Boolean)
-    fun getAutoReconnectEnabled(): Flow<Boolean>
 }

@@ -28,8 +28,6 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 fun LastConnectedDeviceCard(
     device: ConnectedDevice,
     onQuickConnect: () -> Unit,
-    isAutoReconnectEnabled: Boolean,
-    onToggleAutoReconnect: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -94,19 +92,6 @@ fun LastConnectedDeviceCard(
             }
             Text("Last seen $lastConnectedTime", style = MaterialTheme.typography.bodyMedium)
 
-            // Auto re-connect toggle
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Auto re-connect", style = MaterialTheme.typography.bodyMedium)
-                Switch(
-                    checked = isAutoReconnectEnabled,
-                    onCheckedChange = onToggleAutoReconnect
-                )
-            }
 
             Button(
                 onClick = onQuickConnect,

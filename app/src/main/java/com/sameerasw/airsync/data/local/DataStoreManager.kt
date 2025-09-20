@@ -37,8 +37,7 @@ class DataStoreManager(private val context: Context) {
         private val CLIPBOARD_SYNC_ENABLED = booleanPreferencesKey("clipboard_sync_enabled")
         private val ICON_SYNC_COUNT = stringPreferencesKey("icon_sync_count")
         private val LAST_ICON_SYNC_DATE = stringPreferencesKey("last_icon_sync_date")
-        private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
-        private val AUTO_RECONNECT_ENABLED = booleanPreferencesKey("auto_reconnect_enabled")
+    private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
         // New: Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
         // New: Send now playing toggle
@@ -156,19 +155,6 @@ class DataStoreManager(private val context: Context) {
     fun getSendNowPlayingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[SEND_NOW_PLAYING_ENABLED] != false // Default to enabled
-        }
-    }
-
-    //  auto-reconnect toggle
-    suspend fun setAutoReconnectEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[AUTO_RECONNECT_ENABLED] = enabled
-        }
-    }
-
-    fun getAutoReconnectEnabled(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            preferences[AUTO_RECONNECT_ENABLED] != false // Default to enabled
         }
     }
 

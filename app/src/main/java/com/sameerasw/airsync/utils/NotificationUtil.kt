@@ -54,10 +54,9 @@ object NotificationUtil {
      * Show the real-time connection status notification with a single dynamic action.
      * Content contract:
      * - Title: device name if available, otherwise "AirSync"
-     * - Text: "Connected", "Connecting...", "Trying to re-connect", or "Disconnected"
+    * - Text: "Connected", "Connecting...", or "Disconnected"
      * - One action button based on state:
      *   - Connected -> "Disconnect"
-     *   - Auto-reconnecting (waiting/trying) -> "Stop"
      *   - Disconnected with a reconnect target -> "Reconnect"
      *   - Otherwise -> "Open app"
      */
@@ -75,7 +74,6 @@ object NotificationUtil {
         val content = when {
             isConnecting -> "Connecting..."
             isConnected -> "Connected"
-            isAutoReconnecting -> "Trying to re-connect"
             else -> "Disconnected"
         }
 
@@ -87,16 +85,6 @@ object NotificationUtil {
                     101,
                     Intent(context, NotificationActionReceiver::class.java).apply {
                         action = NotificationActionReceiver.ACTION_DISCONNECT
-                    },
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            }
-            isAutoReconnecting -> {
-                "Stop" to PendingIntent.getBroadcast(
-                    context,
-                    102,
-                    Intent(context, NotificationActionReceiver::class.java).apply {
-                        action = NotificationActionReceiver.ACTION_STOP_AUTORECONNECT
                     },
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )

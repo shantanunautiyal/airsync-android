@@ -676,32 +676,7 @@ class MediaNotificationListener : NotificationListenerService() {
 
     private suspend fun updatePersistentNotification() {
         try {
-            val connectedDevice = dataStoreManager.getLastConnectedDevice().first()
-            val deviceName = connectedDevice?.name
-            val isConnected = WebSocketUtil.isConnected()
-
-            val ourIp = DeviceInfoUtil.getWifiIpAddress(this)
-            val all = dataStoreManager.getAllNetworkDeviceConnections().first()
-            val hasReconnectTarget = ourIp != null && all.any { it.getClientIpForNetwork(ourIp!!) != null }
-
-            val autoEnabled = dataStoreManager.getAutoReconnectEnabled().first()
-            val manual = dataStoreManager.getUserManuallyDisconnected().first()
-            val isAutoReconnecting = !isConnected && autoEnabled && !manual && hasReconnectTarget
-
-            // Only show the status notification when auto-reconnecting (waiting/trying).
-            // Otherwise, hide it so it does not reappear while connected or fully disconnected without auto-reconnect.
-            if (isAutoReconnecting) {
-                NotificationUtil.showConnectionStatusNotification(
-                    context = this,
-                    deviceName = deviceName,
-                    isConnected = isConnected,
-                    isConnecting = false,
-                    isAutoReconnecting = true,
-                    hasReconnectTarget = hasReconnectTarget
-                )
-            } else {
-                NotificationUtil.hideConnectionStatusNotification(this)
-            }
+            NotificationUtil.hideConnectionStatusNotification(this)
         } catch (e: Exception) {
             Log.e(TAG, "Error updating persistent notification: ${e.message}")
         }
