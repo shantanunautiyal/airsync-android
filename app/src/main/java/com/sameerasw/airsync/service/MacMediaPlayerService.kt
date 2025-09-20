@@ -251,8 +251,9 @@ class MacMediaPlayerService : Service() {
             createMediaActionPendingIntent("next")
         )
 
+        val dynamicIcon = com.sameerasw.airsync.utils.DeviceIconResolver.getLastDeviceIconRes(this)
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_laptop_24)
+            .setSmallIcon(dynamicIcon)
             .setContentTitle(title.ifEmpty { "Mac Media Player" })
             .setContentText(artist.ifEmpty { "Playing on Mac" })
             .setContentIntent(activityPendingIntent)

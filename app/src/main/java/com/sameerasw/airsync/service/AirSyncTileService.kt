@@ -151,7 +151,8 @@ class AirSyncTileService : TileService() {
             val macStatus = MacDeviceStatusManager.macDeviceStatus.value
 
             qsTile?.apply {
-                icon = Icon.createWithResource(this@AirSyncTileService, R.drawable.ic_laptop_24)
+                val dynamicIcon = com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(lastDevice)
+                icon = Icon.createWithResource(this@AirSyncTileService, dynamicIcon)
 
                 if (isConnected && lastDevice != null) {
                     // Connected state
@@ -190,7 +191,8 @@ class AirSyncTileService : TileService() {
                 state = Tile.STATE_INACTIVE
                 label = "AirSync"
                 subtitle = "Error"
-                icon = Icon.createWithResource(this@AirSyncTileService, R.drawable.ic_laptop_24)
+                val dynamicIcon = com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(null)
+                icon = Icon.createWithResource(this@AirSyncTileService, dynamicIcon)
                 updateTile()
             }
         }

@@ -25,6 +25,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.core.net.toUri
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.sameerasw.airsync.data.local.DataStoreManager
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.Flow
 
 class MainActivity : ComponentActivity() {
     
@@ -81,8 +86,13 @@ class MainActivity : ComponentActivity() {
                         LargeTopAppBar(
                             title = {
                                 Row {
+                                    // Dynamic icon based on last connected device category
+                                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                                    val ds = remember(ctx) { DataStoreManager(ctx) }
+                                    val lastDevice by ds.getLastConnectedDevice().collectAsState(initial = null)
+                                    val iconRes = com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(lastDevice)
                                     Image(
-                                        painter = painterResource(id = R.drawable.ic_laptop_24),
+                                        painter = painterResource(id = iconRes),
                                         contentDescription = "AirSync Logo",
                                         modifier = Modifier.size(32.dp),
                                         contentScale = ContentScale.Fit,

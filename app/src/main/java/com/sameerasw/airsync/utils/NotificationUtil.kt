@@ -123,11 +123,12 @@ object NotificationUtil {
             }
         }
 
+        val smallIcon = DeviceIconResolver.getLastDeviceIconRes(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setSmallIcon(R.drawable.ic_stat_name)
+            .setSmallIcon(smallIcon)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
