@@ -43,6 +43,17 @@ object WebSocketUtil {
             .build()
     }
 
+    // Manual connect listeners are invoked when a user-initiated connection starts (not auto reconnect)
+    private val manualConnectListeners = mutableSetOf<() -> Unit>()
+
+    fun registerManualConnectListener(listener: () -> Unit) {
+        manualConnectListeners.add(listener)
+    }
+
+    fun unregisterManualConnectListener(listener: () -> Unit) {
+        manualConnectListeners.remove(listener)
+    }
+
     fun connect(
         context: Context,
         ipAddress: String,

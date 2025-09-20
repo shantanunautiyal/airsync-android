@@ -71,8 +71,9 @@ class AirSyncTileService : TileService() {
             val isConnected = WebSocketUtil.isConnected()
 
             if (isConnected) {
-                WebSocketUtil.disconnect()
+                // Mark manual disconnect BEFORE disconnecting so listeners won't schedule auto-reconnect
                 dataStoreManager.setUserManuallyDisconnected(true)
+                WebSocketUtil.disconnect()
                 updateTileState()
             } else {
                 dataStoreManager.setUserManuallyDisconnected(false)

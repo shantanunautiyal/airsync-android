@@ -52,6 +52,8 @@ class AirSyncViewModel(
     private var autoReconnectJob: kotlinx.coroutines.Job? = null
     private var autoReconnectStart: Long = 0L
     private var appContext: Context? = null
+    // Manual connect canceller reference (set in init) for unregistering
+    private val manualConnectCanceler: () -> Unit = { cancelAutoReconnect() }
 
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
@@ -62,12 +64,15 @@ class AirSyncViewModel(
                 response = if (isConnected) "Connected successfully!" else "Disconnected"
             )
 
-            // Cancel auto-reconnect when connected; schedule when disconnected (if allowed)
             if (isConnected) {
                 cancelAutoReconnect()
             } else {
-                appContext?.let { ctx ->
-                    maybeScheduleAutoReconnect(ctx)
+                // Only schedule if user did NOT manually disconnect
+                val manuallyDisconnected = repository.getUserManuallyDisconnected().first()
+                if (!manuallyDisconnected) {
+                    appContext?.let { ctx -> maybeScheduleAutoReconnect(ctx) }
+                } else {
+                    cancelAutoReconnect()
                 }
             }
 
@@ -79,11 +84,24 @@ class AirSyncViewModel(
     init {
         // Register for WebSocket connection status updates
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+        // Cancel any auto-reconnect job when a manual connection starts
+        try {
+            WebSocketUtil.registerManualConnectListener(manualConnectCanceler)
+        } catch (_: Exception) {}
 
         // Observe Mac device status updates
         viewModelScope.launch {
             MacDeviceStatusManager.macDeviceStatus.collect { macStatus ->
                 _uiState.value = _uiState.value.copy(macDeviceStatus = macStatus)
+            }
+        }
+        // Observe manual disconnect flag to immediately cancel any running auto-reconnect and update notification
+        viewModelScope.launch {
+            repository.getUserManuallyDisconnected().collect { manual ->
+                if (manual) {
+                    cancelAutoReconnect()
+                }
+                appContext?.let { pushStatusNotification(it) }
             }
         }
     }
@@ -92,6 +110,7 @@ class AirSyncViewModel(
         super.onCleared()
         // Unregister the connection status listener when ViewModel is cleared
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
+        try { WebSocketUtil.unregisterManualConnectListener { cancelAutoReconnect() } } catch (_: Exception) {}
 
         // Clean up Mac media session
         MacDeviceStatusManager.cleanup()
@@ -99,7 +118,7 @@ class AirSyncViewModel(
 
     private fun startObservingDeviceChanges(context: Context) {
         val dataStoreManager = DataStoreManager(context)
-
+        
         // Observe both last connected device and network devices for real-time updates
         viewModelScope.launch {
             dataStoreManager.getLastConnectedDevice().collect { device ->
@@ -107,7 +126,7 @@ class AirSyncViewModel(
                 updateDisplayedDevice(context)
             }
         }
-
+        
         viewModelScope.launch {
             dataStoreManager.getAllNetworkDeviceConnections().collect { networkDevices ->
                 Log.d("AirSyncViewModel", "Network devices changed: ${networkDevices.size} devices")
@@ -122,12 +141,12 @@ class AirSyncViewModel(
             // Get current network IP for network-aware device lookup
             val currentIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
             _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
-
+            
             // Use network-aware device if available for current network, otherwise use the stored device
             val networkAwareDevice = getNetworkAwareLastConnectedDevice()
             val storedDevice = repository.getLastConnectedDevice().first()
             val deviceToShow = networkAwareDevice ?: storedDevice
-
+            
             Log.d("AirSyncViewModel", "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}")
             _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
         }
@@ -428,8 +447,12 @@ class AirSyncViewModel(
             repository.setUserManuallyDisconnected(disconnected)
             if (disconnected) {
                 cancelAutoReconnect()
+                appContext?.let { ctx ->
+                    try { com.sameerasw.airsync.utils.NotificationUtil.hideConnectionStatusNotification(ctx) } catch (_: Exception) {}
+                }
+            } else {
+                appContext?.let { pushStatusNotification(it) }
             }
-            appContext?.let { pushStatusNotification(it) }
         }
     }
 
@@ -506,6 +529,8 @@ class AirSyncViewModel(
                         // Delay according to elapsed time window
                         val elapsed = System.currentTimeMillis() - autoReconnectStart
                         val delayMs = if (elapsed <= 60_000L) 10_000L else 60_000L
+                        // Update notification during waiting period
+                        appContext?.let { pushStatusNotification(it) }
                         delay(delayMs)
 
                         if (WebSocketUtil.isConnected()) continue

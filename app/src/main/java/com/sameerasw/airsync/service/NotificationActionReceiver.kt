@@ -55,7 +55,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 scope.launch {
                     try {
                         val ds = DataStoreManager(context)
-                        // Mark manual disconnect and disconnect socket
+                        // Mark manual disconnect BEFORE disconnecting so auto-reconnect won't trigger
                         ds.setUserManuallyDisconnected(true)
                         WebSocketUtil.disconnect()
                         // Clear Continue Browsing notifications on disconnect
