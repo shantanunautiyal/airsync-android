@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.*
@@ -12,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object WebSocketUtil {
     private const val TAG = "WebSocketUtil"
+    private const val HANDSHAKE_TIMEOUT_MS = 7_000L
     private var webSocket: WebSocket? = null
     private var client: OkHttpClient? = null
     private var currentIpAddress: String? = null
@@ -19,6 +22,10 @@ object WebSocketUtil {
     private var currentSymmetricKey: javax.crypto.SecretKey? = null
     private var isConnected = AtomicBoolean(false)
     private var isConnecting = AtomicBoolean(false)
+    // Transport state: true after OkHttp onOpen, false after closing/failure/disconnect
+    private var isSocketOpen = AtomicBoolean(false)
+    private var handshakeCompleted = AtomicBoolean(false)
+    private var handshakeTimeoutJob: Job? = null
 
     // Callback for connection status changes
     private var onConnectionStatusChanged: ((Boolean) -> Unit)? = null
@@ -55,7 +62,9 @@ object WebSocketUtil {
         onConnectionStatus: ((Boolean) -> Unit)? = null,
         onMessage: ((String) -> Unit)? = null,
         // Distinguish between manual user triggered connections and auto reconnect attempts
-        manualAttempt: Boolean = true
+        manualAttempt: Boolean = true,
+        // Called if we don't receive an initial message from Mac within timeout (likely auth failure)
+        onHandshakeTimeout: (() -> Unit)? = null
     ) {
         if (isConnecting.get() || isConnected.get()) {
             Log.d(TAG, "Already connected or connecting")
@@ -70,6 +79,7 @@ object WebSocketUtil {
         }
 
         isConnecting.set(true)
+        handshakeCompleted.set(false)
 
         // Notify listeners that a manual connection attempt has begun so they can cancel auto-reconnect loops
         if (manualAttempt) {
@@ -103,21 +113,40 @@ object WebSocketUtil {
             val listener = object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     Log.d(TAG, "WebSocket connected to $url")
-                    isConnected.set(true)
-                    isConnecting.set(false)
+                    // Transport is open now
+                    isSocketOpen.set(true)
+                    // Defer marking as connected until we get macInfo (handshake)
+                    isConnected.set(false)
+                    isConnecting.set(true)
 
-                    // Perform initial sync sequence
-                    SyncManager.performInitialSync(context)
+                    // Trigger initial sync so Mac responds
+                    try { SyncManager.performInitialSync(context) } catch (_: Exception) {}
+                    updatePersistentNotification(context, isConnected = false, isConnecting = true)
 
-                    // Start periodic sync for battery and status updates
-                    SyncManager.startPeriodicSync(context)
-
-                    // Update connection status
-                    onConnectionStatusChanged?.invoke(true)
-                    updatePersistentNotification(context, isConnected = true, isConnecting = false)
-
-                    // Notify all registered listeners about the connection status
-                    notifyConnectionStatusListeners(true)
+                    // Start handshake timeout
+                    handshakeTimeoutJob?.cancel()
+                    handshakeTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            delay(HANDSHAKE_TIMEOUT_MS)
+                            if (!handshakeCompleted.get()) {
+                                Log.w(TAG, "Handshake timed out; treating as authentication failure")
+                                isConnected.set(false)
+                                isConnecting.set(false)
+                                try { webSocket.close(4001, "Handshake timeout") } catch (_: Exception) {}
+                                // Treat as manual disconnect if this was a manual attempt
+                                if (manualAttempt) {
+                                    try {
+                                        val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
+                                        ds.setUserManuallyDisconnected(true)
+                                    } catch (_: Exception) {}
+                                }
+                                onConnectionStatusChanged?.invoke(false)
+                                updatePersistentNotification(context, isConnected = false, isConnecting = false)
+                                notifyConnectionStatusListeners(false)
+                                onHandshakeTimeout?.invoke()
+                            }
+                        } catch (_: Exception) {}
+                    }
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -126,6 +155,24 @@ object WebSocketUtil {
                     val decryptedMessage = currentSymmetricKey?.let { key ->
                         CryptoUtil.decryptMessage(text, key)
                     } ?: text
+
+                    // On first macInfo message, complete handshake and now report connected
+                    if (!handshakeCompleted.get()) {
+                        val handshakeOk = try {
+                            val json = org.json.JSONObject(decryptedMessage)
+                            json.optString("type") == "macInfo"
+                        } catch (_: Exception) { false }
+                        if (handshakeOk) {
+                            handshakeCompleted.set(true)
+                            isConnected.set(true)
+                            isConnecting.set(false)
+                            handshakeTimeoutJob?.cancel()
+                            try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
+                            onConnectionStatusChanged?.invoke(true)
+                            updatePersistentNotification(context, isConnected = true, isConnecting = false)
+                            notifyConnectionStatusListeners(true)
+                        }
+                    }
 
                     // Handle incoming commands
                     WebSocketMessageHandler.handleIncomingMessage(context, decryptedMessage)
@@ -140,6 +187,10 @@ object WebSocketUtil {
                 override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                     Log.d(TAG, "WebSocket closing: $code / $reason")
                     isConnected.set(false)
+                    isSocketOpen.set(false)
+                    isConnecting.set(false)
+                    handshakeCompleted.set(false)
+                    handshakeTimeoutJob?.cancel()
                     onConnectionStatusChanged?.invoke(false)
                     updatePersistentNotification(context, isConnected = false, isConnecting = false)
                     // Clear continue browsing notifs on disconnect
@@ -153,6 +204,9 @@ object WebSocketUtil {
                     Log.e(TAG, "WebSocket connection failed: ${t.message}")
                     isConnected.set(false)
                     isConnecting.set(false)
+                    isSocketOpen.set(false)
+                    handshakeCompleted.set(false)
+                    handshakeTimeoutJob?.cancel()
 
                     // Update connection status
                     onConnectionStatusChanged?.invoke(false)
@@ -169,6 +223,8 @@ object WebSocketUtil {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create WebSocket: ${e.message}")
             isConnecting.set(false)
+            handshakeCompleted.set(false)
+            handshakeTimeoutJob?.cancel()
             onConnectionStatusChanged?.invoke(false)
             updatePersistentNotification(context, isConnected = false, isConnecting = false)
             try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
@@ -190,7 +246,8 @@ object WebSocketUtil {
     }
 
     fun sendMessage(message: String): Boolean {
-        return if (isConnected.get() && webSocket != null) {
+        // Allow sending as soon as the socket is open (even before handshake completes)
+        return if (isSocketOpen.get() && webSocket != null) {
             Log.d(TAG, "Sending message: $message")
             val messageToSend = currentSymmetricKey?.let { key ->
                 CryptoUtil.encryptMessage(message, key)
@@ -207,6 +264,9 @@ object WebSocketUtil {
         Log.d(TAG, "Disconnecting WebSocket")
         isConnected.set(false)
         isConnecting.set(false)
+        isSocketOpen.set(false)
+        handshakeCompleted.set(false)
+        handshakeTimeoutJob?.cancel()
 
         // Stop periodic sync when disconnecting
         SyncManager.stopPeriodicSync()
@@ -237,6 +297,8 @@ object WebSocketUtil {
         currentSymmetricKey = null
         onConnectionStatusChanged = null
         onMessageReceived = null
+        handshakeCompleted.set(false)
+        handshakeTimeoutJob?.cancel()
     }
 
     fun isConnected(): Boolean {

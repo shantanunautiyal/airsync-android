@@ -101,6 +101,18 @@ class AirSyncTileService : TileService() {
                     port = lastDevice.port.toIntOrNull() ?: 6996,
                     symmetricKey = lastDevice.symmetricKey,
                     manualAttempt = true,
+                    onHandshakeTimeout = {
+                        try {
+                            val v = getSystemService(VIBRATOR_SERVICE) as android.os.Vibrator
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                v.vibrate(android.os.VibrationEffect.createOneShot(150, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                            } else {
+                                @Suppress("DEPRECATION") v.vibrate(150)
+                            }
+                        } catch (_: Exception) {}
+                        WebSocketUtil.disconnect(this@AirSyncTileService)
+                        serviceScope.launch { updateTileState() }
+                    },
                     onConnectionStatus = { connected ->
                         serviceScope.launch {
                             updateTileState()

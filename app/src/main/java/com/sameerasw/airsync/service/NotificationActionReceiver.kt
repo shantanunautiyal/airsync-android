@@ -98,6 +98,20 @@ class NotificationActionReceiver : BroadcastReceiver() {
                                 port = port,
                                 symmetricKey = target.symmetricKey,
                                 manualAttempt = true,
+                                onHandshakeTimeout = {
+                                    // Haptic feedback via vibrator if available
+                                    try {
+                                        val v = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                            v.vibrate(android.os.VibrationEffect.createOneShot(150, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                                        } else {
+                                            @Suppress("DEPRECATION") v.vibrate(150)
+                                        }
+                                    } catch (_: Exception) {}
+                                    WebSocketUtil.disconnect(context)
+                                    // Update status notification to show disconnected
+                                    scope.launch { updateStatusNotification(context, isConnecting = false) }
+                                },
                                 onConnectionStatus = { connected ->
                                     scope.launch {
                                         if (connected) {

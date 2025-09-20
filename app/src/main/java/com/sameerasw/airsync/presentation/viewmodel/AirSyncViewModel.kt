@@ -433,6 +433,15 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(iconSyncMessage = "")
     }
 
+    // Auth failure dialog controls
+    fun showAuthFailure(message: String) {
+        _uiState.value = _uiState.value.copy(showAuthFailureDialog = true, authFailureMessage = message)
+    }
+
+    fun dismissAuthFailure() {
+        _uiState.value = _uiState.value.copy(showAuthFailureDialog = false, authFailureMessage = "")
+    }
+
     fun setUserManuallyDisconnected(disconnected: Boolean) {
         viewModelScope.launch {
             repository.setUserManuallyDisconnected(disconnected)
@@ -535,6 +544,12 @@ class AirSyncViewModel(
                             port = currentTarget.port.toIntOrNull() ?: 6996,
                             symmetricKey = currentTarget.symmetricKey,
                             manualAttempt = false,
+                            onHandshakeTimeout = {
+                                viewModelScope.launch {
+                                    _uiState.value = _uiState.value.copy(isConnecting = false, response = "Auto-reconnect authentication failed")
+                                    appContext?.let { pushStatusNotification(it) }
+                                }
+                            },
                             onConnectionStatus = { connected ->
                                 viewModelScope.launch {
                                     _uiState.value = _uiState.value.copy(isConnecting = false)
@@ -581,6 +596,13 @@ class AirSyncViewModel(
                 ipAddress = device.ipAddress,
                 port = device.port.toIntOrNull() ?: 6996,
                 symmetricKey = device.symmetricKey,
+                manualAttempt = false,
+                onHandshakeTimeout = {
+                    viewModelScope.launch {
+                        setConnectionStatus(isConnected = false, isConnecting = false)
+                        setResponse("Auto-reconnection authentication failed")
+                    }
+                },
                 onConnectionStatus = { connected ->
                     viewModelScope.launch {
                         setConnectionStatus(isConnected = connected, isConnecting = false)

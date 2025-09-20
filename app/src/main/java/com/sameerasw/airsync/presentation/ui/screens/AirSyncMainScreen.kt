@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -77,6 +79,7 @@ fun AirSyncMainScreen(
     val uiState by viewModel.uiState.collectAsState()
     val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     // Track if we've already processed the QR code dialog to prevent re-showing
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
@@ -135,6 +138,17 @@ fun AirSyncMainScreen(
             port = uiState.port.toIntOrNull() ?: 6996,
             symmetricKey = uiState.symmetricKey,
             manualAttempt = true,
+            onHandshakeTimeout = {
+                scope.launch(Dispatchers.Main) {
+                    // Strong haptic feedback
+                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
+                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+                    WebSocketUtil.disconnect(context)
+                    viewModel.showAuthFailure(
+                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
+                    )
+                }
+            },
             onConnectionStatus = { connected ->
                 scope.launch(Dispatchers.Main) {
                     viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
@@ -164,6 +178,24 @@ fun AirSyncMainScreen(
                     } catch (_: Exception) {
                         // Not a clipboard update, ignore
                     }
+                }
+            }
+        )
+    }
+
+    // Auth failure dialog
+    if (uiState.showAuthFailureDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAuthFailure() },
+            title = { Text("Connection failed") },
+            text = {
+                Text(uiState.authFailureMessage.ifEmpty {
+                    "Authentication failed. Please re-scan the QR code on your Mac to ensure the encryption key matches."
+                })
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissAuthFailure() }) {
+                    Text("OK")
                 }
             }
         )

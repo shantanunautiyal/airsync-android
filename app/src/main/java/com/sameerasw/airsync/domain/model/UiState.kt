@@ -26,5 +26,8 @@ data class UiState(
     val isContinueBrowsingEnabled: Boolean = true,
     val isSendNowPlayingEnabled: Boolean = true,
     // Mac device status
-    val macDeviceStatus: MacDeviceStatus? = null
+    val macDeviceStatus: MacDeviceStatus? = null,
+    // Auth failure dialog
+    val showAuthFailureDialog: Boolean = false,
+    val authFailureMessage: String = ""
 )
