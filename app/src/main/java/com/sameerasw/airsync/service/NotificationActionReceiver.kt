@@ -25,6 +25,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         // New dynamic actions for status notification
         const val ACTION_DISCONNECT = "com.sameerasw.airsync.DISCONNECT"
     const val ACTION_RECONNECT = "com.sameerasw.airsync.RECONNECT"
+        const val ACTION_STOP_RECONNECT = "com.sameerasw.airsync.STOP_RECONNECT"
         // New: Continue Browsing dismiss action
         const val ACTION_CONTINUE_BROWSING_DISMISS = "com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS"
         private const val TAG = "NotificationActionReceiver"
@@ -138,6 +139,19 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
                 }
             }
+            ACTION_STOP_RECONNECT -> {
+                scope.launch {
+                    try {
+                        // Cancel any auto-reconnect loops and hide connecting notification
+                        WebSocketUtil.cancelAutoReconnect()
+                        NotificationUtil.hideConnectionStatusNotification(context)
+                        // Mark manual so it won't auto-retry until a non-manual disconnect happens
+                        DataStoreManager(context).setUserManuallyDisconnected(true)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error stopping auto-reconnect: ${e.message}")
+                    }
+                }
+            }
             ACTION_CONTINUE_BROWSING_DISMISS -> {
                 val notifId = intent.getIntExtra("notif_id", -1)
                 if (notifId != -1) {
@@ -186,7 +200,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 deviceName = deviceName,
                 isConnected = isConnected,
                 isConnecting = isConnecting,
-                isAutoReconnecting = false,
+                isAutoReconnecting = isAutoReconnecting,
                 hasReconnectTarget = hasReconnectTarget
             )
         } else {

@@ -202,12 +202,11 @@ fun AirSyncMainScreen(
     }
 
     fun disconnect() {
+        // Set manual disconnect flag BEFORE disconnecting to prevent auto-reconnect trigger
+        viewModel.setUserManuallyDisconnected(true)
         WebSocketUtil.disconnect(context)
         viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
         viewModel.setResponse("Disconnected")
-
-        // Set manual disconnect flag to prevent auto-reconnection
-        viewModel.setUserManuallyDisconnected(true)
     }
 
     fun launchScanner(context: Context) {
@@ -327,6 +326,8 @@ fun AirSyncMainScreen(
             uiState.lastConnectedDevice?.let { device ->
                 LastConnectedDeviceCard(
                     device = device,
+                    isAutoReconnectEnabled = uiState.isAutoReconnectEnabled,
+                    onToggleAutoReconnect = { enabled -> viewModel.setAutoReconnectEnabled(enabled) },
                     onQuickConnect = {
                         // Check if we can use network-aware connection first
                         val networkAwareDevice = viewModel.getNetworkAwareLastConnectedDevice()

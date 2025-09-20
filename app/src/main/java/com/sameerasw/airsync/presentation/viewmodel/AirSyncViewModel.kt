@@ -100,7 +100,7 @@ class AirSyncViewModel(
 
     private fun startObservingDeviceChanges(context: Context) {
         val dataStoreManager = DataStoreManager(context)
-        
+
         // Observe both last connected device and network devices for real-time updates
         viewModelScope.launch {
             dataStoreManager.getLastConnectedDevice().collect { device ->
@@ -108,7 +108,7 @@ class AirSyncViewModel(
                 updateDisplayedDevice(context)
             }
         }
-        
+
         viewModelScope.launch {
             dataStoreManager.getAllNetworkDeviceConnections().collect { networkDevices ->
                 Log.d("AirSyncViewModel", "Network devices changed: ${networkDevices.size} devices")
@@ -123,12 +123,12 @@ class AirSyncViewModel(
             // Get current network IP for network-aware device lookup
             val currentIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
             _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
-            
+
             // Use network-aware device if available for current network, otherwise use the stored device
             val networkAwareDevice = getNetworkAwareLastConnectedDevice()
             val storedDevice = repository.getLastConnectedDevice().first()
             val deviceToShow = networkAwareDevice ?: storedDevice
-            
+
             Log.d("AirSyncViewModel", "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}")
             _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
         }
@@ -153,6 +153,7 @@ class AirSyncViewModel(
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
             val isDeveloperMode = repository.getDeveloperMode().first()
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
+            val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
@@ -194,6 +195,7 @@ class AirSyncViewModel(
                 isNotificationSyncEnabled = isNotificationSyncEnabled,
                 isDeveloperMode = isDeveloperMode,
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
+                isAutoReconnectEnabled = isAutoReconnectEnabled,
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
@@ -392,6 +394,13 @@ class AirSyncViewModel(
         }
     }
 
+    fun setAutoReconnectEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
+        viewModelScope.launch {
+            repository.setAutoReconnectEnabled(enabled)
+        }
+    }
+
     fun manualSyncAppIcons(context: Context) {
         _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
 
@@ -498,6 +507,14 @@ class AirSyncViewModel(
 
                         // Update persistent status notification
                         pushStatusNotification(context)
+
+                        // If we became disconnected due to network change, and have a reconnect target, kick auto-reconnect
+                        val hasTarget = hasNetworkAwareMappingForLastDevice() != null
+                        val manual = repository.getUserManuallyDisconnected().first()
+                        val autoOn = repository.getAutoReconnectEnabled().first()
+                        if (!uiState.value.isConnected && hasTarget && autoOn && !manual) {
+                            WebSocketUtil.requestAutoReconnect(context)
+                        }
                     }
                 }
             } catch (_: Exception) {

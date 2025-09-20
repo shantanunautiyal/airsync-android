@@ -27,6 +27,8 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 @Composable
 fun LastConnectedDeviceCard(
     device: ConnectedDevice,
+    isAutoReconnectEnabled: Boolean,
+    onToggleAutoReconnect: (Boolean) -> Unit,
     onQuickConnect: () -> Unit,
 ) {
     Card(
@@ -71,6 +73,18 @@ fun LastConnectedDeviceCard(
             }
 
             Text("${device.ipAddress}:${device.port}", style = MaterialTheme.typography.bodyMedium)
+
+            // Auto-reconnect toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Auto reconnect", style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = isAutoReconnectEnabled, onCheckedChange = onToggleAutoReconnect)
+            }
 
             // Display device model and type if available
             device.model?.let { model ->

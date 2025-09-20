@@ -26,6 +26,11 @@ object WebSocketUtil {
     private var isSocketOpen = AtomicBoolean(false)
     private var handshakeCompleted = AtomicBoolean(false)
     private var handshakeTimeoutJob: Job? = null
+    // Auto-reconnect machinery
+    private var autoReconnectJob: Job? = null
+    private var autoReconnectActive = AtomicBoolean(false)
+    private var autoReconnectStartTime: Long = 0L
+    private var autoReconnectAttempts: Int = 0
 
     // Callback for connection status changes
     private var onConnectionStatusChanged: ((Boolean) -> Unit)? = null
@@ -69,6 +74,11 @@ object WebSocketUtil {
         if (isConnecting.get() || isConnected.get()) {
             Log.d(TAG, "Already connected or connecting")
             return
+        }
+
+        // If user initiates a manual attempt, stop any auto-reconnect loop
+        if (manualAttempt) {
+            cancelAutoReconnect()
         }
 
         // Validate local network IP
@@ -167,6 +177,11 @@ object WebSocketUtil {
                             isConnected.set(true)
                             isConnecting.set(false)
                             handshakeTimeoutJob?.cancel()
+                            // Clear manual-disconnect flag on successful connect so future non-manual disconnects can auto-reconnect
+                            try {
+                                val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
+                                kotlinx.coroutines.runBlocking { ds.setUserManuallyDisconnected(false) }
+                            } catch (_: Exception) { }
                             try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
                             onConnectionStatusChanged?.invoke(true)
                             updatePersistentNotification(context, isConnected = true, isConnecting = false)
@@ -198,6 +213,8 @@ object WebSocketUtil {
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
+                    // Attempt auto-reconnect if allowed
+                    tryStartAutoReconnect(context)
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -216,6 +233,8 @@ object WebSocketUtil {
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
+                    // Attempt auto-reconnect if allowed
+                    tryStartAutoReconnect(context)
                 }
             }
 
@@ -282,6 +301,8 @@ object WebSocketUtil {
 
         // Notify listeners about the disconnection
         notifyConnectionStatusListeners(false)
+        // Stop any auto-reconnect in progress
+        cancelAutoReconnect()
     }
 
     fun cleanup() {
@@ -320,14 +341,14 @@ object WebSocketUtil {
                 } else false
                 val manual = ds.getUserManuallyDisconnected().first()
 
-                // Show only when actively connecting; otherwise hide
-                if (!isConnected && isConnecting && !manual) {
+                // Show only when actively connecting or auto-reconnecting; otherwise hide
+                if (!isConnected && (isConnecting || autoReconnectActive.get()) && !manual) {
                     NotificationUtil.showConnectionStatusNotification(
                         context = context,
                         deviceName = deviceName,
                         isConnected = isConnected,
                         isConnecting = isConnecting,
-                        isAutoReconnecting = false,
+                        isAutoReconnecting = autoReconnectActive.get(),
                         hasReconnectTarget = hasReconnectTarget
                     )
                 } else {
@@ -365,5 +386,121 @@ object WebSocketUtil {
         connectionStatusListeners.forEach { listener ->
             listener(isConnected)
         }
+    }
+
+    // Public API to cancel auto reconnect (from Stop action)
+    fun cancelAutoReconnect() {
+        autoReconnectActive.set(false)
+        autoReconnectJob?.cancel()
+        autoReconnectJob = null
+        autoReconnectAttempts = 0
+        autoReconnectStartTime = 0L
+    }
+
+    fun isAutoReconnecting(): Boolean = autoReconnectActive.get()
+
+    private fun tryStartAutoReconnect(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
+                val manual = ds.getUserManuallyDisconnected().first()
+                val autoEnabled = ds.getAutoReconnectEnabled().first()
+                // Only start when toggle is on and disconnect wasn't manual
+                if (manual || !autoEnabled) return@launch
+
+                // Need a reconnect target
+                val last = ds.getLastConnectedDevice().first()
+                val ourIp = com.sameerasw.airsync.utils.DeviceInfoUtil.getWifiIpAddress(context)
+                val all = ds.getAllNetworkDeviceConnections().first()
+                val target = if (ourIp != null && last != null) {
+                    all.firstOrNull { it.deviceName == last.name && it.getClientIpForNetwork(ourIp) != null }
+                } else null
+                if (target == null || ourIp == null) return@launch
+
+                val ip = target.getClientIpForNetwork(ourIp) ?: return@launch
+                val port = target.port.toIntOrNull() ?: 6996
+
+                if (autoReconnectActive.get()) return@launch // already running
+                autoReconnectActive.set(true)
+                autoReconnectAttempts = 0
+                autoReconnectStartTime = System.currentTimeMillis()
+
+                // Show notification as auto-reconnecting (Stop button)
+                NotificationUtil.showConnectionStatusNotification(
+                    context = context,
+                    deviceName = target.deviceName,
+                    isConnected = false,
+                    isConnecting = false,
+                    isAutoReconnecting = true,
+                    hasReconnectTarget = true
+                )
+
+                autoReconnectJob?.cancel()
+                autoReconnectJob = CoroutineScope(Dispatchers.IO).launch {
+                    val maxDurationMs = 10 * 60 * 1000L // 10 minutes
+                    while (autoReconnectActive.get()) {
+                        val elapsed = System.currentTimeMillis() - autoReconnectStartTime
+                        if (elapsed > maxDurationMs) {
+                            Log.d(TAG, "Auto-reconnect time window exceeded, stopping")
+                            cancelAutoReconnect()
+                            NotificationUtil.hideConnectionStatusNotification(context)
+                            break
+                        }
+
+                        autoReconnectAttempts++
+                        val delayMs = if (autoReconnectAttempts <= 6) 10_000L else 60_000L
+
+                        // Attempt connection
+                        Log.d(TAG, "Auto-reconnect attempt #$autoReconnectAttempts ...")
+                        connect(
+                            context = context,
+                            ipAddress = ip,
+                            port = port,
+                            symmetricKey = target.symmetricKey,
+                            manualAttempt = false,
+                            onConnectionStatus = { connected ->
+                                if (connected) {
+                                    // success: stop auto reconnect
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        try { ds.updateNetworkDeviceLastConnected(target.deviceName, System.currentTimeMillis()) } catch (_: Exception) {}
+                                        cancelAutoReconnect()
+                                        NotificationUtil.hideConnectionStatusNotification(context)
+                                    }
+                                } else {
+                                    // keep going
+                                }
+                            }
+                        )
+
+                        // Wait for next attempt unless canceled or connected
+                        var waited = 0L
+                        val step = 500L
+                        while (autoReconnectActive.get() && !isConnected.get() && waited < delayMs) {
+                            delay(step)
+                            waited += step
+                        }
+                        if (!autoReconnectActive.get() || isConnected.get()) break
+                        // update notification to show still auto reconnecting
+                        NotificationUtil.showConnectionStatusNotification(
+                            context = context,
+                            deviceName = target.deviceName,
+                            isConnected = false,
+                            isConnecting = false,
+                            isAutoReconnecting = true,
+                            hasReconnectTarget = true
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting auto-reconnect: ${e.message}")
+            }
+        }
+    }
+
+    // Public wrapper to request auto-reconnect from app logic (e.g., network changes)
+    fun requestAutoReconnect(context: Context) {
+        // Only if not already connected or connecting
+        if (isConnected.get() || isConnecting.get()) return
+        tryStartAutoReconnect(context)
     }
 }
