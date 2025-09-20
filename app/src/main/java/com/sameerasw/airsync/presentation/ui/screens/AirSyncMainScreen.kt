@@ -134,6 +134,7 @@ fun AirSyncMainScreen(
             ipAddress = uiState.ipAddress,
             port = uiState.port.toIntOrNull() ?: 6996,
             symmetricKey = uiState.symmetricKey,
+            manualAttempt = true,
             onConnectionStatus = { connected ->
                 scope.launch(Dispatchers.Main) {
                     viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)

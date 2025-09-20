@@ -36,13 +36,26 @@ object WebSocketUtil {
             .build()
     }
 
+    // Manual connect listeners are invoked when a user-initiated connection starts (not auto reconnect)
+    private val manualConnectListeners = mutableSetOf<() -> Unit>()
+
+    fun registerManualConnectListener(listener: () -> Unit) {
+        manualConnectListeners.add(listener)
+    }
+
+    fun unregisterManualConnectListener(listener: () -> Unit) {
+        manualConnectListeners.remove(listener)
+    }
+
     fun connect(
         context: Context,
         ipAddress: String,
         port: Int,
         symmetricKey: String?,
         onConnectionStatus: ((Boolean) -> Unit)? = null,
-        onMessage: ((String) -> Unit)? = null
+        onMessage: ((String) -> Unit)? = null,
+        // Distinguish between manual user triggered connections and auto reconnect attempts
+        manualAttempt: Boolean = true
     ) {
         if (isConnecting.get() || isConnected.get()) {
             Log.d(TAG, "Already connected or connecting")
@@ -57,6 +70,13 @@ object WebSocketUtil {
         }
 
         isConnecting.set(true)
+
+        // Notify listeners that a manual connection attempt has begun so they can cancel auto-reconnect loops
+        if (manualAttempt) {
+            manualConnectListeners.forEach { listener ->
+                try { listener() } catch (e: Exception) { Log.w(TAG, "ManualConnectListener error: ${e.message}") }
+            }
+        }
         currentIpAddress = ipAddress
         currentPort = port
         currentSymmetricKey = symmetricKey?.let { CryptoUtil.decodeKey(it) }

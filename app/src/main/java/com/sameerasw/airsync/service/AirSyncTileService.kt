@@ -71,8 +71,9 @@ class AirSyncTileService : TileService() {
             val isConnected = WebSocketUtil.isConnected()
 
             if (isConnected) {
-                WebSocketUtil.disconnect()
+                // Mark manual disconnect BEFORE disconnecting so listeners won't schedule auto-reconnect
                 dataStoreManager.setUserManuallyDisconnected(true)
+                WebSocketUtil.disconnect()
                 updateTileState()
             } else {
                 dataStoreManager.setUserManuallyDisconnected(false)
@@ -99,6 +100,7 @@ class AirSyncTileService : TileService() {
                     ipAddress = lastDevice.ipAddress,
                     port = lastDevice.port.toIntOrNull() ?: 6996,
                     symmetricKey = lastDevice.symmetricKey,
+                    manualAttempt = true,
                     onConnectionStatus = { connected ->
                         serviceScope.launch {
                             updateTileState()
