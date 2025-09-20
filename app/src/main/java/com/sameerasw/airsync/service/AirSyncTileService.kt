@@ -24,6 +24,7 @@ class AirSyncTileService : TileService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var dataStoreManager: DataStoreManager
+    private var pollJob: kotlinx.coroutines.Job? = null
 
     companion object {
         private const val TAG = "AirSyncTileService"
@@ -62,6 +63,21 @@ class AirSyncTileService : TileService() {
         serviceScope.launch {
             updateTileState()
         }
+
+        // Start a lightweight poll while listening so tile reflects auto-reconnect transitions
+        pollJob?.cancel()
+        pollJob = serviceScope.launch {
+            while (true) {
+                try { updateTileState() } catch (_: Exception) {}
+                kotlinx.coroutines.delay(600)
+            }
+        }
+    }
+
+    override fun onStopListening() {
+        super.onStopListening()
+        pollJob?.cancel()
+        pollJob = null
     }
 
     override fun onClick() {
@@ -69,8 +85,14 @@ class AirSyncTileService : TileService() {
 
         serviceScope.launch {
             val isConnected = WebSocketUtil.isConnected()
+            val isAuto = WebSocketUtil.isAutoReconnecting()
 
-            if (isConnected) {
+            if (isAuto && !isConnected) {
+                // Stop auto-reconnect and mark manual to avoid immediate restart
+                WebSocketUtil.stopAutoReconnect(this@AirSyncTileService)
+                dataStoreManager.setUserManuallyDisconnected(true)
+                updateTileState()
+            } else if (isConnected) {
                 // Mark manual disconnect BEFORE disconnecting so listeners won't schedule auto-reconnect
                 dataStoreManager.setUserManuallyDisconnected(true)
                 WebSocketUtil.disconnect()
@@ -145,6 +167,8 @@ class AirSyncTileService : TileService() {
     private suspend fun updateTileState() {
         try {
             val isConnected = WebSocketUtil.isConnected()
+            val isAuto = WebSocketUtil.isAutoReconnecting()
+            val isConnecting = WebSocketUtil.isConnecting()
             val lastDevice = dataStoreManager.getLastConnectedDevice().first()
 
             // Read latest Mac device status for battery/charging
@@ -154,7 +178,12 @@ class AirSyncTileService : TileService() {
                 val dynamicIcon = com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(lastDevice)
                 icon = Icon.createWithResource(this@AirSyncTileService, dynamicIcon)
 
-                if (isConnected && lastDevice != null) {
+                if (isAuto) {
+                    // Auto-reconnect in progress or waiting
+                    state = if (isConnecting) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+                    label = "Trying to reconnect"
+                    subtitle = "Tap to stop"
+                } else if (isConnected && lastDevice != null) {
                     // Connected state
                     state = Tile.STATE_ACTIVE
                     label = lastDevice.name

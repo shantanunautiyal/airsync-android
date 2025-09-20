@@ -142,9 +142,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
             ACTION_STOP_RECONNECT -> {
                 scope.launch {
                     try {
-                        // Cancel any auto-reconnect loops and hide connecting notification
+                        // Cancel any auto-reconnect loops
                         WebSocketUtil.cancelAutoReconnect()
-                        NotificationUtil.hideConnectionStatusNotification(context)
                         // Mark manual so it won't auto-retry until a non-manual disconnect happens
                         DataStoreManager(context).setUserManuallyDisconnected(true)
                     } catch (e: Exception) {

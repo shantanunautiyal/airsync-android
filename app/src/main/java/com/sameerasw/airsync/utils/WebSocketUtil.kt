@@ -326,6 +326,10 @@ object WebSocketUtil {
         return isConnected.get()
     }
 
+    fun isConnecting(): Boolean {
+        return isConnecting.get()
+    }
+
     private fun updatePersistentNotification(context: Context, isConnected: Boolean, isConnecting: Boolean) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -341,14 +345,14 @@ object WebSocketUtil {
                 } else false
                 val manual = ds.getUserManuallyDisconnected().first()
 
-                // Show only when actively connecting or auto-reconnecting; otherwise hide
-                if (!isConnected && (isConnecting || autoReconnectActive.get()) && !manual) {
+                // Show only when actively connecting (manual/normal). During auto-reconnect we rely on QS tile only.
+                if (!isConnected && isConnecting && !manual) {
                     NotificationUtil.showConnectionStatusNotification(
                         context = context,
                         deviceName = deviceName,
                         isConnected = isConnected,
                         isConnecting = isConnecting,
-                        isAutoReconnecting = autoReconnectActive.get(),
+                        isAutoReconnecting = false,
                         hasReconnectTarget = hasReconnectTarget
                     )
                 } else {
@@ -396,8 +400,12 @@ object WebSocketUtil {
         autoReconnectAttempts = 0
         autoReconnectStartTime = 0L
     }
-
     fun isAutoReconnecting(): Boolean = autoReconnectActive.get()
+
+    fun stopAutoReconnect(context: Context) {
+        cancelAutoReconnect()
+        try { NotificationUtil.hideConnectionStatusNotification(context) } catch (_: Exception) {}
+    }
 
     private fun tryStartAutoReconnect(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -425,16 +433,6 @@ object WebSocketUtil {
                 autoReconnectAttempts = 0
                 autoReconnectStartTime = System.currentTimeMillis()
 
-                // Show notification as auto-reconnecting (Stop button)
-                NotificationUtil.showConnectionStatusNotification(
-                    context = context,
-                    deviceName = target.deviceName,
-                    isConnected = false,
-                    isConnecting = false,
-                    isAutoReconnecting = true,
-                    hasReconnectTarget = true
-                )
-
                 autoReconnectJob?.cancel()
                 autoReconnectJob = CoroutineScope(Dispatchers.IO).launch {
                     val maxDurationMs = 10 * 60 * 1000L // 10 minutes
@@ -443,7 +441,6 @@ object WebSocketUtil {
                         if (elapsed > maxDurationMs) {
                             Log.d(TAG, "Auto-reconnect time window exceeded, stopping")
                             cancelAutoReconnect()
-                            NotificationUtil.hideConnectionStatusNotification(context)
                             break
                         }
 
@@ -464,7 +461,6 @@ object WebSocketUtil {
                                     CoroutineScope(Dispatchers.IO).launch {
                                         try { ds.updateNetworkDeviceLastConnected(target.deviceName, System.currentTimeMillis()) } catch (_: Exception) {}
                                         cancelAutoReconnect()
-                                        NotificationUtil.hideConnectionStatusNotification(context)
                                     }
                                 } else {
                                     // keep going
@@ -480,15 +476,6 @@ object WebSocketUtil {
                             waited += step
                         }
                         if (!autoReconnectActive.get() || isConnected.get()) break
-                        // update notification to show still auto reconnecting
-                        NotificationUtil.showConnectionStatusNotification(
-                            context = context,
-                            deviceName = target.deviceName,
-                            isConnected = false,
-                            isConnecting = false,
-                            isAutoReconnecting = true,
-                            hasReconnectTarget = true
-                        )
                     }
                 }
             } catch (e: Exception) {

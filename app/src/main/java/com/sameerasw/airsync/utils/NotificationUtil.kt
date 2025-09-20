@@ -72,7 +72,6 @@ object NotificationUtil {
 
         val title = deviceName ?: "AirSync"
         val content = when {
-            isAutoReconnecting -> "Trying to reconnect to $title..."
             isConnecting -> "Connecting..."
             isConnected -> "Connected"
             else -> "Disconnected"
@@ -86,16 +85,6 @@ object NotificationUtil {
                     101,
                     Intent(context, NotificationActionReceiver::class.java).apply {
                         action = NotificationActionReceiver.ACTION_DISCONNECT
-                    },
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            }
-            isAutoReconnecting -> {
-                "Stop" to PendingIntent.getBroadcast(
-                    context,
-                    106,
-                    Intent(context, NotificationActionReceiver::class.java).apply {
-                        action = NotificationActionReceiver.ACTION_STOP_RECONNECT
                     },
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
@@ -128,7 +117,7 @@ object NotificationUtil {
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setSmallIcon(smallIcon)
-            .setOngoing(isConnecting || isAutoReconnecting)
+            .setOngoing(isConnecting)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(false)
