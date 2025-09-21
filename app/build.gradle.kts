@@ -55,6 +55,7 @@ dependencies {
 
     implementation ("androidx.compose.material3:material3:1.5.0-alpha03")
     implementation("androidx.compose.material:material-icons-core:1.7.8")
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     // DataStore for state persistence
     implementation("androidx.datastore:datastore-preferences:1.1.1")
