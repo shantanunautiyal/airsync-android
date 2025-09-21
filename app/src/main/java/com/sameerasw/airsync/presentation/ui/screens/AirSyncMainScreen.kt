@@ -3,6 +3,7 @@ package com.sameerasw.airsync.presentation.ui.screens
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -26,8 +27,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.R
@@ -258,9 +262,11 @@ fun AirSyncMainScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             val items = listOf("Connect", "Settings")
-            val selectedIcons = listOf(Icons.Filled.Home, Icons.Filled.Settings)
-            val unselectedIcons = listOf(Icons.Outlined.Home, Icons.Outlined.Settings)
-            NavigationBar(windowInsets = WindowInsets(0, 0, 0, 0)) {
+            val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.Settings)
+            val unselectedIcons = listOf(Icons.Outlined.Phonelink, Icons.Outlined.Settings)
+            NavigationBar(
+                windowInsets = NavigationBarDefaults.windowInsets
+            ) {
                 items.forEachIndexed { index, item ->
                     NavigationBarItem(
                         icon = {
