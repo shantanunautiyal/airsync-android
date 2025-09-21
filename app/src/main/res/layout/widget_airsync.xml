@@ -9,17 +9,70 @@
     android:clickable="true"
     android:gravity="center_horizontal">
 
-    <!-- Device image takes flexible space at top -->
-    <ImageView
-        android:id="@+id/widget_device_image"
+    <!-- Device image with overlay hint -->
+    <FrameLayout
+        android:id="@+id/widget_image_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:contentDescription="Device image"
-        android:src="@drawable/ic_laptop_24"
-        android:scaleType="fitCenter"
-        android:adjustViewBounds="true"
-        android:padding="0dp" />
+        android:layout_weight="1">
+
+        <ImageView
+            android:id="@+id/widget_device_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="Device image"
+            android:src="@drawable/ic_laptop_24"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:padding="0dp" />
+
+        <TextView
+            android:id="@+id/widget_tap_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to reconnect"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:textColor="@color/widget_primary_text"
+            android:background="@drawable/widget_tap_hint_bg"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Battery overlay (shown when connected) -->
+        <LinearLayout
+            android:id="@+id/widget_battery_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_gravity="center"
+            android:gravity="center_vertical"
+            android:background="@drawable/widget_tap_hint_bg"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/widget_battery_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:adjustViewBounds="true"
+                android:scaleType="centerInside"
+                android:tint="@color/widget_primary_text"
+                android:src="@drawable/outline_battery_full_24" />
+
+            <TextView
+                android:id="@+id/widget_battery_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="100%"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:textColor="@color/widget_primary_text" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- Header: Name and status -->
     <LinearLayout
@@ -28,8 +81,7 @@
         android:baselineAligned="false"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="8dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -47,46 +99,26 @@
                 android:textColor="@color/widget_primary_text" />
 
             <TextView
-                android:id="@+id/widget_status"
+                android:id="@+id/widget_media_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Disconnected"
+                android:text=""
                 android:textSize="12sp"
-                android:textColor="@color/widget_secondary_text" />
+                android:textColor="@color/widget_secondary_text"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/widget_secondary_line"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="@color/widget_secondary_text"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Actions Row -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:paddingTop="4dp">
-
-        <TextView
-            android:id="@+id/widget_btn_disconnect"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Disconnect"
-            android:textStyle="bold"
-            android:textColor="@color/widget_on_primary"
-            android:background="@drawable/widget_button_primary"
-            android:visibility="gone"
-            android:clickable="true" />
-
-        <TextView
-            android:id="@+id/widget_btn_reconnect"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="Reconnect"
-            android:textStyle="bold"
-            android:textColor="@color/widget_primary_text"
-            android:background="@drawable/widget_button_secondary"
-            android:clickable="true" />
-    </LinearLayout>
+    <!-- Actions moved to image click -->
 </LinearLayout>

@@ -13,6 +13,7 @@ import com.sameerasw.airsync.R
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 
@@ -105,19 +106,48 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             // Device image (large preview) and name
             val previewRes = DevicePreviewResolver.getPreviewRes(lastDevice)
             views.setImageViewResource(R.id.widget_device_image, previewRes)
+            // Dim the device image when not connected (including while connecting)
+            val alphaFloat = if (isConnected) 1.0f else 0.6f
+            val alphaInt = if (isConnected) 255 else 153 // 0.6 * 255 ≈ 153
+            // Apply both view alpha and image alpha for broader device compatibility
+            views.setFloat(R.id.widget_device_image, "setAlpha", alphaFloat)
+            views.setInt(R.id.widget_device_image, "setImageAlpha", alphaInt)
             views.setTextViewText(R.id.widget_device_name, lastDevice?.name ?: "AirSync")
 
-            // Status
-            val statusText = when {
-                isConnecting -> "Connecting…"
-                isConnected -> "Connected"
-                lastDevice != null -> "Disconnected"
-                else -> "Not setup"
+            // Read persisted Mac status snapshot
+            val macStatus = runBlocking { DataStoreManager(context).getMacStatusForWidget().first() }
+
+            // Battery overlay and secondary line
+            if (isConnected && macStatus.batteryLevel != null) {
+                val pct = macStatus.batteryLevel.coerceIn(0, 100)
+                views.setTextViewText(R.id.widget_battery_text, "$pct%")
+                views.setViewVisibility(R.id.widget_battery_container, android.view.View.VISIBLE)
+                // Hide secondary line when connected (we will use media info instead)
+                views.setViewVisibility(R.id.widget_secondary_line, android.view.View.GONE)
+            } else {
+                views.setViewVisibility(R.id.widget_battery_container, android.view.View.GONE)
+                val secondaryText = when {
+                    lastDevice != null -> {
+                        val lastSeenMs = lastDevice.lastConnected
+                        if (lastSeenMs > 0) formatLastSeen(lastSeenMs) else "Last seen: unknown"
+                    }
+                    else -> ""
+                }
+                views.setTextViewText(R.id.widget_secondary_line, secondaryText)
+                views.setViewVisibility(R.id.widget_secondary_line, if (secondaryText.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE)
             }
-            views.setTextViewText(R.id.widget_status, statusText)
+
+            // Media info when connected: show title - artist if present
+            if (isConnected && !macStatus.title.isNullOrBlank()) {
+                val mediaLine = if (!macStatus.artist.isNullOrBlank()) "${macStatus.title} — ${macStatus.artist}" else macStatus.title
+                views.setTextViewText(R.id.widget_media_info, mediaLine)
+                views.setViewVisibility(R.id.widget_media_info, android.view.View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.widget_media_info, android.view.View.GONE)
+            }
 
 
-            // Open app when tapping header area
+            // Open app when tapping outer container (fallback/default)
             val openAppIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
@@ -127,26 +157,20 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_container, openAppPendingIntent)
 
-            // Buttons visibility and actions
-            if (isConnected) {
-                // Show Disconnect
-                views.setViewVisibility(R.id.widget_btn_disconnect, 0)
-                views.setViewVisibility(R.id.widget_btn_reconnect, 8)
+            // Toggle overlay hint visibility: show when can reconnect (disconnected, have last device, not currently connecting)
+            val showTapHint = (!isConnected && lastDevice != null && !isConnecting)
+            views.setViewVisibility(
+                R.id.widget_tap_hint,
+                if (showTapHint) android.view.View.VISIBLE else android.view.View.GONE
+            )
 
-                val disconnectIntent = Intent(context, AirSyncWidgetProvider::class.java).apply {
-                    action = ACTION_DISCONNECT
+            // Make the device image tap only reconnect (no disconnect action from widget)
+            when {
+                isConnected -> {
+                    // When connected, tapping image opens the app (no disconnect from widget)
+                    views.setOnClickPendingIntent(R.id.widget_device_image, openAppPendingIntent)
                 }
-                val disconnectPI = PendingIntent.getBroadcast(
-                    context, 1, disconnectIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_btn_disconnect, disconnectPI)
-            } else {
-                // Show Reconnect if we have a device
-                views.setViewVisibility(R.id.widget_btn_disconnect, 8)
-                val showReconnect = (lastDevice != null)
-                views.setViewVisibility(R.id.widget_btn_reconnect, if (showReconnect) 0 else 8)
-                if (showReconnect) {
+                !isConnected && lastDevice != null && !isConnecting -> {
                     val reconnectIntent = Intent(context, AirSyncWidgetProvider::class.java).apply {
                         action = ACTION_RECONNECT
                     }
@@ -154,7 +178,11 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
                         context, 2, reconnectIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                     )
-                    views.setOnClickPendingIntent(R.id.widget_btn_reconnect, reconnectPI)
+                    views.setOnClickPendingIntent(R.id.widget_device_image, reconnectPI)
+                }
+                else -> {
+                    // While connecting or if no device is saved, just open the app
+                    views.setOnClickPendingIntent(R.id.widget_device_image, openAppPendingIntent)
                 }
             }
 
@@ -167,4 +195,28 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
     }
 
     // (no additional companion objects)
+
+    private fun formatLastSeen(lastSeenMs: Long): String {
+        val now = System.currentTimeMillis()
+        val diff = (now - lastSeenMs).coerceAtLeast(0)
+        val minute = 60_000L
+        val hour = 60 * minute
+        val day = 24 * hour
+        val text = when {
+            diff < minute -> "Last seen just now"
+            diff < hour -> {
+                val m = (diff / minute).toInt()
+                "Last seen ${m} min ago"
+            }
+            diff < day -> {
+                val h = (diff / hour).toInt()
+                "Last seen ${h} hr ago"
+            }
+            else -> {
+                val d = (diff / day).toInt()
+                "Last seen ${d} day${if (d == 1) "" else "s"} ago"
+            }
+        }
+        return text
+    }
 }
