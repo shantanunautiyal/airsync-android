@@ -78,10 +78,10 @@ fun ConnectionStatusCard(
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            gradientColor.copy(alpha = 0.2f),
+                            gradientColor.copy(alpha = 0.3f),
                             Color.Transparent
                         ),
-                        start = Offset(0f, 0f),
+                        start = Offset(0f, 1f),
                         end = Offset.Infinite
                     )
                 )
@@ -109,8 +109,8 @@ fun ConnectionStatusCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Connected to ${connectedDevice.name}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "${connectedDevice.name}",
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
