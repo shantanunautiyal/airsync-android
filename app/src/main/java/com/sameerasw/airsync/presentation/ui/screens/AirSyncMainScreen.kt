@@ -19,8 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -50,6 +49,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCa
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -167,7 +167,7 @@ fun AirSyncMainScreen(
                     viewModel.setResponse("Received: $response")
                     // Handle clipboard updates from desktop
                     try {
-                        val json = org.json.JSONObject(response)
+                        val json = JSONObject(response)
                         if (json.optString("type") == "clipboardUpdate") {
                             val data = json.optJSONObject("data")
                             val text = data?.optString("text")
@@ -253,14 +253,14 @@ fun AirSyncMainScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
 
         AnimatedVisibility(
             visible = !uiState.isConnected,
@@ -294,7 +294,8 @@ fun AirSyncMainScreen(
             isConnecting = uiState.isConnecting,
             onDisconnect = { disconnect() },
             connectedDevice = uiState.lastConnectedDevice,
-            lastConnected = uiState.lastConnectedDevice != null
+            lastConnected = uiState.lastConnectedDevice != null,
+            uiState = uiState,
         )
 
         AnimatedVisibility(
