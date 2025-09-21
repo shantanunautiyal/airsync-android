@@ -89,28 +89,7 @@ fun DeveloperModeCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-
-                // Response Display
-                if (uiState.response.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
-                                MaterialTheme.colorScheme.errorContainer
-                            else MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = uiState.response,
-                            modifier = Modifier.padding(16.dp),
-                            color = if (uiState.response.startsWith("Error") || uiState.response.startsWith("Failed"))
-                                MaterialTheme.colorScheme.onErrorContainer
-                            else MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
+                // Removed preview/response display to avoid crashes from large/encoded payloads
             }
         }
     }

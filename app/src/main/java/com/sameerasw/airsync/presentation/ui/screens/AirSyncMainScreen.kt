@@ -11,6 +11,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +32,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
@@ -44,6 +48,7 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
@@ -52,7 +57,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCa
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
-import com.sameerasw.airsync.presentation.ui.components.cards.QrScannerRow
+// Removed QrScannerRow; functionality moved to FAB
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
@@ -88,6 +93,10 @@ fun AirSyncMainScreen(
     val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+    val connectScrollState = rememberScrollState()
+    val settingsScrollState = rememberScrollState()
+    var fabVisible by remember { mutableStateOf(true) }
+    var fabExpanded by remember { mutableStateOf(true) }
 
     // Track if we've already processed the QR code dialog to prevent re-showing
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
@@ -120,6 +129,26 @@ fun AirSyncMainScreen(
         if (!uiState.showPermissionDialog) {
             viewModel.refreshPermissions(context)
         }
+    }
+
+    // Hide FAB on scroll down, show on scroll up for the active tab
+    LaunchedEffect(selectedTab) {
+        val state = if (selectedTab == 0) connectScrollState else settingsScrollState
+        var last = state.value
+        snapshotFlow { state.value }.collect { value ->
+            val delta = value - last
+            if (delta > 2) fabVisible = false
+            else if (delta < -2) fabVisible = true
+            last = value
+        }
+    }
+
+    // Expand FAB on first launch and whenever variant changes (connect <-> disconnect), then collapse after 5s
+    LaunchedEffect(uiState.isConnected) {
+        fabExpanded = true
+        // Give users a hint for a short period, then collapse to icon-only
+        delay(5000)
+        fabExpanded = false
     }
 
     // Start/stop clipboard sync based on connection status and settings
@@ -260,6 +289,28 @@ fun AirSyncMainScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        if (uiState.isConnected) {
+                            disconnect()
+                        } else {
+                            launchScanner(context)
+                        }
+                    },
+                    icon = {
+                        if (uiState.isConnected) {
+                            Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
+                        } else {
+                            Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
+                        }
+                    },
+                    text = { Text(text = if (uiState.isConnected) "Disconnect" else "Scan to connect") },
+                    expanded = fabExpanded
+                )
+            }
+        },
         bottomBar = {
             val items = listOf("Connect", "Settings")
             val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.Settings)
@@ -290,22 +341,11 @@ fun AirSyncMainScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(bottom = innerPadding.calculateBottomPadding())
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(connectScrollState)
                         .padding(horizontal = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    AnimatedVisibility(
-                        visible = !uiState.isConnected,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        QrScannerRow(
-                            onLaunchScanner = {
-                                launchScanner(context)
-                            }
-                        )
-                    }
 
                     // Permission Status Card
                     AnimatedVisibility(
@@ -381,6 +421,8 @@ fun AirSyncMainScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
             else -> {
@@ -389,7 +431,7 @@ fun AirSyncMainScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(bottom = innerPadding.calculateBottomPadding())
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(settingsScrollState)
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -519,6 +561,8 @@ fun AirSyncMainScreen(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
