@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
                                 IconButton(
                                     onClick = {
                                         val airSyncPlusUrl =
-                                            "https://github.com/sameerasw/airsync-android/issues/new"
+                                            "https://airsync.notion.site"
                                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
                                         startActivity(intent)
                                     }
