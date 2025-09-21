@@ -53,6 +53,12 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
+    // Material Components (XML themes: Theme.Material3.*)
+    implementation("com.google.android.material:material:1.12.0")
+
+    // Android 12+ SplashScreen API with backward compatibility attributes
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     implementation ("androidx.compose.material3:material3:1.5.0-alpha03")
     implementation("androidx.compose.material:material-icons-core:1.7.8")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")

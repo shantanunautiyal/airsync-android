@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ splash screen colors -->
+    <style name="Theme.AirSync.Splash" parent="Theme.SplashScreen">
+        <!-- Prevent any system bar/title from showing -->
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowSplashScreenBackground">@color/app_window_background</item>
+        <!-- Optional: use app icon for center mark; can be adjusted -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.AirSync</item>
+    </style>
+</resources>
