@@ -2,6 +2,7 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.util.Log
+import com.sameerasw.airsync.widget.AirSyncWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,6 +91,8 @@ object WebSocketUtil {
 
         isConnecting.set(true)
         handshakeCompleted.set(false)
+    // Update widgets to show "Connecting…" immediately
+    try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
 
         // Notify listeners that a manual connection attempt has begun so they can cancel auto-reconnect loops
         if (manualAttempt) {
@@ -149,6 +152,7 @@ object WebSocketUtil {
                                 onConnectionStatusChanged?.invoke(false)
                                 notifyConnectionStatusListeners(false)
                                 onHandshakeTimeout?.invoke()
+                                try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                             }
                         } catch (_: Exception) {}
                     }
@@ -169,6 +173,7 @@ object WebSocketUtil {
                         } catch (_: Exception) { false }
                         if (handshakeOk) {
                             handshakeCompleted.set(true)
+                                try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                             isConnected.set(true)
                             isConnecting.set(false)
                             handshakeTimeoutJob?.cancel()
@@ -180,6 +185,7 @@ object WebSocketUtil {
                             try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
                             onConnectionStatusChanged?.invoke(true)
                             notifyConnectionStatusListeners(true)
+                            try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                         }
                     }
 
@@ -208,6 +214,7 @@ object WebSocketUtil {
                     notifyConnectionStatusListeners(false)
                     // Attempt auto-reconnect if allowed
                     tryStartAutoReconnect(context)
+                    try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -227,6 +234,7 @@ object WebSocketUtil {
                     notifyConnectionStatusListeners(false)
                     // Attempt auto-reconnect if allowed
                     tryStartAutoReconnect(context)
+                    try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                 }
             }
 
@@ -294,6 +302,10 @@ object WebSocketUtil {
         notifyConnectionStatusListeners(false)
         // Stop any auto-reconnect in progress
         cancelAutoReconnect()
+        // Update widgets to reflect new state
+        context?.let {
+            try { AirSyncWidgetProvider.updateAllWidgets(it) } catch (_: Exception) {}
+        }
     }
 
     fun cleanup() {
