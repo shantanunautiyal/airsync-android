@@ -15,7 +15,8 @@ object QuickSettingsUtil {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val statusBarManager = context.getSystemService(StatusBarManager::class.java)
             val componentName = ComponentName(context, AirSyncTileService::class.java)
-            val icon = Icon.createWithResource(context, R.drawable.ic_laptop_24)
+            val iconRes = DeviceIconResolver.getLastDeviceIconRes(context)
+            val icon = Icon.createWithResource(context, iconRes)
 
             statusBarManager?.requestAddTileService(
                 componentName,

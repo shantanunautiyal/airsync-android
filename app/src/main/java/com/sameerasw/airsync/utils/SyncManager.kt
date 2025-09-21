@@ -130,8 +130,7 @@ object SyncManager {
             try {
                 val dataStoreManager = DataStoreManager(context)
 
-                // 1. Send device info with wallpaper
-                delay(500)
+                // 1. Send lightweight device info immediately (no wallpaper) to trigger macInfo
 
                 // Prefer the persisted device name set in the app. Fall back to system device name only if empty.
                 val persistedName = dataStoreManager.getDeviceName().first().ifBlank { null }
@@ -148,18 +147,28 @@ object SyncManager {
                 val version = context.packageManager
                     .getPackageInfo(context.packageName, 0).versionName ?: "2.0.0"
 
-
-                // Get wallpaper as base64
-                val wallpaperBase64 = WallpaperUtil.getWallpaperAsBase64(context)
-                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version,wallpaperBase64)
-
-                if (WebSocketUtil.sendMessage(deviceInfoJson)) {
-                    Log.d(TAG, "Device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}")
+                val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version)
+                if (WebSocketUtil.sendMessage(liteDeviceInfoJson)) {
+                    Log.d(TAG, "Lite device info sent to trigger macInfo")
                 } else {
-                    Log.e(TAG, "Failed to send device info")
+                    Log.e(TAG, "Failed to send lite device info")
                 }
 
-                delay(250)
+                // Optionally send full device info with wallpaper a bit later, but don't block handshake
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        delay(1500)
+                        val wallpaperBase64 = try { WallpaperUtil.getWallpaperAsBase64(context) } catch (_: Exception) { null }
+                        val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, wallpaperBase64)
+                        if (WebSocketUtil.sendMessage(fullDeviceInfoJson)) {
+                            Log.d(TAG, "Full device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to send full device info later: ${e.message}")
+                    }
+                }
+
+                delay(150)
 
                 // 2. Send device status (respect now playing setting)
                 val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
@@ -176,7 +185,7 @@ object SyncManager {
                 // 3. Defer icon sync to macInfo handler to avoid unnecessary extraction
                 Log.d(TAG, "Deferring app icon sync until macInfo arrives (to compare package lists first)")
 
-                Log.d(TAG, "Initial sync sequence completed")
+                Log.d(TAG, "Initial sync sequence completed (handshake depends on macInfo)")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error in initial sync: ${e.message}")

@@ -51,6 +51,12 @@ class ShareActivity : ComponentActivity() {
                             ipAddress = ipAddress,
                             port = port,
                             symmetricKey = symmetricKey,
+                            manualAttempt = true,
+                            onHandshakeTimeout = {
+                                WebSocketUtil.disconnect(this@ShareActivity)
+                                showToast("Authentication failed. Re-scan the QR code on your Mac.")
+                                finish()
+                            },
                             onConnectionStatus = { connected ->
                                 if (connected) {
                                     // Send text after connection
@@ -102,6 +108,12 @@ class ShareActivity : ComponentActivity() {
                         ipAddress = ipAddress,
                         port = port,
                         symmetricKey = symmetricKey,
+                        manualAttempt = true,
+                        onHandshakeTimeout = {
+                            WebSocketUtil.disconnect(this@ShareActivity)
+                            showToast("Authentication failed. Re-scan the QR code on your Mac.")
+                            finish()
+                        },
                         onConnectionStatus = { connected ->
                             if (connected) {
                                 FileSender.sendFile(this@ShareActivity, uri)

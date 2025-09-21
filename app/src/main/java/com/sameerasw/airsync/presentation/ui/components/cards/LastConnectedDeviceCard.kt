@@ -27,9 +27,9 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 @Composable
 fun LastConnectedDeviceCard(
     device: ConnectedDevice,
-    onQuickConnect: () -> Unit,
     isAutoReconnectEnabled: Boolean,
-    onToggleAutoReconnect: (Boolean) -> Unit
+    onToggleAutoReconnect: (Boolean) -> Unit,
+    onQuickConnect: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -74,6 +74,18 @@ fun LastConnectedDeviceCard(
 
             Text("${device.ipAddress}:${device.port}", style = MaterialTheme.typography.bodyMedium)
 
+            // Auto-reconnect toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Auto reconnect", style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = isAutoReconnectEnabled, onCheckedChange = onToggleAutoReconnect)
+            }
+
             // Display device model and type if available
             device.model?.let { model ->
                 Text("Model: $model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -94,19 +106,6 @@ fun LastConnectedDeviceCard(
             }
             Text("Last seen $lastConnectedTime", style = MaterialTheme.typography.bodyMedium)
 
-            // Auto re-connect toggle
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Auto re-connect", style = MaterialTheme.typography.bodyMedium)
-                Switch(
-                    checked = isAutoReconnectEnabled,
-                    onCheckedChange = onToggleAutoReconnect
-                )
-            }
 
             Button(
                 onClick = onQuickConnect,

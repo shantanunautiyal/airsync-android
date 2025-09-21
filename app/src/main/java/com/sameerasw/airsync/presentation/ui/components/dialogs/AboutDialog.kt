@@ -26,7 +26,7 @@ import androidx.core.net.toUri
 fun AboutDialog(
     onDismissRequest: () -> Unit,
     onToggleDeveloperMode: () -> Unit = {},
-    appName: String = "AirSync BETA",
+    appName: String = "AirSync",
     developerName: String = "Sameera Wijerathna",
     description: String = "AirSync enables seamless synchronization between your Android device and mac. Share notifications, clipboard content, and device status wirelessly over your local network.",
 ) {

@@ -14,7 +14,6 @@ import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
-import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
@@ -48,10 +47,9 @@ class AirSyncViewModel(
     private var isNetworkMonitoringActive = false
     private var previousNetworkIp: String? = null
 
-    // Auto-reconnect
-    private var autoReconnectJob: kotlinx.coroutines.Job? = null
-    private var autoReconnectStart: Long = 0L
     private var appContext: Context? = null
+    // Manual connect canceller reference (set in init) for unregistering
+    private val manualConnectCanceler: () -> Unit = { /* no-op */ }
 
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
@@ -62,28 +60,26 @@ class AirSyncViewModel(
                 response = if (isConnected) "Connected successfully!" else "Disconnected"
             )
 
-            // Cancel auto-reconnect when connected; schedule when disconnected (if allowed)
-            if (isConnected) {
-                cancelAutoReconnect()
-            } else {
-                appContext?.let { ctx ->
-                    maybeScheduleAutoReconnect(ctx)
-                }
-            }
-
-            // Update persistent status notification to reflect real-time state
-            appContext?.let { pushStatusNotification(it) }
         }
     }
 
     init {
         // Register for WebSocket connection status updates
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+        try {
+            WebSocketUtil.registerManualConnectListener(manualConnectCanceler)
+        } catch (_: Exception) {}
 
         // Observe Mac device status updates
         viewModelScope.launch {
             MacDeviceStatusManager.macDeviceStatus.collect { macStatus ->
                 _uiState.value = _uiState.value.copy(macDeviceStatus = macStatus)
+            }
+        }
+        // Observe manual disconnect flag to immediately cancel any running auto-reconnect
+        viewModelScope.launch {
+            repository.getUserManuallyDisconnected().collect { manual ->
+                // No device status notification to update
             }
         }
     }
@@ -92,6 +88,7 @@ class AirSyncViewModel(
         super.onCleared()
         // Unregister the connection status listener when ViewModel is cleared
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
+    try { WebSocketUtil.unregisterManualConnectListener(manualConnectCanceler) } catch (_: Exception) {}
 
         // Clean up Mac media session
         MacDeviceStatusManager.cleanup()
@@ -99,7 +96,7 @@ class AirSyncViewModel(
 
     private fun startObservingDeviceChanges(context: Context) {
         val dataStoreManager = DataStoreManager(context)
-        
+
         // Observe both last connected device and network devices for real-time updates
         viewModelScope.launch {
             dataStoreManager.getLastConnectedDevice().collect { device ->
@@ -107,7 +104,7 @@ class AirSyncViewModel(
                 updateDisplayedDevice(context)
             }
         }
-        
+
         viewModelScope.launch {
             dataStoreManager.getAllNetworkDeviceConnections().collect { networkDevices ->
                 Log.d("AirSyncViewModel", "Network devices changed: ${networkDevices.size} devices")
@@ -122,12 +119,12 @@ class AirSyncViewModel(
             // Get current network IP for network-aware device lookup
             val currentIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
             _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
-            
+
             // Use network-aware device if available for current network, otherwise use the stored device
             val networkAwareDevice = getNetworkAwareLastConnectedDevice()
             val storedDevice = repository.getLastConnectedDevice().first()
             val deviceToShow = networkAwareDevice ?: storedDevice
-            
+
             Log.d("AirSyncViewModel", "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}")
             _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
         }
@@ -152,8 +149,8 @@ class AirSyncViewModel(
             val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
             val isDeveloperMode = repository.getDeveloperMode().first()
             val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
-            val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
+            val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
 
@@ -194,9 +191,9 @@ class AirSyncViewModel(
                 isNotificationSyncEnabled = isNotificationSyncEnabled,
                 isDeveloperMode = isDeveloperMode,
                 isClipboardSyncEnabled = isClipboardSyncEnabled,
+                isAutoReconnectEnabled = isAutoReconnectEnabled,
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
-                isAutoReconnectEnabled = isAutoReconnectEnabled,
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
                 isSendNowPlayingEnabled = isSendNowPlayingEnabled
             )
@@ -215,13 +212,7 @@ class AirSyncViewModel(
                 )
             }
 
-            // If not connected and conditions allow, schedule auto-reconnect
-            if (!currentlyConnected) {
-                maybeScheduleAutoReconnect(context)
-            }
 
-            // Push initial status notification
-            pushStatusNotification(context)
 
             // Start observing device changes for real-time updates
             startObservingDeviceChanges(context)
@@ -308,9 +299,6 @@ class AirSyncViewModel(
             isConnected = isConnected,
             isConnecting = isConnecting
         )
-        appContext?.let { ctx ->
-            viewModelScope.launch { pushStatusNotification(ctx) }
-        }
     }
 
     fun refreshPermissions(context: Context) {
@@ -347,8 +335,6 @@ class AirSyncViewModel(
             // Refresh network devices list
             loadNetworkDevices()
 
-            // Update status notification with new device name
-            appContext?.let { pushStatusNotification(it) }
         }
     }
 
@@ -397,6 +383,13 @@ class AirSyncViewModel(
         }
     }
 
+    fun setAutoReconnectEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
+        viewModelScope.launch {
+            repository.setAutoReconnectEnabled(enabled)
+        }
+    }
+
     fun manualSyncAppIcons(context: Context) {
         _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
 
@@ -414,39 +407,25 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(iconSyncMessage = "")
     }
 
+    // Auth failure dialog controls
+    fun showAuthFailure(message: String) {
+        _uiState.value = _uiState.value.copy(showAuthFailureDialog = true, authFailureMessage = message)
+    }
+
+    fun dismissAuthFailure() {
+        _uiState.value = _uiState.value.copy(showAuthFailureDialog = false, authFailureMessage = "")
+    }
+
     fun setUserManuallyDisconnected(disconnected: Boolean) {
         viewModelScope.launch {
             repository.setUserManuallyDisconnected(disconnected)
-            if (disconnected) {
-                cancelAutoReconnect()
-            }
-            appContext?.let { pushStatusNotification(it) }
         }
     }
 
-    fun setAutoReconnectEnabled(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
-        viewModelScope.launch {
-            repository.setAutoReconnectEnabled(enabled)
-            if (!enabled) {
-                cancelAutoReconnect()
-            } else {
-                appContext?.let { ctx ->
-                    if (!_uiState.value.isConnected) {
-                        maybeScheduleAutoReconnect(ctx)
-                    }
-                }
-            }
-            appContext?.let { pushStatusNotification(it) }
-        }
+    // Awaitable variant used when ordering matters (e.g., ensure flag is persisted before disconnect)
+    suspend fun setUserManuallyDisconnectedAwait(disconnected: Boolean) {
+        repository.setUserManuallyDisconnected(disconnected)
     }
-
-    private fun cancelAutoReconnect() {
-        autoReconnectJob?.cancel()
-        autoReconnectJob = null
-        autoReconnectStart = 0L
-    }
-
     private fun hasNetworkAwareMappingForLastDevice(): ConnectedDevice? {
         val ourIp = _deviceInfo.value.localIp
         val last = _uiState.value.lastConnectedDevice ?: return null
@@ -456,171 +435,9 @@ class AirSyncViewModel(
         return networkDevice?.toConnectedDevice(ourIp)
     }
 
-    fun maybeScheduleAutoReconnect(context: Context) {
-        viewModelScope.launch {
-            try {
-                val autoEnabled = repository.getAutoReconnectEnabled().first()
-                val manuallyDisconnected = repository.getUserManuallyDisconnected().first()
-                if (!autoEnabled || manuallyDisconnected || WebSocketUtil.isConnected()) {
-                    return@launch
-                }
-
-                // Ensure we have latest network devices
-                loadNetworkDevices()
-
-                val targetDevice = hasNetworkAwareMappingForLastDevice() ?: return@launch
-
-                if (autoReconnectJob?.isActive == true) return@launch
-
-                autoReconnectStart = System.currentTimeMillis()
-                _uiState.value = _uiState.value.copy(response = "Will auto reconnect to ${targetDevice.name} if possible")
-
-                // Reflect auto-reconnect waiting state
-                pushStatusNotification(context)
-
-                autoReconnectJob = viewModelScope.launch {
-                    while (coroutineContext.isActive) {
-                        // Stop conditions
-                        val autoStillEnabled = repository.getAutoReconnectEnabled().first()
-                        val stillManual = repository.getUserManuallyDisconnected().first()
-                        if (WebSocketUtil.isConnected() || !autoStillEnabled || stillManual) {
-                            break
-                        }
-
-                        // Re-resolve mapping in case IP changed
-                        val currentTarget = hasNetworkAwareMappingForLastDevice()
-                        if (currentTarget == null) {
-                            // No longer on a known network for last device; stop trying
-                            break
-                        }
-
-                        // Delay according to elapsed time window
-                        val elapsed = System.currentTimeMillis() - autoReconnectStart
-                        val delayMs = if (elapsed <= 60_000L) 10_000L else 60_000L
-                        delay(delayMs)
-
-                        if (WebSocketUtil.isConnected()) continue
-
-                        // Attempt connection
-                        _uiState.value = _uiState.value.copy(isConnecting = true, response = "Auto reconnecting to ${currentTarget.name}...")
-                        // Notification will show Connecting via WebSocketUtil.connect
-                        WebSocketUtil.connect(
-                            context = context,
-                            ipAddress = currentTarget.ipAddress,
-                            port = currentTarget.port.toIntOrNull() ?: 6996,
-                            symmetricKey = currentTarget.symmetricKey,
-                            onConnectionStatus = { connected ->
-                                viewModelScope.launch {
-                                    _uiState.value = _uiState.value.copy(isConnecting = false)
-                                    if (connected) {
-                                        _uiState.value = _uiState.value.copy(response = "Auto-reconnected to ${currentTarget.name}")
-                                        repository.updateNetworkDeviceLastConnected(currentTarget.name, System.currentTimeMillis())
-                                        cancelAutoReconnect()
-                                    } else {
-                                        _uiState.value = _uiState.value.copy(response = "Auto-reconnect attempt failed")
-                                    }
-
-                                    // Push status notification after attempt
-                                    appContext?.let { pushStatusNotification(it) }
-                                }
-                            }
-                        )
-                    }
-                }
-            } catch (_: Exception) {
-                // no-op
-            }
-        }
-    }
-
     private suspend fun loadNetworkDevicesForNetworkChange() {
         // thin wrapper in case logic needs splitting
         loadNetworkDevices()
-    }
-
-    private suspend fun attemptAutoReconnection(context: Context, device: ConnectedDevice) {
-        // Add a small delay to ensure network is stable
-        delay(2000)
-
-        // Check if we're still on the same network and not manually disconnected
-        val currentIp = DeviceInfoUtil.getWifiIpAddress(context)
-        val userManuallyDisconnected = repository.getUserManuallyDisconnected().first()
-
-        if (currentIp != null && !userManuallyDisconnected && !WebSocketUtil.isConnected()) {
-            setConnectionStatus(isConnected = false, isConnecting = true)
-            setResponse("Auto-reconnecting to ${device.name}...")
-
-            WebSocketUtil.connect(
-                context = context,
-                ipAddress = device.ipAddress,
-                port = device.port.toIntOrNull() ?: 6996,
-                symmetricKey = device.symmetricKey,
-                onConnectionStatus = { connected ->
-                    viewModelScope.launch {
-                        setConnectionStatus(isConnected = connected, isConnecting = false)
-                        if (connected) {
-                            setResponse("Auto-reconnected to ${device.name}")
-                            // Update last connected timestamp
-                            repository.updateNetworkDeviceLastConnected(device.name, System.currentTimeMillis())
-                        } else {
-                            setResponse("Auto-reconnection failed")
-                        }
-                    }
-                },
-                onMessage = { response ->
-                    viewModelScope.launch {
-                        setResponse("Received: $response")
-                        // Handle clipboard updates and other messages as usual
-                        try {
-                            val json = org.json.JSONObject(response)
-                            if (json.optString("type") == "clipboardUpdate") {
-                                val data = json.optJSONObject("data")
-                                val text = data?.optString("text")
-                                if (!text.isNullOrEmpty()) {
-                                    com.sameerasw.airsync.utils.ClipboardSyncManager.handleClipboardUpdate(context, text)
-                                }
-                            }
-                        } catch (_: Exception) {
-                            // Not a clipboard update, ignore
-                        }
-                    }
-                }
-            )
-        }
-    }
-
-    // Build and push the latest status notification
-    private suspend fun pushStatusNotification(context: Context) {
-        try {
-            val last = repository.getLastConnectedDevice().first()
-            val deviceName = last?.name
-            val ourIp = DeviceInfoUtil.getWifiIpAddress(context)
-            val all = repository.getAllNetworkDeviceConnections().first()
-            val hasReconnectTarget = if (ourIp != null && last != null) {
-                all.firstOrNull { it.deviceName == last.name && it.getClientIpForNetwork(ourIp) != null } != null
-            } else false
-            val autoEnabled = repository.getAutoReconnectEnabled().first()
-            val manual = repository.getUserManuallyDisconnected().first()
-            val isConnected = _uiState.value.isConnected
-            val isConnecting = _uiState.value.isConnecting
-
-            val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
-            if (shouldShow) {
-                val isAutoReconnecting = true // show notification during both waiting and connecting
-                NotificationUtil.showConnectionStatusNotification(
-                    context = context,
-                    deviceName = deviceName,
-                    isConnected = isConnected,
-                    isConnecting = isConnecting,
-                    isAutoReconnecting = isAutoReconnecting,
-                    hasReconnectTarget = hasReconnectTarget
-                )
-            } else {
-                NotificationUtil.hideConnectionStatusNotification(context)
-            }
-        } catch (_: Exception) {
-            // ignore
-        }
     }
 
     // Start monitoring network changes (Wi-Fi IP) to update mappings and trigger auto-reconnect attempts
@@ -637,23 +454,92 @@ class AirSyncViewModel(
                     if (currentIp != previousNetworkIp) {
                         previousNetworkIp = currentIp
 
-                        // Update local device info
+                        // Update local device info immediately
                         _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
 
-                        // Reload network-aware device mappings
+                        // Always refresh network-aware device mappings on network change
                         loadNetworkDevicesForNetworkChange()
 
-                        // If we have a mapping for the last connected device, try auto-reconnect
-                        val target = getNetworkAwareLastConnectedDevice()
-                        if (target != null && !_uiState.value.isConnected) {
-                            // Attempt auto-reconnect asynchronously
-                            try {
-                                attemptAutoReconnection(context, target)
-                            } catch (_: Exception) { /* ignore */ }
+                        // Cancel any ongoing auto-reconnect loop; we'll restart with the new network context if needed
+                        try { WebSocketUtil.cancelAutoReconnect() } catch (_: Exception) {}
+
+                        val manual = repository.getUserManuallyDisconnected().first()
+                        val autoOn = repository.getAutoReconnectEnabled().first()
+
+                        // Determine if we have a mapping for the last connected device on this network
+                        val target = hasNetworkAwareMappingForLastDevice()
+
+                        if (currentIp == "No Wi-Fi" || currentIp == "Unknown") {
+                            // No usable Wi‑Fi: ensure we stop any active connection and do not attempt reconnect
+                            try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            _uiState.value = _uiState.value.copy(isConnected = false, isConnecting = false)
+                            return@collect
                         }
 
-                        // Update persistent status notification
-                        pushStatusNotification(context)
+                        if (target != null) {
+                            // We have a specific device mapping for this network. Switch immediately.
+                            // Update UI fields so the user sees the correct endpoint.
+                            updateIpAddress(target.ipAddress)
+                            updatePort(target.port)
+                            updateSymmetricKey(target.symmetricKey)
+
+                            // If connected/connecting to old network, disconnect first to force a clean switch
+                            if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
+                                try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            }
+
+                            // Auto-connect if auto-reconnect is enabled and the user hasn't manually disconnected.
+                            if (autoOn && !manual) {
+                                // Mark as connecting in UI and kick off a non-manual connection (so it won't flip manual flags)
+                                _uiState.value = _uiState.value.copy(isConnecting = true)
+                                try {
+                                    WebSocketUtil.connect(
+                                        context = context,
+                                        ipAddress = target.ipAddress,
+                                        port = target.port.toIntOrNull() ?: 6996,
+                                        symmetricKey = target.symmetricKey,
+                                        manualAttempt = false,
+                                        onConnectionStatus = { connected ->
+                                            viewModelScope.launch {
+                                                _uiState.value = _uiState.value.copy(
+                                                    isConnected = connected,
+                                                    isConnecting = false,
+                                                    response = if (connected) "Connected successfully!" else "Reconnection failed"
+                                                )
+                                                if (connected) {
+                                                    // Update last connected record timestamp for this device
+                                                    try {
+                                                        // Persist as the last connected device and refresh network-aware mapping timestamps
+                                                        saveLastConnectedDevice(
+                                                            pcName = target.name,
+                                                            isPlus = target.isPlus,
+                                                            symmetricKey = target.symmetricKey
+                                                        )
+                                                    } catch (_: Exception) {}
+                                                } else if (autoOn && !manual) {
+                                                    // If the immediate connect failed, restart the auto-reconnect loop for this network
+                                                    try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                                }
+                                            }
+                                        }
+                                    )
+                                } catch (_: Exception) {
+                                    // Fall back to auto-reconnect loop
+                                    try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                }
+                            } else {
+                                // User has disabled auto connect, just update the displayed device/IP
+                                _uiState.value = _uiState.value.copy(isConnecting = false)
+                            }
+                        } else {
+                            // No mapping for this network: disconnect if connected and, if allowed, start generic auto-reconnect
+                            if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
+                                try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            }
+                            if (autoOn && !manual) {
+                                try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                            }
+                        }
                     }
                 }
             } catch (_: Exception) {

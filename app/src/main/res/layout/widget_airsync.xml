@@ -4,40 +4,121 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="12dp"
     android:background="@drawable/widget_background"
     android:clickable="true"
-    android:gravity="center">
+    android:gravity="center_horizontal">
 
-    <!-- AirSync App Title -->
-    <TextView
-        android:id="@+id/widget_app_title"
-        android:layout_width="wrap_content"
+    <!-- Device image with overlay hint -->
+    <FrameLayout
+        android:id="@+id/widget_image_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ImageView
+            android:id="@+id/widget_device_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="Device image"
+            android:src="@drawable/ic_laptop_24"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:padding="0dp" />
+
+        <TextView
+            android:id="@+id/widget_tap_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to reconnect"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:textColor="@color/widget_primary_text"
+            android:background="@drawable/widget_tap_hint_bg"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Battery overlay (shown when connected) -->
+        <LinearLayout
+            android:id="@+id/widget_battery_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_gravity="center"
+            android:gravity="center_vertical"
+            android:background="@drawable/widget_tap_hint_bg"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/widget_battery_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:adjustViewBounds="true"
+                android:scaleType="centerInside"
+                android:tint="@color/widget_primary_text"
+                android:src="@drawable/outline_battery_full_24" />
+
+            <TextView
+                android:id="@+id/widget_battery_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="100%"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:textColor="@color/widget_primary_text" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Header: Name and status -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/airsync"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="@color/widget_primary_text"
-        android:layout_marginBottom="8dp" />
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="8dp">
 
-    <!-- Work In Progress Message -->
-    <TextView
-        android:id="@+id/widget_wip_message"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/work_in_progress"
-        android:textSize="14sp"
-        android:textColor="@color/widget_secondary_text"
-        android:layout_marginBottom="4dp" />
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-    <!-- Subtitle -->
-    <TextView
-        android:id="@+id/widget_subtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_under_development"
-        android:textSize="12sp"
-        android:textColor="@color/widget_secondary_text"
-        android:gravity="center" />
+            <TextView
+                android:id="@+id/widget_device_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AirSync"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="@color/widget_primary_text" />
 
+            <TextView
+                android:id="@+id/widget_media_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="@color/widget_secondary_text"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/widget_secondary_line"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="@color/widget_secondary_text"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Actions moved to image click -->
 </LinearLayout>

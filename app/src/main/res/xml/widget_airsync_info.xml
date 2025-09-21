@@ -5,13 +5,10 @@
     android:initialLayout="@layout/widget_airsync"
     android:minWidth="180dp"
     android:minHeight="110dp"
-    android:maxResizeWidth="320dp"
-    android:maxResizeHeight="200dp"
+    android:resizeMode="horizontal|vertical"
     android:previewImage="@drawable/widget_preview"
     android:previewLayout="@layout/widget_airsync"
-    android:resizeMode="horizontal|vertical"
     android:targetCellWidth="3"
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen" />
-

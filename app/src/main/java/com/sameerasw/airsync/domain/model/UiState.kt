@@ -17,14 +17,17 @@ data class UiState(
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
     val isClipboardSyncEnabled: Boolean = true,
+    val isAutoReconnectEnabled: Boolean = true,
     val isIconSyncLoading: Boolean = false,
     val iconSyncMessage: String = "",
     val symmetricKey: String? = null,
     val manualPcName: String = "",
     val manualIsPlus: Boolean = false,
-    val isAutoReconnectEnabled: Boolean = true,
     val isContinueBrowsingEnabled: Boolean = true,
     val isSendNowPlayingEnabled: Boolean = true,
     // Mac device status
-    val macDeviceStatus: MacDeviceStatus? = null
+    val macDeviceStatus: MacDeviceStatus? = null,
+    // Auth failure dialog
+    val showAuthFailureDialog: Boolean = false,
+    val authFailureMessage: String = ""
 )

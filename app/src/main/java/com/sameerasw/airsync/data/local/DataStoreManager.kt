@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sameerasw.airsync.domain.model.ConnectedDevice
@@ -31,13 +33,20 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_SYMMETRIC_KEY = stringPreferencesKey("last_connected_symmetric_key")
         private val LAST_CONNECTED_MODEL = stringPreferencesKey("last_connected_model")
         private val LAST_CONNECTED_DEVICE_TYPE = stringPreferencesKey("last_connected_device_type")
-        private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
+    private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
+    // Widget-visible Mac status keys
+    private val MAC_BATTERY_LEVEL = intPreferencesKey("mac_battery_level")
+    private val MAC_BATTERY_CHARGING = booleanPreferencesKey("mac_battery_charging")
+    private val MAC_MUSIC_TITLE = stringPreferencesKey("mac_music_title")
+    private val MAC_MUSIC_ARTIST = stringPreferencesKey("mac_music_artist")
+    private val MAC_WIDGET_REFRESH_AT = longPreferencesKey("mac_widget_refresh_at")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         private val CLIPBOARD_SYNC_ENABLED = booleanPreferencesKey("clipboard_sync_enabled")
         private val ICON_SYNC_COUNT = stringPreferencesKey("icon_sync_count")
         private val LAST_ICON_SYNC_DATE = stringPreferencesKey("last_icon_sync_date")
-        private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
+    private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
+        // Auto reconnect toggle
         private val AUTO_RECONNECT_ENABLED = booleanPreferencesKey("auto_reconnect_enabled")
         // New: Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
@@ -133,6 +142,19 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
+    // Auto Reconnect toggle
+    suspend fun setAutoReconnectEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_RECONNECT_ENABLED] = enabled
+        }
+    }
+
+    fun getAutoReconnectEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[AUTO_RECONNECT_ENABLED] != false // Default to enabled
+        }
+    }
+
     // New: Continue Browsing toggle
     suspend fun setContinueBrowsingEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
@@ -156,19 +178,6 @@ class DataStoreManager(private val context: Context) {
     fun getSendNowPlayingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[SEND_NOW_PLAYING_ENABLED] != false // Default to enabled
-        }
-    }
-
-    //  auto-reconnect toggle
-    suspend fun setAutoReconnectEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[AUTO_RECONNECT_ENABLED] = enabled
-        }
-    }
-
-    fun getAutoReconnectEnabled(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            preferences[AUTO_RECONNECT_ENABLED] != false // Default to enabled
         }
     }
 
@@ -242,6 +251,44 @@ class DataStoreManager(private val context: Context) {
         return context.dataStore.data.map { preferences ->
             preferences[LAST_SYNC_TIME]?.toLongOrNull()
         }
+    }
+
+    // --- Mac status persisted for widget ---
+    suspend fun saveMacStatusForWidget(batteryLevel: Int, isCharging: Boolean, title: String, artist: String) {
+        context.dataStore.edit { preferences ->
+            preferences[MAC_BATTERY_LEVEL] = batteryLevel
+            preferences[MAC_BATTERY_CHARGING] = isCharging
+            preferences[MAC_MUSIC_TITLE] = title
+            preferences[MAC_MUSIC_ARTIST] = artist
+        }
+    }
+
+    suspend fun setMacWidgetRefreshedAt(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[MAC_WIDGET_REFRESH_AT] = timestamp
+        }
+    }
+
+    fun getMacWidgetRefreshedAt(): Flow<Long?> {
+        return context.dataStore.data.map { preferences ->
+            preferences[MAC_WIDGET_REFRESH_AT]
+        }
+    }
+
+    data class MacStatusSnapshot(
+        val batteryLevel: Int?,
+        val isCharging: Boolean?,
+        val title: String?,
+        val artist: String?
+    )
+
+    fun getMacStatusForWidget(): Flow<MacStatusSnapshot> = context.dataStore.data.map { preferences ->
+        MacStatusSnapshot(
+            batteryLevel = preferences[MAC_BATTERY_LEVEL],
+            isCharging = preferences[MAC_BATTERY_CHARGING],
+            title = preferences[MAC_MUSIC_TITLE],
+            artist = preferences[MAC_MUSIC_ARTIST]
+        )
     }
 
     suspend fun saveNotificationApps(apps: List<NotificationApp>) {

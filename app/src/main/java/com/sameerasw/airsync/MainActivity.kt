@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -25,9 +26,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.core.net.toUri
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.sameerasw.airsync.data.local.DataStoreManager
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.Flow
 
 class MainActivity : ComponentActivity() {
-    
+
     // Permission launcher for Android 13+ notification permission
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -37,7 +43,22 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Enable full edge-to-edge drawing for both status and navigation bars
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
+        )
+
+        // On Android 10+ disable forced high-contrast nav bar, so app can draw beneath gesture bar
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
 
         val data: android.net.Uri? = intent?.data
         val ip = data?.host
@@ -77,12 +98,18 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
                     topBar = {
                         LargeTopAppBar(
                             title = {
                                 Row {
+                                    // Dynamic icon based on last connected device category
+                                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                                    val ds = remember(ctx) { DataStoreManager(ctx) }
+                                    val lastDevice by ds.getLastConnectedDevice().collectAsState(initial = null)
+                                    val iconRes = com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(lastDevice)
                                     Image(
-                                        painter = painterResource(id = R.drawable.ic_laptop_24),
+                                        painter = painterResource(id = iconRes),
                                         contentDescription = "AirSync Logo",
                                         modifier = Modifier.size(32.dp),
                                         contentScale = ContentScale.Fit,
@@ -99,7 +126,7 @@ class MainActivity : ComponentActivity() {
                                 IconButton(
                                     onClick = {
                                         val airSyncPlusUrl =
-                                            "https://github.com/sameerasw/airsync-android/issues/new"
+                                            "https://airsync.notion.site"
                                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
                                         startActivity(intent)
                                     }

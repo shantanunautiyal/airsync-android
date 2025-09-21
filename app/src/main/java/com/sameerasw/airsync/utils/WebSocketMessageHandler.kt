@@ -390,6 +390,22 @@ object WebSocketMessageHandler {
                 likeStatus = likeStatus
             )
 
+            // Persist a lightweight snapshot for widget consumption and throttle widget refresh
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val ds = DataStoreManager(context)
+                    ds.saveMacStatusForWidget(batteryLevel, isCharging, title, artist)
+
+                    // Throttle widget updates to once per minute to reduce battery usage
+                    val lastRefresh = ds.getMacWidgetRefreshedAt().first() ?: 0L
+                    val now = System.currentTimeMillis()
+                    if (now - lastRefresh >= 30_000L) {
+                        com.sameerasw.airsync.widget.AirSyncWidgetProvider.updateAllWidgets(context)
+                        ds.setMacWidgetRefreshedAt(now)
+                    }
+                } catch (_: Exception) { }
+            }
+
             Log.d(TAG, "Mac device status updated successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error handling Mac device status: ${e.message}")

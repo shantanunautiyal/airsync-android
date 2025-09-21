@@ -7,7 +7,6 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.NotificationUtil
-import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,12 +19,6 @@ import kotlinx.coroutines.launch
 class NotificationActionReceiver : BroadcastReceiver() {
 
     companion object {
-        /** Action string for stopping notification sync. */
-        const val ACTION_STOP_SYNC = "com.sameerasw.airsync.STOP_SYNC"
-        // New dynamic actions for status notification
-        const val ACTION_DISCONNECT = "com.sameerasw.airsync.DISCONNECT"
-        const val ACTION_RECONNECT = "com.sameerasw.airsync.RECONNECT"
-        const val ACTION_STOP_AUTORECONNECT = "com.sameerasw.airsync.STOP_AUTORECONNECT"
         // New: Continue Browsing dismiss action
         const val ACTION_CONTINUE_BROWSING_DISMISS = "com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS"
         private const val TAG = "NotificationActionReceiver"
@@ -36,106 +29,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            ACTION_STOP_SYNC -> {
-                Log.d(TAG, "Stop sync action received")
-                scope.launch {
-                    try {
-                        val ds = DataStoreManager(context)
-                        // Disable notification sync
-                        ds.setNotificationSyncEnabled(false)
-                        // Hide the persistent notification
-                        NotificationUtil.hideConnectionStatusNotification(context)
-                        Log.d(TAG, "Notification sync disabled and notification hidden")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error stopping sync: ${e.message}")
-                    }
-                }
-            }
-            ACTION_DISCONNECT -> {
-                scope.launch {
-                    try {
-                        val ds = DataStoreManager(context)
-                        // Mark manual disconnect and disconnect socket
-                        ds.setUserManuallyDisconnected(true)
-                        WebSocketUtil.disconnect()
-                        // Clear Continue Browsing notifications on disconnect
-                        NotificationUtil.clearContinueBrowsingNotifications(context)
-                        // Update notification to Disconnected with appropriate action
-                        updateStatusNotification(context, isConnecting = false)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error handling disconnect: ${e.message}")
-                    }
-                }
-            }
-            ACTION_RECONNECT -> {
-                scope.launch {
-                    try {
-                        val ds = DataStoreManager(context)
-                        ds.setUserManuallyDisconnected(false)
-
-                        val ourIp = DeviceInfoUtil.getWifiIpAddress(context)
-                        val lastDevice = ds.getLastConnectedDevice().first()
-                        val all = ds.getAllNetworkDeviceConnections().first()
-                        val target = if (ourIp != null && lastDevice != null) {
-                            all.firstOrNull { it.deviceName == lastDevice.name && it.getClientIpForNetwork(ourIp) != null }
-                        } else null
-
-                        if (target != null && ourIp != null) {
-                            val ip = target.getClientIpForNetwork(ourIp) ?: return@launch
-                            val port = target.port.toIntOrNull() ?: 6996
-                            // Show connecting state immediately
-                            showStatus(
-                                context,
-                                deviceName = target.deviceName,
-                                isConnected = false,
-                                isConnecting = true,
-                                isAutoReconnecting = false,
-                                hasReconnectTarget = true
-                            )
-                            WebSocketUtil.connect(
-                                context = context,
-                                ipAddress = ip,
-                                port = port,
-                                symmetricKey = target.symmetricKey,
-                                onConnectionStatus = { connected ->
-                                    scope.launch {
-                                        if (connected) {
-                                            // Update last connected timestamp
-                                            ds.updateNetworkDeviceLastConnected(target.deviceName, System.currentTimeMillis())
-                                        }
-                                        showStatus(
-                                            context,
-                                            deviceName = target.deviceName,
-                                            isConnected = connected,
-                                            isConnecting = false,
-                                            isAutoReconnecting = false,
-                                            hasReconnectTarget = true
-                                        )
-                                    }
-                                }
-                            )
-                        } else {
-                            // No target; just update notification to disconnected with Open app
-                            updateStatusNotification(context, isConnecting = false)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error handling reconnect: ${e.message}")
-                        updateStatusNotification(context, isConnecting = false)
-                    }
-                }
-            }
-            ACTION_STOP_AUTORECONNECT -> {
-                scope.launch {
-                    try {
-                        val ds = DataStoreManager(context)
-                        ds.setUserManuallyDisconnected(true)
-                        // If connected, leave as-is; purpose is to stop auto-reconnect attempts
-                        updateStatusNotification(context, isConnecting = false)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error stopping auto-reconnect: ${e.message}")
-                    }
-                }
-            }
             ACTION_CONTINUE_BROWSING_DISMISS -> {
                 val notifId = intent.getIntExtra("notif_id", -1)
                 if (notifId != -1) {
@@ -147,50 +40,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
                 }
             }
-        }
-    }
-
-    private suspend fun updateStatusNotification(context: Context, isConnecting: Boolean) {
-        val ds = DataStoreManager(context)
-        val lastDevice = ds.getLastConnectedDevice().first()
-        val deviceName = lastDevice?.name
-        val isConnected = WebSocketUtil.isConnected()
-        val ourIp = DeviceInfoUtil.getWifiIpAddress(context)
-        val all = ds.getAllNetworkDeviceConnections().first()
-        val hasReconnectTarget = if (ourIp != null && lastDevice != null) {
-            all.firstOrNull { it.deviceName == lastDevice.name && it.getClientIpForNetwork(ourIp) != null } != null
-        } else false
-        val autoEnabled = ds.getAutoReconnectEnabled().first()
-        val manual = ds.getUserManuallyDisconnected().first()
-        val shouldShow = !isConnected && autoEnabled && !manual && hasReconnectTarget
-        if (shouldShow) {
-            showStatus(context, deviceName, isConnected, isConnecting, true, hasReconnectTarget)
-        } else {
-            NotificationUtil.hideConnectionStatusNotification(context)
-        }
-    }
-
-    private fun showStatus(
-        context: Context,
-        deviceName: String?,
-        isConnected: Boolean,
-        isConnecting: Boolean,
-        isAutoReconnecting: Boolean,
-        hasReconnectTarget: Boolean
-    ) {
-        // Only show while actively trying (connecting) or waiting/trying to auto-reconnect.
-        // Hide in all other states, especially when connected.
-        if (!isConnected && (isConnecting || isAutoReconnecting)) {
-            NotificationUtil.showConnectionStatusNotification(
-                context = context,
-                deviceName = deviceName,
-                isConnected = isConnected,
-                isConnecting = isConnecting,
-                isAutoReconnecting = isAutoReconnecting,
-                hasReconnectTarget = hasReconnectTarget
-            )
-        } else {
-            NotificationUtil.hideConnectionStatusNotification(context)
         }
     }
 }

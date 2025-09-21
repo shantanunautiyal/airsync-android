@@ -116,6 +116,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getClipboardSyncEnabled()
     }
 
+    override suspend fun setAutoReconnectEnabled(enabled: Boolean) {
+        dataStoreManager.setAutoReconnectEnabled(enabled)
+    }
+
+    override fun getAutoReconnectEnabled(): Flow<Boolean> {
+        return dataStoreManager.getAutoReconnectEnabled()
+    }
+
     override suspend fun setContinueBrowsingEnabled(enabled: Boolean) {
         dataStoreManager.setContinueBrowsingEnabled(enabled)
     }
@@ -141,12 +149,4 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getUserManuallyDisconnected()
     }
 
-    // Auto-reconnect toggle
-    override suspend fun setAutoReconnectEnabled(enabled: Boolean) {
-        dataStoreManager.setAutoReconnectEnabled(enabled)
-    }
-
-    override fun getAutoReconnectEnabled(): Flow<Boolean> {
-        return dataStoreManager.getAutoReconnectEnabled()
-    }
 }

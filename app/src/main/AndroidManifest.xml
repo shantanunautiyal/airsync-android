@@ -37,7 +37,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.AirSync"
+            android:theme="@style/Theme.AirSync.Splash"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
             <!-- Main launcher intent filter -->
             <intent-filter>
@@ -129,11 +129,6 @@
             android:name=".service.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sameerasw.airsync.STOP_SYNC" />
-                <!-- Status notification actions -->
-                <action android:name="com.sameerasw.airsync.DISCONNECT" />
-                <action android:name="com.sameerasw.airsync.RECONNECT" />
-                <action android:name="com.sameerasw.airsync.STOP_AUTORECONNECT" />
                 <!-- Continue Browsing actions -->
                 <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
             </intent-filter>
