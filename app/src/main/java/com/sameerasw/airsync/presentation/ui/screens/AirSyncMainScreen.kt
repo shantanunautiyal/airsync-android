@@ -3,7 +3,6 @@ package com.sameerasw.airsync.presentation.ui.screens
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -13,32 +12,32 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.LinkOff
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.DeviceInfoUtil
@@ -48,7 +47,6 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collect
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
@@ -64,7 +62,7 @@ import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import org.json.JSONObject
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AirSyncMainScreen(
     modifier: Modifier = Modifier,
@@ -101,8 +99,8 @@ fun AirSyncMainScreen(
     // Track if we've already processed the QR code dialog to prevent re-showing
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
 
-    // Bottom navigation state (0 = Connect, 1 = Settings)
-    var selectedTab by remember { mutableIntStateOf(0) }
+    // Pager state for swipeable tabs (0 = Connect, 1 = Settings)
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
 
     LaunchedEffect(Unit) {
         viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
@@ -132,8 +130,8 @@ fun AirSyncMainScreen(
     }
 
     // Hide FAB on scroll down, show on scroll up for the active tab
-    LaunchedEffect(selectedTab) {
-        val state = if (selectedTab == 0) connectScrollState else settingsScrollState
+    LaunchedEffect(pagerState.currentPage) {
+        val state = if (pagerState.currentPage == 0) connectScrollState else settingsScrollState
         var last = state.value
         snapshotFlow { state.value }.collect { value ->
             val delta = value - last
@@ -324,31 +322,44 @@ fun AirSyncMainScreen(
                 items.forEachIndexed { index, item ->
                     NavigationBarItem(
                         icon = {
+                            val selected = pagerState.currentPage == index
+                            val iconOffset by animateDpAsState(targetValue = if (selected) 0.dp else 2.dp, label = "NavIconOffset")
                             Icon(
-                                imageVector = if (selectedTab == index) selectedIcons[index] else unselectedIcons[index],
-                                contentDescription = item
+                                imageVector = if (selected) selectedIcons[index] else unselectedIcons[index],
+                                contentDescription = item,
+                                modifier = Modifier.offset(y = iconOffset)
                             )
                         },
-                        label = { Text(item) },
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index }
+                        label = {
+                            val selected = pagerState.currentPage == index
+                            val alpha by animateFloatAsState(targetValue = if (selected) 1f else 0f, label = "NavLabelAlpha")
+                            // Keep label space reserved (alwaysShowLabel=true) and fade it in/out to avoid icon jumps
+                            Text(item, modifier = Modifier.alpha(alpha))
+                        },
+                        alwaysShowLabel = true,
+                        selected = pagerState.currentPage == index,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } }
                     )
                 }
             }
         }
     ) { innerPadding ->
-        when (selectedTab) {
-            0 -> {
-                // Connect tab content
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = innerPadding.calculateBottomPadding())
-                        .verticalScroll(connectScrollState)
-                        .padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+        HorizontalPager(
+            modifier = Modifier.fillMaxSize(),
+            state = pagerState
+        ) { page ->
+            when (page) {
+                0 -> {
+                    // Connect tab content
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = innerPadding.calculateBottomPadding())
+                            .verticalScroll(connectScrollState)
+                            .padding(horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
 
                     // Permission Status Card
                     AnimatedVisibility(
@@ -425,19 +436,19 @@ fun AirSyncMainScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
                 }
-            }
-            else -> {
-                // Settings tab content
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = innerPadding.calculateBottomPadding())
-                        .verticalScroll(settingsScrollState)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                else -> {
+                    // Settings tab content
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = innerPadding.calculateBottomPadding())
+                            .verticalScroll(settingsScrollState)
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                     // Notification Sync Settings Card
                     NotificationSyncCard(
                         isNotificationEnabled = uiState.isNotificationEnabled,
@@ -565,7 +576,8 @@ fun AirSyncMainScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
                 }
             }
         }
