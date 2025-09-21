@@ -449,18 +449,91 @@ class AirSyncViewModel(
                     if (currentIp != previousNetworkIp) {
                         previousNetworkIp = currentIp
 
-                        // Update local device info
+                        // Update local device info immediately
                         _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
 
-                        // Reload network-aware device mappings
+                        // Always refresh network-aware device mappings on network change
                         loadNetworkDevicesForNetworkChange()
 
-                        // If we became disconnected due to network change, and have a reconnect target, kick auto-reconnect
-                        val hasTarget = hasNetworkAwareMappingForLastDevice() != null
+                        // Cancel any ongoing auto-reconnect loop; we'll restart with the new network context if needed
+                        try { WebSocketUtil.cancelAutoReconnect() } catch (_: Exception) {}
+
                         val manual = repository.getUserManuallyDisconnected().first()
                         val autoOn = repository.getAutoReconnectEnabled().first()
-                        if (!uiState.value.isConnected && hasTarget && autoOn && !manual) {
-                            WebSocketUtil.requestAutoReconnect(context)
+
+                        // Determine if we have a mapping for the last connected device on this network
+                        val target = hasNetworkAwareMappingForLastDevice()
+
+                        if (currentIp == "No Wi-Fi" || currentIp == "Unknown") {
+                            // No usable Wi‑Fi: ensure we stop any active connection and do not attempt reconnect
+                            try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            _uiState.value = _uiState.value.copy(isConnected = false, isConnecting = false)
+                            return@collect
+                        }
+
+                        if (target != null) {
+                            // We have a specific device mapping for this network. Switch immediately.
+                            // Update UI fields so the user sees the correct endpoint.
+                            updateIpAddress(target.ipAddress)
+                            updatePort(target.port)
+                            updateSymmetricKey(target.symmetricKey)
+
+                            // If connected/connecting to old network, disconnect first to force a clean switch
+                            if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
+                                try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            }
+
+                            // Auto-connect if auto-reconnect is enabled and the user hasn't manually disconnected.
+                            if (autoOn && !manual) {
+                                // Mark as connecting in UI and kick off a non-manual connection (so it won't flip manual flags)
+                                _uiState.value = _uiState.value.copy(isConnecting = true)
+                                try {
+                                    WebSocketUtil.connect(
+                                        context = context,
+                                        ipAddress = target.ipAddress,
+                                        port = target.port.toIntOrNull() ?: 6996,
+                                        symmetricKey = target.symmetricKey,
+                                        manualAttempt = false,
+                                        onConnectionStatus = { connected ->
+                                            viewModelScope.launch {
+                                                _uiState.value = _uiState.value.copy(
+                                                    isConnected = connected,
+                                                    isConnecting = false,
+                                                    response = if (connected) "Connected successfully!" else "Reconnection failed"
+                                                )
+                                                if (connected) {
+                                                    // Update last connected record timestamp for this device
+                                                    try {
+                                                        // Persist as the last connected device and refresh network-aware mapping timestamps
+                                                        saveLastConnectedDevice(
+                                                            pcName = target.name,
+                                                            isPlus = target.isPlus,
+                                                            symmetricKey = target.symmetricKey
+                                                        )
+                                                    } catch (_: Exception) {}
+                                                } else if (autoOn && !manual) {
+                                                    // If the immediate connect failed, restart the auto-reconnect loop for this network
+                                                    try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                                }
+                                            }
+                                        }
+                                    )
+                                } catch (_: Exception) {
+                                    // Fall back to auto-reconnect loop
+                                    try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                }
+                            } else {
+                                // User has disabled auto connect, just update the displayed device/IP
+                                _uiState.value = _uiState.value.copy(isConnecting = false)
+                            }
+                        } else {
+                            // No mapping for this network: disconnect if connected and, if allowed, start generic auto-reconnect
+                            if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
+                                try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            }
+                            if (autoOn && !manual) {
+                                try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                            }
                         }
                     }
                 }
