@@ -103,9 +103,6 @@ object WebSocketUtil {
         onConnectionStatusChanged = onConnectionStatus
         onMessageReceived = onMessage
 
-        // Reflect "Connecting..." immediately in the persistent notification
-    updatePersistentNotification(context, isConnected = false, isConnecting = true)
-
         try {
             if (client == null) {
                 client = createClient()
@@ -131,7 +128,6 @@ object WebSocketUtil {
 
                     // Trigger initial sync so Mac responds
                     try { SyncManager.performInitialSync(context) } catch (_: Exception) {}
-                    updatePersistentNotification(context, isConnected = false, isConnecting = true)
 
                     // Start handshake timeout
                     handshakeTimeoutJob?.cancel()
@@ -151,7 +147,6 @@ object WebSocketUtil {
                                     } catch (_: Exception) {}
                                 }
                                 onConnectionStatusChanged?.invoke(false)
-                                updatePersistentNotification(context, isConnected = false, isConnecting = false)
                                 notifyConnectionStatusListeners(false)
                                 onHandshakeTimeout?.invoke()
                             }
@@ -184,7 +179,6 @@ object WebSocketUtil {
                             } catch (_: Exception) { }
                             try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
                             onConnectionStatusChanged?.invoke(true)
-                            updatePersistentNotification(context, isConnected = true, isConnecting = false)
                             notifyConnectionStatusListeners(true)
                         }
                     }
@@ -207,7 +201,6 @@ object WebSocketUtil {
                     handshakeCompleted.set(false)
                     handshakeTimeoutJob?.cancel()
                     onConnectionStatusChanged?.invoke(false)
-                    updatePersistentNotification(context, isConnected = false, isConnecting = false)
                     // Clear continue browsing notifs on disconnect
                     try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
 
@@ -227,7 +220,6 @@ object WebSocketUtil {
 
                     // Update connection status
                     onConnectionStatusChanged?.invoke(false)
-                    updatePersistentNotification(context, isConnected = false, isConnecting = false)
                     // Clear continue browsing notifs on failure
                     try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
 
@@ -245,7 +237,6 @@ object WebSocketUtil {
             handshakeCompleted.set(false)
             handshakeTimeoutJob?.cancel()
             onConnectionStatusChanged?.invoke(false)
-            updatePersistentNotification(context, isConnected = false, isConnecting = false)
             try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
         }
     }
@@ -330,40 +321,6 @@ object WebSocketUtil {
         return isConnecting.get()
     }
 
-    private fun updatePersistentNotification(context: Context, isConnected: Boolean, isConnecting: Boolean) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
-
-                val lastDevice = ds.getLastConnectedDevice().first()
-                val deviceName = lastDevice?.name
-
-                val ourIp = com.sameerasw.airsync.utils.DeviceInfoUtil.getWifiIpAddress(context)
-                val all = ds.getAllNetworkDeviceConnections().first()
-                val hasReconnectTarget = if (ourIp != null && lastDevice != null) {
-                    all.firstOrNull { it.deviceName == lastDevice.name && it.getClientIpForNetwork(ourIp) != null } != null
-                } else false
-                val manual = ds.getUserManuallyDisconnected().first()
-
-                // Show only when actively connecting (manual/normal). During auto-reconnect we rely on QS tile only.
-                if (!isConnected && isConnecting && !manual) {
-                    NotificationUtil.showConnectionStatusNotification(
-                        context = context,
-                        deviceName = deviceName,
-                        isConnected = isConnected,
-                        isConnecting = isConnecting,
-                        isAutoReconnecting = false,
-                        hasReconnectTarget = hasReconnectTarget
-                    )
-                } else {
-                    NotificationUtil.hideConnectionStatusNotification(context)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating persistent notification: ${e.message}")
-            }
-        }
-    }
-
     private fun updateLastSyncTime(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -404,7 +361,6 @@ object WebSocketUtil {
 
     fun stopAutoReconnect(context: Context) {
         cancelAutoReconnect()
-        try { NotificationUtil.hideConnectionStatusNotification(context) } catch (_: Exception) {}
     }
 
     private fun tryStartAutoReconnect(context: Context) {

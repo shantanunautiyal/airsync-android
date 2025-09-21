@@ -129,11 +129,6 @@
             android:name=".service.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.sameerasw.airsync.STOP_SYNC" />
-                <!-- Status notification actions -->
-                <action android:name="com.sameerasw.airsync.DISCONNECT" />
-                <action android:name="com.sameerasw.airsync.RECONNECT" />
-                    <action android:name="com.sameerasw.airsync.STOP_RECONNECT" />
                 <!-- Continue Browsing actions -->
                 <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
             </intent-filter>
