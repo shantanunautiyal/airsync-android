@@ -421,6 +421,11 @@ class AirSyncViewModel(
             repository.setUserManuallyDisconnected(disconnected)
         }
     }
+
+    // Awaitable variant used when ordering matters (e.g., ensure flag is persisted before disconnect)
+    suspend fun setUserManuallyDisconnectedAwait(disconnected: Boolean) {
+        repository.setUserManuallyDisconnected(disconnected)
+    }
     private fun hasNetworkAwareMappingForLastDevice(): ConnectedDevice? {
         val ourIp = _deviceInfo.value.localIp
         val last = _uiState.value.lastConnectedDevice ?: return null

@@ -237,10 +237,13 @@ fun AirSyncMainScreen(
 
     fun disconnect() {
         // Set manual disconnect flag BEFORE disconnecting to prevent auto-reconnect trigger
-        viewModel.setUserManuallyDisconnected(true)
-        WebSocketUtil.disconnect(context)
-        viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
-        viewModel.setResponse("Disconnected")
+        // Use an awaited write to avoid a race where auto-reconnect reads the old value.
+        scope.launch {
+            viewModel.setUserManuallyDisconnectedAwait(true)
+            WebSocketUtil.disconnect(context)
+            viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+            viewModel.setResponse("Disconnected")
+        }
     }
 
     fun launchScanner(context: Context) {
