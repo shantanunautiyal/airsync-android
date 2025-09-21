@@ -260,7 +260,7 @@ fun AirSyncMainScreen(
             val items = listOf("Connect", "Settings")
             val selectedIcons = listOf(Icons.Filled.Home, Icons.Filled.Settings)
             val unselectedIcons = listOf(Icons.Outlined.Home, Icons.Outlined.Settings)
-            NavigationBar {
+            NavigationBar(windowInsets = WindowInsets(0, 0, 0, 0)) {
                 items.forEachIndexed { index, item ->
                     NavigationBarItem(
                         icon = {
