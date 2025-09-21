@@ -36,6 +36,8 @@ object WebSocketUtil {
     // Callback for connection status changes
     private var onConnectionStatusChanged: ((Boolean) -> Unit)? = null
     private var onMessageReceived: ((String) -> Unit)? = null
+    // Application context for side-effects (notifications/services) when explicit context isn't provided
+    private var appContext: Context? = null
 
     // Global connection status listeners for UI updates
     private val connectionStatusListeners = mutableSetOf<(Boolean) -> Unit>()
@@ -72,6 +74,9 @@ object WebSocketUtil {
         // Called if we don't receive an initial message from Mac within timeout (likely auth failure)
         onHandshakeTimeout: (() -> Unit)? = null
     ) {
+        // Cache application context for future cleanup even if callers don't pass context on disconnect
+        appContext = context.applicationContext
+
         if (isConnecting.get() || isConnected.get()) {
             Log.d(TAG, "Already connected or connecting")
             return
@@ -209,6 +214,8 @@ object WebSocketUtil {
                     onConnectionStatusChanged?.invoke(false)
                     // Clear continue browsing notifs on disconnect
                     try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+                    // Ensure media player is removed when connection closes
+                    try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
@@ -229,6 +236,8 @@ object WebSocketUtil {
                     onConnectionStatusChanged?.invoke(false)
                     // Clear continue browsing notifs on failure
                     try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+                    // Ensure media player is removed when connection fails
+                    try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
 
                     // Notify listeners about the connection status
                     notifyConnectionStatusListeners(false)
@@ -293,18 +302,25 @@ object WebSocketUtil {
         webSocket = null
         onConnectionStatusChanged?.invoke(false)
 
+        // Resolve a context for side-effects (try provided one, fall back to appContext)
+        val ctx = context ?: appContext
         // Clear continue browsing notifications if possible
-        context?.let {
-            try { NotificationUtil.clearContinueBrowsingNotifications(it) } catch (_: Exception) {}
+        ctx?.let { c ->
+            try { NotificationUtil.clearContinueBrowsingNotifications(c) } catch (_: Exception) {}
         }
 
         // Notify listeners about the disconnection
         notifyConnectionStatusListeners(false)
         // Stop any auto-reconnect in progress
         cancelAutoReconnect()
+        // Stop media player if running
+        ctx?.let { c ->
+            try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(c) } catch (_: Exception) {}
+        }
+
         // Update widgets to reflect new state
-        context?.let {
-            try { AirSyncWidgetProvider.updateAllWidgets(it) } catch (_: Exception) {}
+        ctx?.let { c ->
+            try { AirSyncWidgetProvider.updateAllWidgets(c) } catch (_: Exception) {}
         }
     }
 
@@ -323,6 +339,7 @@ object WebSocketUtil {
         onMessageReceived = null
         handshakeCompleted.set(false)
         handshakeTimeoutJob?.cancel()
+        appContext = null
     }
 
     fun isConnected(): Boolean {
