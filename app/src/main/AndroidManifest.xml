@@ -112,6 +112,11 @@
             </intent-filter>
         </service>
 
+        <!-- Wake-up Service for receiving reconnection requests from Mac -->
+        <service
+            android:name=".service.WakeupService"
+            android:exported="false" />
+
         <!-- Widget Provider -->
         <receiver
             android:name=".widget.AirSyncWidgetProvider"

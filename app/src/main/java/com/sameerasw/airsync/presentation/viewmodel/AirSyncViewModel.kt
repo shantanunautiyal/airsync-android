@@ -17,6 +17,7 @@ import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.service.WakeupService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -95,6 +96,11 @@ class AirSyncViewModel(
 
         // Clean up Mac media session
         MacDeviceStatusManager.cleanup()
+        
+        // Stop WakeupService when ViewModel is cleared
+        appContext?.let { context ->
+            try { WakeupService.stopService(context) } catch (_: Exception) {}
+        }
     }
 
     private fun startObservingDeviceChanges(context: Context) {
@@ -221,6 +227,11 @@ class AirSyncViewModel(
 
             // Start observing device changes for real-time updates
             startObservingDeviceChanges(context)
+            
+            // Start WakeupService if we have WiFi connectivity
+            if (localIp != "Unknown" && localIp != "No Wi-Fi") {
+                try { WakeupService.startService(context) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -477,8 +488,13 @@ class AirSyncViewModel(
                         if (currentIp == "No Wi-Fi" || currentIp == "Unknown") {
                             // No usable Wi‑Fi: ensure we stop any active connection and do not attempt reconnect
                             try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                            // Stop wake-up service when no WiFi
+                            try { WakeupService.stopService(context) } catch (_: Exception) {}
                             _uiState.value = _uiState.value.copy(isConnected = false, isConnecting = false)
                             return@collect
+                        } else {
+                            // Start wake-up service when WiFi is available
+                            try { WakeupService.startService(context) } catch (_: Exception) {}
                         }
 
                         if (target != null) {
