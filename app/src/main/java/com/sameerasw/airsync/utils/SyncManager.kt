@@ -154,18 +154,6 @@ object SyncManager {
                     Log.e(TAG, "Failed to send lite device info")
                 }
 
-                // Send Android wake-up connection info to Mac
-                try {
-                    val connectionInfo = DeviceConnectionInfo.generateConnectionInfo(context)
-                    if (WebSocketUtil.sendMessage(connectionInfo)) {
-                        Log.d(TAG, "Android wake-up connection info sent to Mac")
-                    } else {
-                        Log.w(TAG, "Failed to send wake-up connection info")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error sending wake-up connection info: ${e.message}")
-                }
-
                 // Optionally send full device info with wallpaper a bit later, but don't block handshake
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
