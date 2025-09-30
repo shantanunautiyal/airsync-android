@@ -24,10 +24,12 @@ object NotificationUtil {
     private fun createContinueBrowsingChannel(context: Context) {
         val name = "Continue browsing"
         val descriptionText = "Quick open links received from desktop"
-        val importance = NotificationManager.IMPORTANCE_DEFAULT
+        val importance = NotificationManager.IMPORTANCE_LOW
         val channel = NotificationChannel(CONTINUE_CHANNEL_ID, name, importance).apply {
             description = descriptionText
-            setShowBadge(true)
+            setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
         }
         val notificationManager: NotificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -97,10 +99,15 @@ object NotificationUtil {
     }
 
     // New: Continue Browsing notifications
-    fun showContinueBrowsingLink(context: Context, url: String) {
+    fun showContinueBrowsingLink(context: Context, url: String, keepPrevious: Boolean = true) {
         createContinueBrowsingChannel(context)
         val manager = NotificationManagerCompat.from(context)
         val notifId = (url.hashCode() and 0x7fffffff) // stable positive ID per URL
+
+        // If keepPrevious is false, clear all existing continue browsing notifications first
+        if (!keepPrevious) {
+            clearContinueBrowsingNotifications(context)
+        }
 
         // Normalize only for the open intent (keep text as-is)
         val trimmed = url.trim()
@@ -132,7 +139,8 @@ object NotificationUtil {
             .setStyle(NotificationCompat.BigTextStyle().bigText(trimmed))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
             .setContentIntent(openPending)
             .addAction(android.R.drawable.ic_menu_view, "Open", openPending)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending)

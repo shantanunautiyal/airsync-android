@@ -468,7 +468,9 @@ fun AirSyncMainScreen(
                         isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
                         continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
                         isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                        onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) }
+                        onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
+                        isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
+                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
                     )
 
                     DeviceInfoCard(

@@ -31,6 +31,9 @@ fun ClipboardSyncCard(
     // New: Send now playing props
     isSendNowPlayingEnabled: Boolean,
     onToggleSendNowPlaying: (Boolean) -> Unit,
+    // New: Keep previous link props
+    isKeepPreviousLinkEnabled: Boolean,
+    onToggleKeepPreviousLink: (Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -98,6 +101,29 @@ fun ClipboardSyncCard(
                 )
             }
 
+            // Keep previous link toggle under Send now playing
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Keep previous link", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Keep multiple continue browsing notifications",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isKeepPreviousLinkEnabled,
+                    onCheckedChange = onToggleKeepPreviousLink,
+                    enabled = isContinueBrowsingToggleEnabled
+                )
+            }
+
             // Send now playing toggle under Continue Browsing
             Row(
                 modifier = Modifier
@@ -119,6 +145,7 @@ fun ClipboardSyncCard(
                     onCheckedChange = onToggleSendNowPlaying
                 )
             }
+
         }
     }
 }

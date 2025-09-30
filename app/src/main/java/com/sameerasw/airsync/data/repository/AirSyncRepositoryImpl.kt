@@ -141,6 +141,15 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getSendNowPlayingEnabled()
     }
 
+    // New: Keep previous link setting
+    override suspend fun setKeepPreviousLinkEnabled(enabled: Boolean) {
+        dataStoreManager.setKeepPreviousLinkEnabled(enabled)
+    }
+
+    override fun getKeepPreviousLinkEnabled(): Flow<Boolean> {
+        return dataStoreManager.getKeepPreviousLinkEnabled()
+    }
+
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
         dataStoreManager.setUserManuallyDisconnected(disconnected)
     }

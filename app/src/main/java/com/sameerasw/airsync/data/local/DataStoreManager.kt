@@ -52,6 +52,8 @@ class DataStoreManager(private val context: Context) {
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
         // New: Send now playing toggle
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
+        // New: Keep previous link toggle
+        private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
 
         // Network-aware device connections
         private val NETWORK_DEVICES_PREFIX = "network_device_"
@@ -178,6 +180,19 @@ class DataStoreManager(private val context: Context) {
     fun getSendNowPlayingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[SEND_NOW_PLAYING_ENABLED] != false // Default to enabled
+        }
+    }
+
+    // New: Keep previous link toggle
+    suspend fun setKeepPreviousLinkEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEEP_PREVIOUS_LINK_ENABLED] = enabled
+        }
+    }
+
+    fun getKeepPreviousLinkEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[KEEP_PREVIOUS_LINK_ENABLED] != false // Default to enabled
         }
     }
 
