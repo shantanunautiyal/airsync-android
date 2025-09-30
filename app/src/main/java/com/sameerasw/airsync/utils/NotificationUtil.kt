@@ -24,10 +24,12 @@ object NotificationUtil {
     private fun createContinueBrowsingChannel(context: Context) {
         val name = "Continue browsing"
         val descriptionText = "Quick open links received from desktop"
-        val importance = NotificationManager.IMPORTANCE_DEFAULT
+        val importance = NotificationManager.IMPORTANCE_LOW
         val channel = NotificationChannel(CONTINUE_CHANNEL_ID, name, importance).apply {
             description = descriptionText
-            setShowBadge(true)
+            setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
         }
         val notificationManager: NotificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -132,7 +134,8 @@ object NotificationUtil {
             .setStyle(NotificationCompat.BigTextStyle().bigText(trimmed))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
             .setContentIntent(openPending)
             .addAction(android.R.drawable.ic_menu_view, "Open", openPending)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending)
