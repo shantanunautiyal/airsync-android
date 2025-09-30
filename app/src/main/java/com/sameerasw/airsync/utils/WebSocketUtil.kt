@@ -259,17 +259,24 @@ object WebSocketUtil {
     }
 
     private fun isLocalNetwork(ipAddress: String): Boolean {
-        return ipAddress.startsWith("192.168.") ||
-                ipAddress.startsWith("10.") ||
-                ipAddress.startsWith("172.16.") ||
-                ipAddress.startsWith("172.17.") ||
-                ipAddress.startsWith("172.18.") ||
-                ipAddress.startsWith("172.19.") ||
-                ipAddress.startsWith("172.2") ||
-                ipAddress.startsWith("172.30.") ||
-                ipAddress.startsWith("172.31.") ||
-                ipAddress == "127.0.0.1" ||
-                ipAddress == "localhost"
+        // Check standard private IP ranges (RFC 1918)
+        if (ipAddress.startsWith("192.168.") || ipAddress.startsWith("10.")) {
+            return true
+        }
+        
+        // Check 172.16.0.0 to 172.31.255.255 range
+        if (ipAddress.startsWith("172.")) {
+            val parts = ipAddress.split(".")
+            if (parts.size >= 2) {
+                val secondOctet = parts[1].toIntOrNull()
+                if (secondOctet != null && secondOctet in 16..31) {
+                    return true
+                }
+            }
+        }
+        
+        // Check localhost
+        return ipAddress == "127.0.0.1" || ipAddress == "localhost"
     }
 
     fun sendMessage(message: String): Boolean {

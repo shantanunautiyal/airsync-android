@@ -49,7 +49,10 @@ class AirSyncViewModel(
 
     private var appContext: Context? = null
     // Manual connect canceller reference (set in init) for unregistering
-    private val manualConnectCanceler: () -> Unit = { /* no-op */ }
+    private val manualConnectCanceler: () -> Unit = { 
+        // Cancel any active auto-reconnect when user starts manual connection
+        try { WebSocketUtil.cancelAutoReconnect() } catch (_: Exception) {}
+    }
 
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
