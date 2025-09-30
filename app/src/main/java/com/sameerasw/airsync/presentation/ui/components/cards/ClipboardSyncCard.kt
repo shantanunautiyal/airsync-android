@@ -101,28 +101,6 @@ fun ClipboardSyncCard(
                 )
             }
 
-            // Send now playing toggle under Continue Browsing
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Send now playing", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Share media playback details (title, artist, artwork) with desktop",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = isSendNowPlayingEnabled,
-                    onCheckedChange = onToggleSendNowPlaying
-                )
-            }
-
             // Keep previous link toggle under Send now playing
             Row(
                 modifier = Modifier
@@ -145,6 +123,29 @@ fun ClipboardSyncCard(
                     enabled = isContinueBrowsingToggleEnabled
                 )
             }
+
+            // Send now playing toggle under Continue Browsing
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Send now playing", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Share media playback details (title, artist, artwork) with desktop",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isSendNowPlayingEnabled,
+                    onCheckedChange = onToggleSendNowPlaying
+                )
+            }
+
         }
     }
 }
