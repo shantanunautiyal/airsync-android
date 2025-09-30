@@ -60,6 +60,10 @@ interface AirSyncRepository {
     suspend fun setSendNowPlayingEnabled(enabled: Boolean)
     fun getSendNowPlayingEnabled(): Flow<Boolean>
 
+    // Keep previous link settings
+    suspend fun setKeepPreviousLinkEnabled(enabled: Boolean)
+    fun getKeepPreviousLinkEnabled(): Flow<Boolean>
+
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>

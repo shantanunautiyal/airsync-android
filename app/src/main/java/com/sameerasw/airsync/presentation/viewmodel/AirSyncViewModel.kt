@@ -156,6 +156,7 @@ class AirSyncViewModel(
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
+            val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -198,7 +199,8 @@ class AirSyncViewModel(
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
-                isSendNowPlayingEnabled = isSendNowPlayingEnabled
+                isSendNowPlayingEnabled = isSendNowPlayingEnabled,
+                isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -566,6 +568,13 @@ class AirSyncViewModel(
                 // Update media listener immediate behavior and sync status
                 com.sameerasw.airsync.service.MediaNotificationListener.setNowPlayingEnabled(ctx, enabled)
             }
+        }
+    }
+
+    fun setKeepPreviousLinkEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isKeepPreviousLinkEnabled = enabled)
+        viewModelScope.launch {
+            repository.setKeepPreviousLinkEnabled(enabled)
         }
     }
 

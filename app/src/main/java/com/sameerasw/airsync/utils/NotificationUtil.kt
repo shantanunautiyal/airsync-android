@@ -99,10 +99,15 @@ object NotificationUtil {
     }
 
     // New: Continue Browsing notifications
-    fun showContinueBrowsingLink(context: Context, url: String) {
+    fun showContinueBrowsingLink(context: Context, url: String, keepPrevious: Boolean = true) {
         createContinueBrowsingChannel(context)
         val manager = NotificationManagerCompat.from(context)
         val notifId = (url.hashCode() and 0x7fffffff) // stable positive ID per URL
+
+        // If keepPrevious is false, clear all existing continue browsing notifications first
+        if (!keepPrevious) {
+            clearContinueBrowsingNotifications(context)
+        }
 
         // Normalize only for the open intent (keep text as-is)
         val trimmed = url.trim()
