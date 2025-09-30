@@ -111,8 +111,42 @@ object ClipboardSyncManager {
     private fun isLinkOnly(text: String): Boolean {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false
-        val matcher = Patterns.WEB_URL.matcher(trimmed)
-        return matcher.matches()
+        
+        // Split by whitespace to check if it's only a single token (no other text)
+        val tokens = trimmed.split("\\s+".toRegex())
+        if (tokens.size != 1) return false
+        
+        val url = tokens[0]
+        
+        // Check for explicit protocols
+        if (url.startsWith("http://", ignoreCase = true) || 
+            url.startsWith("https://", ignoreCase = true) ||
+            url.startsWith("ftp://", ignoreCase = true)) {
+            return true
+        }
+        
+        // Check for www prefix without protocol
+        if (url.startsWith("www.", ignoreCase = true)) {
+            return isValidDomainFormat(url.substring(4))
+        }
+        
+        // Check if it looks like a domain name (no protocol, no www)
+        return isValidDomainFormat(url)
+    }
+    
+    private fun isValidDomainFormat(domain: String): Boolean {
+        if (domain.isEmpty()) return false
+        
+        // Basic domain validation regex
+        // Matches: domain.com, sub.domain.com, domain.co.uk, etc.
+        val domainRegex = Regex(
+            "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" +
+            "(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*" +
+            "\\.[a-zA-Z]{2,}$",
+            RegexOption.IGNORE_CASE
+        )
+        
+        return domainRegex.matches(domain)
     }
 
     /**
