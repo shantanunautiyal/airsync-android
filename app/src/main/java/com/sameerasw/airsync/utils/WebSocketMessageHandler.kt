@@ -31,6 +31,8 @@ object WebSocketMessageHandler {
             Log.d(TAG, "Handling message type: $type")
 
             when (type) {
+                "startMirrorRequest" -> handleStartMirrorRequest(context, data)
+                "stopMirrorRequest" -> handleStopMirrorRequest(context)
                 "clipboardUpdate" -> handleClipboardUpdate(context, data)
                 "fileTransferInit" -> handleFileTransferInit(context, data)
                 "fileChunk" -> handleFileChunk(context, data)
@@ -45,12 +47,113 @@ object WebSocketMessageHandler {
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
                 "macInfo" -> handleMacInfo(context, data)
+                "requestSmsConversations" -> handleRequestSmsConversations(context)
+                "requestSmsMessages" -> handleRequestSmsMessages(context, data)
+                "sendSms" -> handleSendSms(context, data)
+                "requestCallLogs" -> handleRequestCallLogs(context)
+                "startHealthScan" -> handleStartHealthScan(context)
+                "requestWallpaper" -> handleRequestWallpaper(context)
+                "requestHealthData" -> handleRequestHealthData(context)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling incoming message: ${e.message}")
+        }
+    }
+
+    private fun handleRequestHealthData(context: Context) {
+        val viewModel = com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel.create(context)
+        viewModel.onHealthDataRequest()
+    }
+
+    private fun handleRequestWallpaper(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            WallpaperHandler.sendWallpaper(context)
+        }
+    }
+
+    private fun handleStartMirrorRequest(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            // Accept either res or resolution, and bitrate or bitrateMbps
+            val res = data.optString("res", data.optString("resolution", ""))
+            val bitrate = if (data.has("bitrate")) data.optInt("bitrate", 2) else data.optInt("bitrateMbps", 2)
+            val parts = res.split("x")
+            val width = parts.getOrNull(0)?.toIntOrNull() ?: 1280
+            val height = parts.getOrNull(1)?.toIntOrNull() ?: 720
+
+            // TODO: Ideally signal MainActivity to show MediaProjection dialog. As a pragmatic approach,
+            // send a broadcast that activities can observe to trigger MirroringManager.requestStartProjection
+            val intent = android.content.Intent("com.sameerasw.airsync.ACTION_REQUEST_MIRROR")
+            intent.addFlags(android.content.Intent.FLAG_RECEIVER_FOREGROUND)
+            intent.putExtra("width", width)
+            intent.putExtra("height", height)
+            intent.putExtra("bitrate", bitrate)
+            // Notify UI via broadcast so MainActivity (registered receiver) can request MediaProjection
+            context.sendBroadcast(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "handleStartMirrorRequest error: ${e.message}")
+        }
+    }
+
+    private fun handleStopMirrorRequest(context: Context) {
+        try {
+            com.sameerasw.airsync.mirror.MirroringManager.stop()
+            val resp = org.json.JSONObject()
+            resp.put("type", "stopMirrorResponse")
+            val d = org.json.JSONObject()
+            d.put("success", true)
+            resp.put("data", d)
+            WebSocketUtil.sendMessage(JsonUtil.toSingleLine(resp.toString()))
+        } catch (e: Exception) {
+            Log.e(TAG, "handleStopMirrorRequest error: ${e.message}")
+        }
+    }
+
+    private fun handleRequestSmsConversations(context: Context) {
+        try {
+            SmsHandler.fetchConversations(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "handleRequestSmsConversations error: ${e.message}")
+        }
+    }
+
+    private fun handleRequestSmsMessages(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val convId = data.optString("conversationId", "")
+            if (convId.isNotEmpty()) SmsHandler.fetchMessagesForConversation(context, convId)
+        } catch (e: Exception) {
+            Log.e(TAG, "handleRequestSmsMessages error: ${e.message}")
+        }
+    }
+
+    private fun handleSendSms(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val recipient = data.optString("recipient", "")
+            val message = data.optString("message", "")
+            if (recipient.isNotEmpty() && message.isNotEmpty()) SmsHandler.sendSms(context, recipient, message)
+        } catch (e: Exception) {
+            Log.e(TAG, "handleSendSms error: ${e.message}")
+        }
+    }
+
+    private fun handleRequestCallLogs(context: Context) {
+        try {
+            CallLogHandler.fetchCallLogs(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "handleRequestCallLogs error: ${e.message}")
+        }
+    }
+
+    private fun handleStartHealthScan(context: Context) {
+        try {
+            HealthBleManager.startScanAndConnect(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "handleStartHealthScan error: ${e.message}")
         }
     }
 

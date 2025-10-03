@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A list of Health Connect permissions that your app wants to request. -->
+    <string-array name="health_permissions">
+        <!-- Steps & Activity -->
+        <item>android.permission.health.READ_STEPS</item>
+        <item>android.permission.health.WRITE_STEPS</item>
+        <item>android.permission.health.READ_ACTIVE_MINUTES</item>
+        <item>android.permission.health.WRITE_ACTIVE_MINUTES</item>
+        <item>android.permission.health.READ_DISTANCE</item>
+        <item>android.permission.health.WRITE_DISTANCE</item>
+        
+        <!-- Heart & Vitals -->
+        <item>android.permission.health.READ_HEART_RATE</item>
+        <item>android.permission.health.WRITE_HEART_RATE</item>
+        <item>android.permission.health.READ_BLOOD_PRESSURE</item>
+        <item>android.permission.health.WRITE_BLOOD_PRESSURE</item>
+        <item>android.permission.health.READ_BODY_TEMPERATURE</item>
+        <item>android.permission.health.WRITE_BODY_TEMPERATURE</item>
+        <item>android.permission.health.READ_OXYGEN_SATURATION</item>
+        <item>android.permission.health.WRITE_OXYGEN_SATURATION</item>
+
+        <!-- Sleep & Mindfulness -->
+        <item>android.permission.health.READ_SLEEP</item>
+        <item>android.permission.health.WRITE_SLEEP</item>
+        <item>android.permission.health.READ_MINDFULNESS</item>
+        <item>android.permission.health.WRITE_MINDFULNESS</item>
+
+        <!-- Nutrition -->
+        <item>android.permission.health.READ_NUTRITION</item>
+        <item>android.permission.health.WRITE_NUTRITION</item>
+
+        <!-- Body Measurements -->
+        <item>android.permission.health.READ_BODY_MASS</item>
+        <item>android.permission.health.WRITE_BODY_MASS</item>
+        <item>android.permission.health.READ_BODY_FAT_PERCENTAGE</item>
+        <item>android.permission.health.WRITE_BODY_FAT_PERCENTAGE</item>
+        <item>android.permission.health.READ_HEIGHT</item>
+        <item>android.permission.health.WRITE_HEIGHT</item>
+        <item>android.permission.health.READ_WEIGHT</item>
+        <item>android.permission.health.WRITE_WEIGHT</item>
+
+        <!-- Blood Glucose & Pressure -->
+        <item>android.permission.health.READ_BLOOD_GLUCOSE</item>
+        <item>android.permission.health.WRITE_BLOOD_GLUCOSE</item>
+    </string-array>
+</resources>

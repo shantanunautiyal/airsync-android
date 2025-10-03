@@ -171,4 +171,16 @@ object JsonUtil {
         val statePart = newState?.let { ",\"state\":$it" } ?: ""
         return """{"type":"toggleNowPlayingResponse","data":{"success":$success$statePart,"message":"${escape(message)}"}}"""
     }
+
+    fun createSmsConversationsJson(conversationsJsonArrayString: String): String {
+        return "{" + "\"type\":\"smsConversations\",\"data\":$conversationsJsonArrayString}".replace("\n", " ")
+    }
+
+    fun createSmsMessagesJson(conversationId: String, messagesJsonArrayString: String): String {
+        return "{" + "\"type\":\"smsMessages\",\"data\":{\"conversationId\":\"$conversationId\",\"messages\":$messagesJsonArrayString}}".replace("\n", " ")
+    }
+
+    fun createHealthUpdateJson(source: String, heartRate: Int, timestampSec: Long): String {
+        return "{" + "\"type\":\"healthUpdate\",\"data\":{\"source\":\"$source\",\"heartRate\":$heartRate,\"timestamp\":$timestampSec}}"
+    }
 }

@@ -2,6 +2,7 @@ package com.sameerasw.airsync.presentation.viewmodel
 
 import android.content.Context
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sameerasw.airsync.data.local.DataStoreManager
@@ -12,6 +13,7 @@ import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.HealthConnectManager
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.PermissionUtil
@@ -22,6 +24,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -139,6 +144,10 @@ class AirSyncViewModel(
         }
     }
 
+    fun startMirroring() {
+        // TODO: Implement screen mirroring logic
+    }
+
     fun initializeState(
         context: Context,
         initialIp: String? = null,
@@ -150,72 +159,81 @@ class AirSyncViewModel(
     ) {
         appContext = context.applicationContext
         viewModelScope.launch {
-            // Load saved values
-            val savedIp = initialIp ?: repository.getIpAddress().first()
-            val savedPort = initialPort ?: repository.getPort().first()
-            val savedDeviceName = repository.getDeviceName().first()
-            val lastConnected = repository.getLastConnectedDevice().first()
-            val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
-            val isDeveloperMode = repository.getDeveloperMode().first()
-            val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
-            val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
-            val lastConnectedSymmetricKey = lastConnected?.symmetricKey
-            val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
-            val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
-            val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
+            val (initialState, deviceInfo) = withContext(Dispatchers.IO) {
+                // Load saved values
+                val savedIp = initialIp ?: repository.getIpAddress().first()
+                val savedPort = initialPort ?: repository.getPort().first()
+                val savedDeviceName = repository.getDeviceName().first()
+                val lastConnected = repository.getLastConnectedDevice().first()
+                val isNotificationSyncEnabled = repository.getNotificationSyncEnabled().first()
+                val isDeveloperMode = repository.getDeveloperMode().first()
+                val isClipboardSyncEnabled = repository.getClipboardSyncEnabled().first()
+                val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
+                val lastConnectedSymmetricKey = lastConnected?.symmetricKey
+                val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
+                val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
+                val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
+                val isPhoneLogSyncEnabled = repository.getPhoneLogSyncEnabled().first()
+                val isMessageSyncEnabled = repository.getMessageSyncEnabled().first()
 
-            // Get device info
-            val deviceName = savedDeviceName.ifEmpty {
-                val autoName = DeviceInfoUtil.getDeviceName(context)
-                repository.saveDeviceName(autoName)
-                autoName
+                // Get device info
+                val deviceName = savedDeviceName.ifEmpty {
+                    val autoName = DeviceInfoUtil.getDeviceName(context)
+                    viewModelScope.launch { repository.saveDeviceName(autoName) }
+                    autoName
+                }
+
+                val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+                val newDeviceInfo = DeviceInfo(name = deviceName, localIp = localIp)
+
+                // Load network-aware device connections
+                loadNetworkDevices()
+
+                // Check for network-aware device for current network
+                val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+                val deviceToShow = networkAwareDevice ?: lastConnected
+
+                // Check permissions
+                val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
+                val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
+
+                // Check current WebSocket connection status
+                val currentlyConnected = WebSocketUtil.isConnected()
+
+                val newState = _uiState.value.copy(
+                    ipAddress = savedIp,
+                    port = savedPort,
+                    deviceNameInput = deviceName,
+                    isDialogVisible = showConnectionDialog && !currentlyConnected,
+                    missingPermissions = missingPermissions,
+                    isNotificationEnabled = isNotificationEnabled,
+                    lastConnectedDevice = deviceToShow,
+                    isNotificationSyncEnabled = isNotificationSyncEnabled,
+                    isDeveloperMode = isDeveloperMode,
+                    isClipboardSyncEnabled = isClipboardSyncEnabled,
+                    isAutoReconnectEnabled = isAutoReconnectEnabled,
+                    isConnected = currentlyConnected,
+                    symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
+                    isContinueBrowsingEnabled = isContinueBrowsingEnabled,
+                    isSendNowPlayingEnabled = isSendNowPlayingEnabled,
+                    isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
+                    isPhoneLogSyncEnabled = isPhoneLogSyncEnabled,
+                    isMessageSyncEnabled = isMessageSyncEnabled
+                )
+
+                Pair(newState, newDeviceInfo)
             }
 
-            val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
-
-            _deviceInfo.value = DeviceInfo(name = deviceName, localIp = localIp)
-
-            // Load network-aware device connections
-            loadNetworkDevices()
-
-            // Check for network-aware device for current network
-            val networkAwareDevice = getNetworkAwareLastConnectedDevice()
-            val deviceToShow = networkAwareDevice ?: lastConnected
-
-            // Check permissions
-            val missingPermissions = PermissionUtil.getAllMissingPermissions(context)
-            val isNotificationEnabled = PermissionUtil.isNotificationListenerEnabled(context)
-
-            // Check current WebSocket connection status
-            val currentlyConnected = WebSocketUtil.isConnected()
-
-            _uiState.value = _uiState.value.copy(
-                ipAddress = savedIp,
-                port = savedPort,
-                deviceNameInput = deviceName,
-                // Only show dialog if not already connected and showConnectionDialog is true
-                isDialogVisible = showConnectionDialog && !currentlyConnected,
-                missingPermissions = missingPermissions,
-                isNotificationEnabled = isNotificationEnabled,
-                lastConnectedDevice = deviceToShow,
-                isNotificationSyncEnabled = isNotificationSyncEnabled,
-                isDeveloperMode = isDeveloperMode,
-                isClipboardSyncEnabled = isClipboardSyncEnabled,
-                isAutoReconnectEnabled = isAutoReconnectEnabled,
-                isConnected = currentlyConnected,
-                symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
-                isContinueBrowsingEnabled = isContinueBrowsingEnabled,
-                isSendNowPlayingEnabled = isSendNowPlayingEnabled,
-                isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled
-            )
+            _deviceInfo.value = deviceInfo
+            _uiState.value = initialState
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
-            if (pcName != null && showConnectionDialog && !currentlyConnected) {
+            if (pcName != null && showConnectionDialog && !_uiState.value.isConnected) {
                 _uiState.value = _uiState.value.copy(
                     lastConnectedDevice = ConnectedDevice(
                         name = pcName,
-                        ipAddress = savedIp,
-                        port = savedPort,
+                        ipAddress = _uiState.value.ipAddress,
+                        port = _uiState.value.port,
                         lastConnected = System.currentTimeMillis(),
                         isPlus = isPlus,
                         symmetricKey = symmetricKey
@@ -223,13 +241,11 @@ class AirSyncViewModel(
                 )
             }
 
-
-
             // Start observing device changes for real-time updates
             startObservingDeviceChanges(context)
-            
+
             // Start WakeupService if we have WiFi connectivity
-            if (localIp != "Unknown" && localIp != "No Wi-Fi") {
+            if (deviceInfo.localIp != "Unknown" && deviceInfo.localIp != "No Wi-Fi") {
                 try { WakeupService.startService(context) } catch (_: Exception) {}
             }
         }
@@ -462,7 +478,7 @@ class AirSyncViewModel(
         isNetworkMonitoringActive = true
         previousNetworkIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 NetworkMonitor.observeNetworkChanges(context).collect { networkInfo ->
                     val currentIp = networkInfo.ipAddress ?: "No Wi-Fi"
@@ -471,7 +487,9 @@ class AirSyncViewModel(
                         previousNetworkIp = currentIp
 
                         // Update local device info immediately
-                        _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
+                        withContext(Dispatchers.Main) {
+                            _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
+                        }
 
                         // Always refresh network-aware device mappings on network change
                         loadNetworkDevicesForNetworkChange()
@@ -490,7 +508,9 @@ class AirSyncViewModel(
                             try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
                             // Stop wake-up service when no WiFi
                             try { WakeupService.stopService(context) } catch (_: Exception) {}
-                            _uiState.value = _uiState.value.copy(isConnected = false, isConnecting = false)
+                            withContext(Dispatchers.Main) {
+                                _uiState.value = _uiState.value.copy(isConnected = false, isConnecting = false)
+                            }
                             return@collect
                         } else {
                             // Start wake-up service when WiFi is available
@@ -500,9 +520,11 @@ class AirSyncViewModel(
                         if (target != null) {
                             // We have a specific device mapping for this network. Switch immediately.
                             // Update UI fields so the user sees the correct endpoint.
-                            updateIpAddress(target.ipAddress)
-                            updatePort(target.port)
-                            updateSymmetricKey(target.symmetricKey)
+                            withContext(Dispatchers.Main) {
+                                updateIpAddress(target.ipAddress)
+                                updatePort(target.port)
+                                updateSymmetricKey(target.symmetricKey)
+                            }
 
                             // If connected/connecting to old network, disconnect first to force a clean switch
                             if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
@@ -512,7 +534,9 @@ class AirSyncViewModel(
                             // Auto-connect if auto-reconnect is enabled and the user hasn't manually disconnected.
                             if (autoOn && !manual) {
                                 // Mark as connecting in UI and kick off a non-manual connection (so it won't flip manual flags)
-                                _uiState.value = _uiState.value.copy(isConnecting = true)
+                                withContext(Dispatchers.Main) {
+                                    _uiState.value = _uiState.value.copy(isConnecting = true)
+                                }
                                 try {
                                     WebSocketUtil.connect(
                                         context = context,
@@ -521,7 +545,7 @@ class AirSyncViewModel(
                                         symmetricKey = target.symmetricKey,
                                         manualAttempt = false,
                                         onConnectionStatus = { connected ->
-                                            viewModelScope.launch {
+                                            viewModelScope.launch(Dispatchers.Main) {
                                                 _uiState.value = _uiState.value.copy(
                                                     isConnected = connected,
                                                     isConnecting = false,
@@ -550,7 +574,9 @@ class AirSyncViewModel(
                                 }
                             } else {
                                 // User has disabled auto connect, just update the displayed device/IP
-                                _uiState.value = _uiState.value.copy(isConnecting = false)
+                                withContext(Dispatchers.Main) {
+                                    _uiState.value = _uiState.value.copy(isConnecting = false)
+                                }
                             }
                         } else {
                             // No mapping for this network: disconnect if connected and, if allowed, start generic auto-reconnect
@@ -594,4 +620,43 @@ class AirSyncViewModel(
         }
     }
 
+    fun setPhoneLogSyncEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isPhoneLogSyncEnabled = enabled)
+        viewModelScope.launch {
+            repository.setPhoneLogSyncEnabled(enabled)
+        }
+    }
+
+    fun setMessageSyncEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isMessageSyncEnabled = enabled)
+        viewModelScope.launch {
+            repository.setMessageSyncEnabled(enabled)
+        }
+    }
+
+    fun onHealthDataRequest() {
+        val context = appContext ?: return // Ensure context is available
+        viewModelScope.launch {
+            try {
+                // Use the manager to read the data
+                val healthData = com.sameerasw.airsync.utils.HealthConnectManager.readHealthData(context)
+
+                // Convert to JSON and send via WebSocket
+                val jsonResponse = healthData.toJson()
+                com.sameerasw.airsync.utils.WebSocketUtil.sendMessage(jsonResponse)
+                
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to fetch or send health data", e)
+                // Optionally send an error message back
+                val errorResponse = "{\"type\":\"healthDataError\", \"message\":\"${e.message}\"}"
+                com.sameerasw.airsync.utils.WebSocketUtil.sendMessage(errorResponse)
+            }
+        }
+    }
+
+    fun sendAllData() {
+        viewModelScope.launch {
+            appContext?.let { repository.sendAllData(it) }
+        }
+    }
 }

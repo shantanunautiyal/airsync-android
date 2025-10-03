@@ -1,0 +1,226 @@
+--------- beginning of main
+10-03 21:33:14.039 19420 19420 I meerasw.airsync: Late-enabling -Xcheck:jni
+10-03 21:33:14.065 19420 19420 I meerasw.airsync: Using CollectorTypeCC GC.
+10-03 21:33:14.077 19420 19420 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+10-03 21:33:14.081 19420 19420 D ActivityThread: setConscryptValidator
+10-03 21:33:14.081 19420 19420 D ActivityThread: setConscryptValidator - put
+10-03 21:33:14.414 19420 19420 D nativeloader: Configuring clns-7 for other apk /data/app/~~F6G5-gmNVcAiTu5iNCvMfA==/com.sameerasw.airsync-IX305UisibMHA2ROATZLfw==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~F6G5-gmNVcAiTu5iNCvMfA==/com.sameerasw.airsync-IX305UisibMHA2ROATZLfw==/lib/arm64:/data/app/~~F6G5-gmNVcAiTu5iNCvMfA==/com.sameerasw.airsync-IX305UisibMHA2ROATZLfw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.sameerasw.airsync
+10-03 21:33:14.423 19420 19420 V GraphicsEnvironment: Currently set values for:
+10-03 21:33:14.423 19420 19420 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+10-03 21:33:14.423 19420 19420 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+10-03 21:33:14.423 19420 19420 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+10-03 21:33:14.423 19420 19420 V GraphicsEnvironment: App is not on the allowlist for updatable production driver.
+--------- beginning of system
+10-03 21:33:14.468 19420 19420 D ActivityThread: com.sameerasw.airsync will use render engine as VK
+10-03 21:33:14.469 19420 19420 D HWUI    : HWUI - treat SMPTE_170M as sRGB
+10-03 21:33:14.480 19420 19442 D HWUI    : CacheManager constructor. deviceInfo=(1080, 1920)
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: QUALCOMM build                   : 9ad1b67875, Ib48d2dada6
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Build Date                       : 05/11/25
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: OpenGL ES Shader Compiler Version: EV031.35.01.12
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Local Branch                     : 
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Remote Branch                    : refs/tags/AU_LINUX_ANDROID_LA.UM.9.14.11.00.00.571.148
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Remote Branch                    : NONE
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Reconstruct Branch               : NOTHING
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Build Config                     : S P 10.0.7 AArch64
+10-03 21:33:14.481 19420 19442 I AdrenoGLES-0: Driver Path                      : /vendor/lib64/egl/libGLESv2_adreno.so
+10-03 21:33:14.488 19420 19442 I AdrenoGLES-0: PFP: 0x016dc094, ME: 0x00000000
+10-03 21:33:14.502 19420 19420 I DecorView: setWindowBackground: isPopOver=false color=ff303030 d=android.graphics.drawable.ColorDrawable@1ee55f6
+10-03 21:33:14.540 19420 19420 I ViewRootImpl: dVRR is disabled
+10-03 21:33:14.540 19420 19420 D HardwareRenderer: onDisplayChanged. displayId=0 current wxh=1080x2340 mLargest wxh=0x0
+10-03 21:33:14.540 19420 19420 D HardwareRenderer: Set largestWidth and largestHeight as logical resolution. (1080x2340)
+10-03 21:33:14.540 19420 19442 D HWUI    : setMaxSurfaceArea requested wxh=(1080,2340) requestedSurfaceArea(2527200) mMaxSurfaceArea(2073600)
+10-03 21:33:14.541 19420 19442 D NativeCustomFrequencyManager: [NativeCFMS] BpCustomFrequencyManager::BpCustomFrequencyManager()
+10-03 21:33:14.548 19420 19420 D InputTransport: Input channel constructed: '23d74bd', fd=126
+10-03 21:33:14.549 19420 19420 I InsetsController: onStateChanged: host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity, from=android.view.ViewRootImpl.setView:1999, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 99 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(505, 0 - 575, 99), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={3.0} cutoutSpec={M 0,0 M 0,29 a 35,35 0 1,0 0,70 a 35,35 0 1,0 0,-70 Z} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=106, center=Point(106, 106)}, RoundedCorner{position=TopRight, radius=106, center=Point(974, 106)}, RoundedCorner{position=BottomRight, radius=106, center=Point(974, 2234)}, RoundedCorner{position=BottomLeft, radius=106, center=Point(106, 2234)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(951, 0 - 1080, 99) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20000 mType=statusBars mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20005 mType=mandatorySystemGestures mFrame=[0,0][1080,134] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20006 mType=tappableElement mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {56a20001 mType=navigationBars mFrame=[0,2296][1080,2340] mVisible=true mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20004 mType=systemGestures mFrame=[0,0][87,2340] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {56a20005 mType=mandatorySystemGestures mFrame=[0,2246][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {56a20024 mType=systemGestures mFrame=[993,0][1080,2340] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
+10-03 21:33:14.549 19420 19420 I VRI[MainActivity]@a428673: synced displayState. AttachInfo displayState=2
+10-03 21:33:14.551 19420 19420 I VRI[MainActivity]@a428673: setView = com.android.internal.policy.DecorView@63516cf IsHRR=false TM=true
+10-03 21:33:14.552 19420 19420 I IDS_TAG : Starting IDS observe window
+10-03 21:33:14.552 19420 19420 I IDS_TAG : Getting Shared Preference for com.sameerasw.airsync.AirSyncApp@7b5a422 uid = 10431
+10-03 21:33:14.556 19420 19420 I IDS_TAG : App com.sameerasw.airsync.AirSyncApp@7b5a422 has not finished training
+10-03 21:33:14.561 19420 19442 D HWUI    : HWUI - treat SMPTE_170M as sRGB
+10-03 21:33:14.561 19420 19420 I IDS_TAG : Closing IDS observe window
+10-03 21:33:14.561 19420 19420 I IDS_TAG : Getting Shared Preference for com.sameerasw.airsync.AirSyncApp@7b5a422 uid = 10431
+10-03 21:33:14.564 19420 19420 I IDS_TAG : IDS count updated to 2 for com.sameerasw.airsync.AirSyncApp@7b5a422
+10-03 21:33:14.753 19420 19420 E meerasw.airsync: Unable to open libpenguin.so: dlopen failed: library "libpenguin.so" not found.
+10-03 21:33:14.753 19420 19420 I BufferQueueProducer: [](id:4bdc00000000,api:0,p:63419648,c:19420) setDequeueTimeout:2077252342
+10-03 21:33:14.754 19420 19420 I BLASTBufferQueue_Java: new BLASTBufferQueue, mName= VRI[MainActivity]@a428673 mNativeObject= 0xb4000074ad476050 sc.mNativeObject= 0xb40000742d46e610 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3397 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 android.view.Choreographer$CallbackRecord.run:1760 android.view.Choreographer.doCallbacks:1216 android.view.Choreographer.doFrame:1142 android.view.Choreographer$FrameDisplayEventReceiver.run:1707 
+10-03 21:33:14.754 19420 19420 I BLASTBufferQueue_Java: update, w= 1080 h= 2340 mName = VRI[MainActivity]@a428673 mNativeObject= 0xb4000074ad476050 sc.mNativeObject= 0xb40000742d46e610 format= -1 caller= android.graphics.BLASTBufferQueue.<init>:88 android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3397 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 
+10-03 21:33:14.754 19420 19420 W libc    : Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+10-03 21:33:14.754 19420 19420 W libc    : Access denied finding property "vendor.gpp.create_frc_extension"
+10-03 21:33:14.755 19420 19420 I VRI[MainActivity]@a428673: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)0 dur=9 res=0x3 s={true 0xb40000738d484320} ch=true seqId=0
+10-03 21:33:14.755 19420 19420 I VRI[MainActivity]@a428673: performConfigurationChange setNightDimText nightDimLevel=0
+10-03 21:33:14.756 19420 19420 D VRI[MainActivity]@a428673: mThreadedRenderer.initialize() mSurface={isValid=true 0xb40000738d484320} hwInitialized=true
+10-03 21:33:14.765 19420 19420 D VRI[MainActivity]@a428673: reportNextDraw android.view.ViewRootImpl.performTraversals:5193 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 android.view.Choreographer$CallbackRecord.run:1760 
+10-03 21:33:14.766 19420 19420 D VRI[MainActivity]@a428673: Setup new sync=wmsSync-VRI[MainActivity]@a428673#0
+10-03 21:33:14.766 19420 19420 I VRI[MainActivity]@a428673: Creating new active sync group VRI[MainActivity]@a428673#1
+10-03 21:33:14.793 19420 19420 D VRI[MainActivity]@a428673: registerCallbacksForSync syncBuffer=false
+10-03 21:33:14.801 19420 19461 D VRI[MainActivity]@a428673: Received frameDrawingCallback syncResult=0 frameNum=1.
+10-03 21:33:14.801 19420 19461 I VRI[MainActivity]@a428673: mWNT: t=0xb4000073dd470d90 mBlastBufferQueue=0xb4000074ad476050 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$11.onFrameDraw:15016 android.view.ThreadedRenderer$1.onFrameDraw:761 <bottom of call stack> 
+10-03 21:33:14.801 19420 19461 I VRI[MainActivity]@a428673: Setting up sync and frameCommitCallback
+10-03 21:33:14.807 19420 19442 I BLASTBufferQueue: [VRI[MainActivity]@a428673#0](f:0,a:0,s:0) onFrameAvailable the first frame is available
+10-03 21:33:14.807 19420 19442 I SurfaceComposerClient: apply transaction with the first frame. layerId: 90626, bufferData(ID: 83408264888323, frameNumber: 1)
+10-03 21:33:14.808 19420 19442 I VRI[MainActivity]@a428673: Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+10-03 21:33:14.808 19420 19442 D HWUI    : CFMS:: SetUp Pid : 19420    Tid : 19442
+10-03 21:33:14.808 19420 19420 D VRI[MainActivity]@a428673: reportDrawFinished seqId=0
+10-03 21:33:14.826 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:33:14.827 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=true, type=statusBars, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:33:14.829 19420 19420 I BLASTBufferQueue_Java: update, w= 1080 h= 2340 mName = VRI[MainActivity]@a428673 mNativeObject= 0xb4000074ad476050 sc.mNativeObject= 0xb40000742d46e610 format= -1 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3386 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 
+10-03 21:33:14.829 19420 19420 I VRI[MainActivity]@a428673: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=true req=(1080,2340)0 dur=0 res=0x0 s={true 0xb40000738d484320} ch=false seqId=0
+10-03 21:33:14.829 19420 19420 I VRI[MainActivity]@a428673: registerCallbackForPendingTransactions
+10-03 21:33:14.830 19420 19462 I VRI[MainActivity]@a428673: mWNT: t=0xb4000073dd496410 mBlastBufferQueue=0xb4000074ad476050 fn= 3 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$9.onFrameDraw:6276 android.view.ViewRootImpl$3.onFrameDraw:2440 android.view.ThreadedRenderer$1.onFrameDraw:761 
+10-03 21:33:14.843 19420 19420 D VRI[MainActivity]@a428673: mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb40000738d484320}
+10-03 21:33:14.844 19420 19420 D InputMethodManagerUtils: startInputInner - Id : 0
+10-03 21:33:14.844 19420 19420 I InputMethodManager: startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+10-03 21:33:14.866 19420 19464 D InputTransport: Input channel constructed: 'ClientS', fd=151
+10-03 21:33:14.881 19420 19420 I InsetsController: onStateChanged: host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity, from=android.view.ViewRootImpl.handleInsetsControlChanged:2888, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 99 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(505, 0 - 575, 99), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={3.0} cutoutSpec={M 0,0 M 0,29 a 35,35 0 1,0 0,70 a 35,35 0 1,0 0,-70 Z} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=106, center=Point(106, 106)}, RoundedCorner{position=TopRight, radius=106, center=Point(974, 106)}, RoundedCorner{position=BottomRight, radius=106, center=Point(974, 2234)}, RoundedCorner{position=BottomLeft, radius=106, center=Point(106, 2234)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(951, 0 - 1080, 99) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20000 mType=statusBars mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20005 mType=mandatorySystemGestures mFrame=[0,0][1080,134] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20006 mType=tappableElement mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {56a20001 mType=navigationBars mFrame=[0,2296][1080,2340] mVisible=true mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20004 mType=systemGestures mFrame=[0,0][87,2340] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {56a20005 mType=mandatorySystemGestures mFrame=[0,2246][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {56a20024 mType=systemGestures mFrame=[993,0][1080,2340] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
+10-03 21:33:14.882 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=false, type=ime, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:33:14.987 19420 19430 I meerasw.airsync: Compiler allocated 7439KB to compile void android.view.ViewRootImpl.performTraversals()
+10-03 21:33:20.258 19420 19475 D ProfileInstaller: Installing profile for com.sameerasw.airsync
+10-03 21:33:28.082 19420 19420 D ActivityThread: com.sameerasw.airsync will use render engine as VK
+10-03 21:33:28.096 19420 19420 I DecorView: setWindowBackground: isPopOver=false color=ff303030 d=android.graphics.drawable.ColorDrawable@603263c
+10-03 21:33:28.111 19420 19420 I ViewRootImpl: dVRR is disabled
+10-03 21:33:28.112 19420 19442 D NativeCustomFrequencyManager: [NativeCFMS] BpCustomFrequencyManager::BpCustomFrequencyManager()
+10-03 21:33:28.118 19420 19420 D InputTransport: Input channel constructed: 'a7cdbaf', fd=154
+10-03 21:33:28.119 19420 19420 I InsetsController: onStateChanged: host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity, from=android.view.ViewRootImpl.setView:1999, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 99 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(505, 0 - 575, 99), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={3.0} cutoutSpec={M 0,0 M 0,29 a 35,35 0 1,0 0,70 a 35,35 0 1,0 0,-70 Z} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=106, center=Point(106, 106)}, RoundedCorner{position=TopRight, radius=106, center=Point(974, 106)}, RoundedCorner{position=BottomRight, radius=106, center=Point(974, 2234)}, RoundedCorner{position=BottomLeft, radius=106, center=Point(106, 2234)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(951, 0 - 1080, 99) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20000 mType=statusBars mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20005 mType=mandatorySystemGestures mFrame=[0,0][1080,134] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20006 mType=tappableElement mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {56a20001 mType=navigationBars mFrame=[0,2296][1080,2340] mVisible=true mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20004 mType=systemGestures mFrame=[0,0][87,2340] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {56a20005 mType=mandatorySystemGestures mFrame=[0,2246][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {56a20024 mType=systemGestures mFrame=[993,0][1080,2340] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
+10-03 21:33:28.119 19420 19420 I VRI[MainActivity]@cbdb0e6: synced displayState. AttachInfo displayState=2
+10-03 21:33:28.122 19420 19420 I VRI[MainActivity]@cbdb0e6: setView = com.android.internal.policy.DecorView@759227d IsHRR=false TM=true
+10-03 21:33:28.157 19420 19420 I BufferQueueProducer: [](id:4bdc00000001,api:0,p:0,c:19420) setDequeueTimeout:2077252342
+10-03 21:33:28.158 19420 19420 I BLASTBufferQueue_Java: new BLASTBufferQueue, mName= VRI[MainActivity]@cbdb0e6 mNativeObject= 0xb4000074ad471eb0 sc.mNativeObject= 0xb40000742d46ca50 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3397 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 android.view.Choreographer$CallbackRecord.run:1760 android.view.Choreographer.doCallbacks:1216 android.view.Choreographer.doFrame:1142 android.view.Choreographer$FrameDisplayEventReceiver.run:1707 
+10-03 21:33:28.158 19420 19420 I BLASTBufferQueue_Java: update, w= 1080 h= 2340 mName = VRI[MainActivity]@cbdb0e6 mNativeObject= 0xb4000074ad471eb0 sc.mNativeObject= 0xb40000742d46ca50 format= -1 caller= android.graphics.BLASTBufferQueue.<init>:88 android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3397 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 
+10-03 21:33:28.158 19420 19420 W libc    : Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+10-03 21:33:28.158 19420 19420 W libc    : Access denied finding property "vendor.gpp.create_frc_extension"
+10-03 21:33:28.158 19420 19420 I VRI[MainActivity]@cbdb0e6: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)0 dur=3 res=0x3 s={true 0xb40000738d48cb60} ch=true seqId=0
+10-03 21:33:28.159 19420 19420 I VRI[MainActivity]@cbdb0e6: performConfigurationChange setNightDimText nightDimLevel=0
+10-03 21:33:28.159 19420 19420 D VRI[MainActivity]@cbdb0e6: mThreadedRenderer.initialize() mSurface={isValid=true 0xb40000738d48cb60} hwInitialized=true
+10-03 21:33:28.162 19420 19420 D VRI[MainActivity]@cbdb0e6: reportNextDraw android.view.ViewRootImpl.performTraversals:5193 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 android.view.Choreographer$CallbackRecord.run:1760 
+10-03 21:33:28.162 19420 19420 D VRI[MainActivity]@cbdb0e6: Setup new sync=wmsSync-VRI[MainActivity]@cbdb0e6#2
+10-03 21:33:28.162 19420 19420 I VRI[MainActivity]@cbdb0e6: Creating new active sync group VRI[MainActivity]@cbdb0e6#3
+10-03 21:33:28.162 19420 19420 D VRI[MainActivity]@cbdb0e6: registerCallbacksForSync syncBuffer=false
+10-03 21:33:28.164 19420 19461 D VRI[MainActivity]@cbdb0e6: Received frameDrawingCallback syncResult=0 frameNum=1.
+10-03 21:33:28.164 19420 19461 I VRI[MainActivity]@cbdb0e6: mWNT: t=0xb4000073dd497590 mBlastBufferQueue=0xb4000074ad471eb0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$11.onFrameDraw:15016 android.view.ThreadedRenderer$1.onFrameDraw:761 <bottom of call stack> 
+10-03 21:33:28.164 19420 19461 I VRI[MainActivity]@cbdb0e6: Setting up sync and frameCommitCallback
+10-03 21:33:28.168 19420 19442 I BLASTBufferQueue: [VRI[MainActivity]@cbdb0e6#1](f:0,a:0,s:0) onFrameAvailable the first frame is available
+10-03 21:33:28.169 19420 19442 I SurfaceComposerClient: apply transaction with the first frame. layerId: 90639, bufferData(ID: 83408264888324, frameNumber: 1)
+10-03 21:33:28.169 19420 19442 I VRI[MainActivity]@cbdb0e6: Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+10-03 21:33:28.169 19420 19442 D HWUI    : CFMS:: SetUp Pid : 19420    Tid : 19442
+10-03 21:33:28.170 19420 19420 D VRI[MainActivity]@cbdb0e6: reportDrawFinished seqId=0
+10-03 21:33:28.170 19420 19442 D HWUI    : HWUI - treat SMPTE_170M as sRGB
+10-03 21:33:28.170 19420 19420 I ImeFocusController: onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+10-03 21:33:28.171 19420 19420 I ImeFocusController: onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+10-03 21:33:28.206 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:33:28.207 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=true, type=statusBars, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:33:28.244 19420 19420 D VRI[MainActivity]@cbdb0e6: mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb40000738d48cb60}
+10-03 21:33:28.244 19420 19420 D InputMethodManagerUtils: startInputInner - Id : 0
+10-03 21:33:28.244 19420 19420 I InputMethodManager: startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+10-03 21:33:28.247 19420 19435 D InputTransport: Input channel constructed: 'ClientS', fd=167
+10-03 21:33:28.261 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=false, type=ime, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:33:28.688 19420 19420 I VRI[MainActivity]@a428673: handleAppVisibility mAppVisible = true visible = false
+10-03 21:33:28.688 19420 19420 D VRI[MainActivity]@a428673: visibilityChanged oldVisibility=true newVisibility=false
+10-03 21:33:28.698 19420 19420 I VRI[MainActivity]@a428673: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)8 dur=2 res=0x2 s={false 0x0} ch=true seqId=0
+10-03 21:33:28.698 19420 19420 D VRI[MainActivity]@a428673: Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+10-03 21:33:28.698 19420 19420 I VRI[MainActivity]@a428673: stopped(true) old = false
+10-03 21:33:28.698 19420 19420 D VRI[MainActivity]@a428673: WindowStopped on com.sameerasw.airsync/com.sameerasw.airsync.MainActivity set to true
+10-03 21:34:14.518 19420 19420 I VRI[MainActivity]@cbdb0e6: handleAppVisibility mAppVisible = true visible = false
+10-03 21:34:14.518 19420 19420 D VRI[MainActivity]@cbdb0e6: visibilityChanged oldVisibility=true newVisibility=false
+10-03 21:34:14.521 19420 19442 D HWUI    : CacheManager::trimMemory(20)
+10-03 21:34:14.556 19420 19420 I VRI[MainActivity]@cbdb0e6: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)8 dur=27 res=0x2 s={false 0x0} ch=true seqId=0
+10-03 21:34:14.556 19420 19420 D VRI[MainActivity]@cbdb0e6: Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+10-03 21:34:14.558 19420 19442 D HWUI    : CacheManager::trimMemory(20)
+10-03 21:34:14.559 19420 19420 I VRI[MainActivity]@cbdb0e6: stopped(true) old = false
+10-03 21:34:14.559 19420 19420 D VRI[MainActivity]@cbdb0e6: WindowStopped on com.sameerasw.airsync/com.sameerasw.airsync.MainActivity set to true
+10-03 21:34:14.559 19420 19442 D HWUI    : CacheManager::trimMemory(20)
+10-03 21:34:14.586 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=2 newDisplayState=1
+10-03 21:34:14.631 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=2 newDisplayState=1
+10-03 21:34:14.726 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=1 newDisplayState=1
+10-03 21:34:14.726 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=1 newDisplayState=1
+10-03 21:34:14.731 19420 19420 I ImeFocusController: onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+10-03 21:34:14.735 19420 19420 I ImeFocusController: onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+10-03 21:34:15.532 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=1 newDisplayState=3
+10-03 21:34:15.533 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=1 newDisplayState=3
+10-03 21:34:15.753 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=3 newDisplayState=3
+10-03 21:34:15.753 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=3 newDisplayState=3
+10-03 21:34:21.095 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=3 newDisplayState=4
+10-03 21:34:21.095 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=3 newDisplayState=4
+10-03 21:34:21.171 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:34:21.171 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:34:28.011 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=4 newDisplayState=3
+10-03 21:34:28.012 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=4 newDisplayState=3
+10-03 21:34:28.028 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=3 newDisplayState=3
+10-03 21:34:28.028 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=3 newDisplayState=3
+10-03 21:34:33.521 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=3 newDisplayState=4
+10-03 21:34:33.521 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=3 newDisplayState=4
+10-03 21:34:33.566 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:34:33.566 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:34:34.642 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:34:34.643 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:34:35.173 19420 19420 I VRI[MainActivity]@cbdb0e6: handleAppVisibility mAppVisible = false visible = true
+10-03 21:34:35.195 19420 19420 I VRI[MainActivity]@cbdb0e6: stopped(false) old = true
+10-03 21:34:35.195 19420 19420 D VRI[MainActivity]@cbdb0e6: WindowStopped on com.sameerasw.airsync/com.sameerasw.airsync.MainActivity set to false
+10-03 21:34:35.213 19420 19420 I InsetsController: onStateChanged: host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity, from=android.view.ViewRootImpl.relayoutWindow:11304, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 99 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(505, 0 - 575, 99), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={3.0} cutoutSpec={M 0,0 M 0,29 a 35,35 0 1,0 0,70 a 35,35 0 1,0 0,-70 Z} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=106, center=Point(106, 106)}, RoundedCorner{position=TopRight, radius=106, center=Point(974, 106)}, RoundedCorner{position=BottomRight, radius=106, center=Point(974, 2234)}, RoundedCorner{position=BottomLeft, radius=106, center=Point(106, 2234)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(951, 0 - 1080, 99) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20000 mType=statusBars mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20005 mType=mandatorySystemGestures mFrame=[0,0][1080,134] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20006 mType=tappableElement mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {56a20001 mType=navigationBars mFrame=[0,2296][1080,2340] mVisible=false mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20004 mType=systemGestures mFrame=[0,0][87,2340] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {56a20005 mType=mandatorySystemGestures mFrame=[0,2246][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {56a20024 mType=systemGestures mFrame=[993,0][1080,2340] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
+10-03 21:34:35.216 19420 19420 I BufferQueueProducer: [](id:4bdc00000002,api:0,p:-1,c:19420) setDequeueTimeout:2077252342
+10-03 21:34:35.218 19420 19420 I BLASTBufferQueue_Java: new BLASTBufferQueue, mName= VRI[MainActivity]@cbdb0e6 mNativeObject= 0xb4000074ad471eb0 sc.mNativeObject= 0xb40000742d46ce10 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3397 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 android.view.Choreographer$CallbackRecord.run:1760 android.view.Choreographer.doCallbacks:1216 android.view.Choreographer.doFrame:1142 android.view.Choreographer$FrameDisplayEventReceiver.run:1707 
+10-03 21:34:35.218 19420 19420 I BLASTBufferQueue_Java: update, w= 1080 h= 2340 mName = VRI[MainActivity]@cbdb0e6 mNativeObject= 0xb4000074ad471eb0 sc.mNativeObject= 0xb40000742d46ce10 format= -1 caller= android.graphics.BLASTBufferQueue.<init>:88 android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3397 android.view.ViewRootImpl.relayoutWindow:11361 android.view.ViewRootImpl.performTraversals:4544 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 
+10-03 21:34:35.218 19420 19420 W libc    : Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+10-03 21:34:35.218 19420 19420 W libc    : Access denied finding property "vendor.gpp.create_frc_extension"
+10-03 21:34:35.218 19420 19420 I VRI[MainActivity]@cbdb0e6: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)0 dur=8 res=0x3 s={true 0xb40000738d48cb60} ch=true seqId=0
+10-03 21:34:35.220 19420 19420 D VRI[MainActivity]@cbdb0e6: mThreadedRenderer.initialize() mSurface={isValid=true 0xb40000738d48cb60} hwInitialized=true
+10-03 21:34:35.222 19420 19420 D VRI[MainActivity]@cbdb0e6: reportNextDraw android.view.ViewRootImpl.performTraversals:5193 android.view.ViewRootImpl.doTraversal:3708 android.view.ViewRootImpl$TraversalRunnable.run:12542 android.view.Choreographer$CallbackRecord.run:1751 android.view.Choreographer$CallbackRecord.run:1760 
+10-03 21:34:35.222 19420 19420 D VRI[MainActivity]@cbdb0e6: Setup new sync=wmsSync-VRI[MainActivity]@cbdb0e6#4
+10-03 21:34:35.222 19420 19420 I VRI[MainActivity]@cbdb0e6: Creating new active sync group VRI[MainActivity]@cbdb0e6#5
+10-03 21:34:35.222 19420 19420 D VRI[MainActivity]@cbdb0e6: Start draw after previous draw not visible
+10-03 21:34:35.222 19420 19420 D VRI[MainActivity]@cbdb0e6: registerCallbacksForSync syncBuffer=false
+10-03 21:34:35.233 19420 19462 D VRI[MainActivity]@cbdb0e6: Received frameDrawingCallback syncResult=0 frameNum=1.
+10-03 21:34:35.233 19420 19462 I VRI[MainActivity]@cbdb0e6: mWNT: t=0xb4000073dd496e90 mBlastBufferQueue=0xb4000074ad471eb0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$11.onFrameDraw:15016 android.view.ThreadedRenderer$1.onFrameDraw:761 <bottom of call stack> 
+10-03 21:34:35.233 19420 19462 I VRI[MainActivity]@cbdb0e6: Setting up sync and frameCommitCallback
+10-03 21:34:35.253 19420 19442 I BLASTBufferQueue: [VRI[MainActivity]@cbdb0e6#2](f:0,a:0,s:0) onFrameAvailable the first frame is available
+10-03 21:34:35.253 19420 19442 I SurfaceComposerClient: apply transaction with the first frame. layerId: 90672, bufferData(ID: 83408264888328, frameNumber: 1)
+10-03 21:34:35.253 19420 19442 I VRI[MainActivity]@cbdb0e6: Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+10-03 21:34:35.258 19420 19420 D VRI[MainActivity]@cbdb0e6: reportDrawFinished seqId=0
+10-03 21:34:35.274 19420 19420 I InsetsController: onStateChanged: host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity, from=android.view.ViewRootImpl.handleResized:2789, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2340), mDisplayCutout=DisplayCutout{insets=Rect(0, 99 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(505, 0 - 575, 99), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1080 displayHeight=2340 physicalDisplayWidth=1080 physicalDisplayHeight=2340 density={3.0} cutoutSpec={M 0,0 M 0,29 a 35,35 0 1,0 0,70 a 35,35 0 1,0 0,-70 Z} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=106, center=Point(106, 106)}, RoundedCorner{position=TopRight, radius=106, center=Point(974, 106)}, RoundedCorner{position=BottomRight, radius=106, center=Point(974, 2234)}, RoundedCorner{position=BottomLeft, radius=106, center=Point(106, 2234)}]}  mRoundedCornerFrame=Rect(0, 0 - 1080, 2340), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(951, 0 - 1080, 99) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1080 displayHeight=2340 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20000 mType=statusBars mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20005 mType=mandatorySystemGestures mFrame=[0,0][1080,134] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {4cc20006 mType=tappableElement mFrame=[0,0][1080,99] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {56a20001 mType=navigationBars mFrame=[0,2296][1080,2340] mVisible=false mFlags=SUPPRESS_SCRIM mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20004 mType=systemGestures mFrame=[0,0][87,2340] mVisible=true mFlags= mSideHint=LEFT mBoundingRects=null}, InsetsSource: {56a20005 mType=mandatorySystemGestures mFrame=[0,2246][1080,2340] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {56a20006 mType=tappableElement mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {56a20024 mType=systemGestures mFrame=[993,0][1080,2340] mVisible=true mFlags= mSideHint=RIGHT mBoundingRects=null} }
+10-03 21:34:35.274 19420 19420 I VRI[MainActivity]@cbdb0e6: handleResized, frames=ClientWindowFrames{frame=[0,0][1080,2340] display=[0,0][1080,2340] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+10-03 21:34:35.314 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=4 newDisplayState=2
+10-03 21:34:35.314 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=4 newDisplayState=2
+10-03 21:34:35.456 19420 19420 I VRI[MainActivity]@cbdb0e6: handleResized, frames=ClientWindowFrames{frame=[0,0][1080,2340] display=[0,0][1080,2340] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+10-03 21:34:35.671 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:34:35.672 19420 19420 I InsetsSourceConsumer: applyRequestedVisibilityToControl: visible=true, type=statusBars, host=com.sameerasw.airsync/com.sameerasw.airsync.MainActivity
+10-03 21:34:35.689 19420 19420 D VRI[MainActivity]@cbdb0e6: mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb40000738d48cb60}
+10-03 21:34:35.690 19420 19420 D InputMethodManagerUtils: startInputInner - Id : 0
+10-03 21:34:35.690 19420 19420 I InputMethodManager: startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+10-03 21:34:35.697 19420 19435 D InputTransport: Input channel constructed: 'ClientS', fd=146
+10-03 21:34:40.456 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@80433da, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:34:40.458 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@8ba7ee8
+10-03 21:34:50.458 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@92ca194, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:34:50.460 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@db4143d
+10-03 21:35:00.474 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@4d2b739, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:35:00.476 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@a1917e
+10-03 21:35:10.467 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@541478a, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:35:10.468 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@f53b1fb
+10-03 21:35:20.473 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@62172d7, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:35:20.475 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@68597c4
+10-03 21:35:30.461 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@2266c30, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:35:30.465 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@c72e0a9
+10-03 21:35:35.958 19420 19420 I VRI[MainActivity]@cbdb0e6: handleAppVisibility mAppVisible = true visible = false
+10-03 21:35:35.958 19420 19420 D VRI[MainActivity]@cbdb0e6: visibilityChanged oldVisibility=true newVisibility=false
+10-03 21:35:35.968 19420 19442 D HWUI    : CacheManager::trimMemory(20)
+10-03 21:35:35.999 19420 19420 I VRI[MainActivity]@cbdb0e6: Relayout returned: old=(0,0,1080,2340) new=(0,0,1080,2340) relayoutAsync=false req=(1080,2340)8 dur=5 res=0x2 s={false 0x0} ch=true seqId=0
+10-03 21:35:35.999 19420 19420 D VRI[MainActivity]@cbdb0e6: Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+10-03 21:35:36.003 19420 19442 D HWUI    : CacheManager::trimMemory(20)
+10-03 21:35:36.007 19420 19420 I VRI[MainActivity]@cbdb0e6: stopped(true) old = false
+10-03 21:35:36.007 19420 19420 D VRI[MainActivity]@cbdb0e6: WindowStopped on com.sameerasw.airsync/com.sameerasw.airsync.MainActivity set to true
+10-03 21:35:36.008 19420 19442 D HWUI    : CacheManager::trimMemory(20)
+10-03 21:35:36.012 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=2 newDisplayState=1
+10-03 21:35:36.019 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=2 newDisplayState=1
+10-03 21:35:36.019 19420 19420 I ImeFocusController: onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+10-03 21:35:36.021 19420 19420 I ImeFocusController: onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+10-03 21:35:36.168 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=1 newDisplayState=1
+10-03 21:35:36.168 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=1 newDisplayState=1
+10-03 21:35:36.262 19420 19420 D TileService: onBind : mService = android.service.quicksettings.IQSService$Stub$Proxy@4710feb, mTileToken = android.os.BinderProxy@632b00bAirSyncTileService
+10-03 21:35:36.265 19420 19420 D TileService: onBind : mTile = android.service.quicksettings.Tile@1bf9148
+10-03 21:35:36.709 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=1 newDisplayState=3
+10-03 21:35:36.711 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=1 newDisplayState=3
+10-03 21:35:36.934 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=3 newDisplayState=3
+10-03 21:35:36.934 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=3 newDisplayState=3
+10-03 21:35:42.271 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=3 newDisplayState=4
+10-03 21:35:42.272 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=3 newDisplayState=4
+10-03 21:35:42.317 19420 19420 I VRI[MainActivity]@a428673: onDisplayChanged oldDisplayState=4 newDisplayState=4
+10-03 21:35:42.317 19420 19420 I VRI[MainActivity]@cbdb0e6: onDisplayChanged oldDisplayState=4 newDisplayState=4

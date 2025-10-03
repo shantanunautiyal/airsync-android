@@ -99,6 +99,7 @@ object NotificationUtil {
     }
 
     // New: Continue Browsing notifications
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun showContinueBrowsingLink(context: Context, url: String, keepPrevious: Boolean = true) {
         createContinueBrowsingChannel(context)
         val manager = NotificationManagerCompat.from(context)

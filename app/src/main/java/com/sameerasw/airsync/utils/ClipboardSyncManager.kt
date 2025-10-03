@@ -10,6 +10,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.sameerasw.airsync.data.local.DataStoreManager
+import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 object ClipboardSyncManager {
     private const val TAG = "ClipboardSyncManager"
@@ -174,7 +178,16 @@ object ClipboardSyncManager {
                 val last = try { dataStoreManager.getLastConnectedDevice().first() } catch (_: Exception) { null }
                 val isPlus = last?.isPlus == true
                 if (continueEnabled && isConnected && isPlus && isLinkOnly(text)) {
-                    NotificationUtil.showContinueBrowsingLink(context, text.trim(), keepPrevious)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        Log.w(TAG, "POST_NOTIFICATIONS permission not granted. Cannot show notification.")
+                    } else {
+                        NotificationUtil.showContinueBrowsingLink(context, text.trim(), keepPrevious)
+                    }
                 }
             }
         } catch (e: Exception) {

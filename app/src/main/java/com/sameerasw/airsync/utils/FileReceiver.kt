@@ -1,14 +1,17 @@
 package com.sameerasw.airsync.utils
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,7 +62,16 @@ object FileReceiver {
 
                 if (uri != null && out != null) {
                     incoming[id] = IncomingFileState(name = name, size = size, mime = mime, checksum = checksum, output = out, uri = uri)
-                    NotificationUtil.showFileProgress(context, id.hashCode(), name, 0)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        // Handle the case where permission is not granted
+                    } else {
+                        NotificationUtil.showFileProgress(context, id.hashCode(), name, 0)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -159,6 +171,15 @@ object FileReceiver {
 
     private fun updateProgressNotification(context: Context, id: String, state: IncomingFileState) {
         val percent = if (state.size > 0) (state.receivedBytes * 100 / state.size) else 0
-        NotificationUtil.showFileProgress(context, id.hashCode(), state.name, percent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // Handle the case where permission is not granted
+        } else {
+            NotificationUtil.showFileProgress(context, id.hashCode(), state.name, percent)
+        }
     }
 }

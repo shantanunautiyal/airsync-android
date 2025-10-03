@@ -2,27 +2,123 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.BATTERY_STATS" />
+
+    <!-- Bluetooth permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Health Connect Permissions -->
+<uses-permission android:name="android.permission.health.READ_STEPS"/>
+<uses-permission android:name="android.permission.health.WRITE_STEPS"/>
+<uses-permission android:name="android.permission.health.READ_ACTIVE_MINUTES"/>
+<uses-permission android:name="android.permission.health.WRITE_ACTIVE_MINUTES"/>
+<uses-permission android:name="android.permission.health.READ_DISTANCE"/>
+<uses-permission android:name="android.permission.health.WRITE_DISTANCE"/>
+<uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+<uses-permission android:name="android.permission.health.WRITE_HEART_RATE"/>
+<uses-permission android:name="android.permission.health.READ_SLEEP"/>
+<uses-permission android:name="android.permission.health.WRITE_SLEEP"/>
+<uses-permission android:name="android.permission.health.READ_NUTRITION"/>
+<uses-permission android:name="android.permission.health.WRITE_NUTRITION"/>
+<uses-permission android:name="android.permission.health.READ_BODY_MASS"/>
+<uses-permission android:name="android.permission.health.WRITE_BODY_MASS"/>
+<uses-permission android:name="android.permission.health.READ_BODY_FAT_PERCENTAGE"/>
+<uses-permission android:name="android.permission.health.WRITE_BODY_FAT_PERCENTAGE"/>
+<uses-permission android:name="android.permission.health.READ_HEIGHT"/>
+<uses-permission android:name="android.permission.health.WRITE_HEIGHT"/>
+<uses-permission android:name="android.permission.health.READ_WEIGHT"/>
+<uses-permission android:name="android.permission.health.WRITE_WEIGHT"/>
+<uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE"/>
+<uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE"/>
+<uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE"/>
+<uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE"/>
+<uses-permission android:name="android.permission.health.READ_MINDFULNESS"/>
+<uses-permission android:name="android.permission.health.WRITE_MINDFULNESS"/>
+<uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION"/>
+<uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION"/>
+
+<!-- Phone & SMS access -->
+<uses-permission android:name="android.permission.READ_CALL_LOG"/>
+<uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+<uses-permission android:name="android.permission.READ_SMS"/>
+<uses-permission android:name="android.permission.SEND_SMS"/>
+<uses-permission android:name="android.permission.CALL_PHONE"/>
+<uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS"/>
+
+<!-- Screen capture / mirroring -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+<uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+
+<!-- Always required to connect to your Mac via WebSocket -->
+<uses-permission android:name="android.permission.INTERNET" />
+
+<!-- Optional, if you check connectivity -->
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<!-- Android 13+ granular media permissions -->
+<uses-permission
+    android:name="android.permission.READ_MEDIA_IMAGES"
+    tools:targetApi="33" />
+
+<!-- Backwards compatibility for Android 12 and below -->
+<uses-permission
+    android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32" />
+
+<!-- If you show notifications (Android 13+) -->
+<uses-permission
+    android:name="android.permission.POST_NOTIFICATIONS"
+    tools:targetApi="33" />
+
+    
+
+    <!-- Nearby Wi-Fi devices (Android 13+) -->
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Audio, notifications, foreground services -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Permissions for wallpaper/media access -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Added permissions -->
+    <uses-permission android:name="android.permission.BATTERY_STATS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_WALLPAPER_INTERNAL" />
-
-    <!-- Permission for downloading updates -->
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
-
-    <!-- Media playback permissions -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application
+        android:name=".AirSyncApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -32,34 +128,46 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AirSync"
         android:networkSecurityConfig="@xml/network_security_config"
-        tools:targetApi="36">
+        tools:targetApi="31">
+
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.AirSync.Splash"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
-            <!-- Main launcher intent filter -->
+            android:theme="@style/Theme.AirSync">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-            <!-- Deep link intent filter for QR codes -->
+            <!-- Deep link for QR code scanning -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="airsync" />
-            </intent-filter>
 
-            <!-- Long-press Quick Settings tile should open this activity -->
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <data
+                    android:host="*"
+                    android:scheme="airsync" />
             </intent-filter>
         </activity>
 
-        <!-- Share target activity for text sharing -->
+        <!-- Activity alias for Health Connect -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="androidx.health.connect.client.permission.REQUEST_PERMISSIONS"/>
+            </intent-filter>
+            <meta-data
+                android:name="health_permissions"
+                android:resource="@array/health_permissions" />
+        </activity-alias>
+
+        <!-- Share activity -->
         <activity
             android:name=".presentation.ui.activities.ShareActivity"
             android:exported="true"
@@ -70,13 +178,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <!-- Accept any single file type -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
             </intent-filter>
-            <!-- Accept multiple files -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -84,6 +190,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Notification listener -->
         <service
             android:name=".service.MediaNotificationListener"
             android:exported="false"
@@ -93,14 +200,13 @@
             </intent-filter>
         </service>
 
-        <!-- Mac Media Player Service - creates native Android media player UI -->
+        <!-- Media player service -->
         <service
             android:name=".service.MacMediaPlayerService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback">
-        </service>
+            android:foregroundServiceType="mediaPlayback" />
 
-        <!-- Quick Settings Tile Service -->
+        <!-- Quick Settings Tile -->
         <service
             android:name=".service.AirSyncTileService"
             android:exported="true"
@@ -112,12 +218,12 @@
             </intent-filter>
         </service>
 
-        <!-- Wake-up Service for receiving reconnection requests from Mac -->
+        <!-- Wakeup service -->
         <service
             android:name=".service.WakeupService"
             android:exported="false" />
 
-        <!-- Widget Provider -->
+        <!-- Widget -->
         <receiver
             android:name=".widget.AirSyncWidgetProvider"
             android:exported="true"
@@ -130,23 +236,23 @@
                 android:resource="@xml/widget_airsync_info" />
         </receiver>
 
+        <!-- Notification action receiver -->
         <receiver
             android:name=".service.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <!-- Continue Browsing actions -->
                 <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
             </intent-filter>
         </receiver>
+
     </application>
 
     <queries>
-        <!-- To see launchable apps -->
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
-            <package android:name="com.google.ar.lens" />
+
     </queries>
 
 </manifest>

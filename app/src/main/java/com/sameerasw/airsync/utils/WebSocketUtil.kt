@@ -17,6 +17,8 @@ object WebSocketUtil {
     private const val TAG = "WebSocketUtil"
     private const val HANDSHAKE_TIMEOUT_MS = 7_000L
     private var webSocket: WebSocket? = null
+    // Separate WebSocket for binary video frames
+    private var videoWebSocket: WebSocket? = null
     private var client: OkHttpClient? = null
     private var currentIpAddress: String? = null
     private var currentPort: Int? = null
@@ -248,6 +250,13 @@ object WebSocketUtil {
             }
 
             webSocket = client!!.newWebSocket(request, listener)
+
+            // Also attempt to connect video websocket to /video
+            try {
+                connectVideo(ipAddress, port)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to start video websocket: ${e.message}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create WebSocket: ${e.message}")
             isConnecting.set(false)
@@ -255,6 +264,41 @@ object WebSocketUtil {
             handshakeTimeoutJob?.cancel()
             onConnectionStatusChanged?.invoke(false)
             try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+        }
+    }
+
+    private fun connectVideo(ipAddress: String, port: Int) {
+        try {
+            if (client == null) client = createClient()
+            val url = "ws://$ipAddress:$port/video"
+            Log.d(TAG, "Connecting video websocket to $url")
+            val request = Request.Builder().url(url).build()
+
+            val videoListener = object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    Log.d(TAG, "Video WebSocket connected to $url")
+                }
+
+                override fun onMessage(webSocket: WebSocket, bytes: okio.ByteString) {
+                    // Typically video socket is broadcast-only from Android to Mac; but handle incoming binary if needed
+                        Log.d(TAG, "Received binary message on video socket (${bytes.size} bytes)")
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    Log.d(TAG, "Video WebSocket closing: $code / $reason")
+                    videoWebSocket = null
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    Log.e(TAG, "Video WebSocket failure: ${t.message}")
+                    videoWebSocket = null
+                }
+            }
+
+            videoWebSocket = client!!.newWebSocket(request, videoListener)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error connecting video websocket: ${e.message}")
+            videoWebSocket = null
         }
     }
 
@@ -294,6 +338,34 @@ object WebSocketUtil {
         }
     }
 
+    /**
+     * Send raw video bytes on the /video websocket as binary.
+     */
+    fun sendVideoFrame(frame: ByteArray): Boolean {
+        return try {
+            if (videoWebSocket != null) {
+                Log.d(TAG, "Sending video frame (${frame.size} bytes)")
+                // Use the ByteString overload that accepts a byte[] + offset/length to avoid
+                // vararg expansion (which would create a huge argument list and can crash
+                // or allocate excessively for large frames). This is safe for large H.264
+                // NAL units produced by MediaCodec.
+                // Create ByteString via a Buffer to avoid deprecated APIs and extension resolution
+                val bs = okio.Buffer().write(frame).readByteString()
+                val sent = videoWebSocket!!.send(bs)
+                if (!sent) {
+                    Log.w(TAG, "Video websocket failed to enqueue frame (send returned false)")
+                }
+                sent
+            } else {
+                Log.w(TAG, "Video websocket not connected, cannot send frame")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send video frame: ${e.message}")
+            false
+        }
+    }
+
     fun disconnect(context: Context? = null) {
         Log.d(TAG, "Disconnecting WebSocket")
         isConnected.set(false)
@@ -307,6 +379,11 @@ object WebSocketUtil {
 
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
+        // Close and clear video websocket if connected
+        try {
+            videoWebSocket?.close(1000, "Manual disconnection")
+        } catch (_: Exception) {}
+        videoWebSocket = null
         onConnectionStatusChanged?.invoke(false)
 
         // Resolve a context for side-effects (try provided one, fall back to appContext)
@@ -339,6 +416,8 @@ object WebSocketUtil {
 
         client?.dispatcher?.executorService?.shutdown()
         client = null
+        // Ensure video socket cleared
+        videoWebSocket = null
         currentIpAddress = null
         currentPort = null
         currentSymmetricKey = null

@@ -19,7 +19,9 @@ enum class PermissionType {
     NOTIFICATION_ACCESS,
     POST_NOTIFICATIONS,
     BACKGROUND_USAGE,
-    WALLPAPER_ACCESS
+    WALLPAPER_ACCESS,
+    NEARBY_DEVICES,
+    CALL_LOG
 }
 
 data class PermissionInfo(
@@ -174,6 +176,21 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
             description = "This optional permission allows AirSync to sync your phone's wallpaper to your mac.",
             whyNeeded = "To read your current wallpaper which is not accessible with regular privileges,  AirSync needs external storage permissions. \nBut the app will only use the permission for the given explained use cases and will not alter or read any other files on the storage.",
             buttonText = "Grant Storage Access"
+        )
+
+        PermissionType.NEARBY_DEVICES -> PermissionInfo(
+            title = "Nearby Devices",
+            icon = "📶",
+            description = "On Android 13+, this permission is needed to find and connect to your Mac/PC over Wi-Fi without requiring location access.",
+            whyNeeded = "This permission allows AirSync to scan for local Wi-Fi devices to make connecting easier and more reliable, especially when your network changes. Your location is never used or tracked.",
+            buttonText = "Allow Nearby Devices"
+        )
+        PermissionType.CALL_LOG -> PermissionInfo(
+            title = "Call Log Access",
+            icon = "📞",
+            description = "AirSync needs access to your call logs to sync them with your mac.",
+            whyNeeded = "This allows you to see your call history on your mac.",
+            buttonText = "Grant Call Log Access"
         )
     }
 }

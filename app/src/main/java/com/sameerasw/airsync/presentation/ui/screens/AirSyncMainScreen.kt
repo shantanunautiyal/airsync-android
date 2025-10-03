@@ -1,10 +1,14 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
 import android.content.ActivityNotFoundException
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -73,9 +77,9 @@ fun AirSyncMainScreen(
     isPlus: Boolean = false,
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
-    onRequestNotificationPermission: () -> Unit = {},
-    showAboutDialog: Boolean = false,
-    onDismissAbout: () -> Unit = {}
+    showAboutDialog: Boolean = false, // Add this parameter
+    onDismissAbout: () -> Unit = {},
+    onRequestCallLogPermission: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -99,14 +103,32 @@ fun AirSyncMainScreen(
     // Track if we've already processed the QR code dialog to prevent re-showing
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
 
+    // Launcher for runtime permissions
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // After the user responds, refresh the permission list to update the UI
+        viewModel.refreshPermissions(context)
+    }
+
+    // Define the actions for requesting specific permissions
+    val onRequestNotificationPermission = {
+        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+    val onRequestNearbyDevicesPermission = {
+        permissionLauncher.launch(Manifest.permission.NEARBY_WIFI_DEVICES)
+    }
+
     // Pager state for swipeable tabs (0 = Connect, 1 = Settings)
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
 
     LaunchedEffect(Unit) {
-        viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
-
-        // Start network monitoring for dynamic Wi-Fi changes
-        viewModel.startNetworkMonitoring(context)
+        // Launch initialization on a background thread to avoid blocking the UI
+        scope.launch(Dispatchers.IO) {
+            viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
+            // Start network monitoring for dynamic Wi-Fi changes
+            viewModel.startNetworkMonitoring(context)
+        }
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
@@ -245,19 +267,12 @@ fun AirSyncMainScreen(
     }
 
     fun launchScanner(context: Context) {
-        val lensIntent = Intent("com.google.vr.apps.ornament.app.lens.LensLauncherActivity.MAIN")
-        lensIntent.setPackage("com.google.ar.lens")
-
+        // Fallback to default camera app
+        val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
         try {
-            context.startActivity(lensIntent)
+            context.startActivity(cameraIntent)
         } catch (_: ActivityNotFoundException) {
-            // Fallback to default camera app
-            val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
-            try {
-                context.startActivity(cameraIntent)
-            } catch (_: ActivityNotFoundException) {
-                Toast.makeText(context, "No camera app found", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(context, "No camera app found", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -371,7 +386,9 @@ fun AirSyncMainScreen(
                             missingPermissions = uiState.missingPermissions,
                             onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
                             onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                            onRequestNotificationPermission = onRequestNotificationPermission
+                            onRequestNotificationPermission = onRequestNotificationPermission,
+                            onRequestNearbyDevicesPermission = onRequestNearbyDevicesPermission,
+                            onRequestCallLogPermission = onRequestCallLogPermission
                         )
                     }
 
@@ -386,7 +403,7 @@ fun AirSyncMainScreen(
                     )
 
                     AnimatedVisibility(
-                        visible = !uiState.isConnected,
+                        visible = uiState.isConnected.not(),
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
@@ -402,6 +419,15 @@ fun AirSyncMainScreen(
                                 onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
                                 onConnect = { viewModel.prepareForManualConnection() }
                             )
+                        }
+                    }
+
+                    AnimatedVisibility(visible = uiState.isConnected) {
+                        Button(onClick = { 
+                            viewModel.startMirroring()
+                            Toast.makeText(context, "Screen mirroring is not yet implemented.", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Text(text = "Start Mirroring")
                         }
                     }
 
@@ -456,6 +482,48 @@ fun AirSyncMainScreen(
                         onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
                         onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                     )
+
+                    // Phone and Message Sync Settings Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(ExtraCornerRadius)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Share Phone Logs",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Switch(
+                                    checked = uiState.isPhoneLogSyncEnabled,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.setPhoneLogSyncEnabled(enabled)
+                                    }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Share Messages",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Switch(
+                                    checked = uiState.isMessageSyncEnabled,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.setMessageSyncEnabled(enabled)
+                                    }
+                                )
+                            }
+                        }
+                    }
 
                     // Clipboard Sync Card
                     ClipboardSyncCard(
@@ -567,9 +635,11 @@ fun AirSyncMainScreen(
                                 Text(
                                     text = uiState.iconSyncMessage,
                                     modifier = Modifier.weight(1f),
-                                    color = if (uiState.iconSyncMessage.contains("Successfully"))
+                                    color = if (uiState.iconSyncMessage.contains("Successfully")) {
                                         MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onErrorContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    }
                                 )
                                 TextButton(onClick = { viewModel.clearIconSyncMessage() }) {
                                     Text("Dismiss")

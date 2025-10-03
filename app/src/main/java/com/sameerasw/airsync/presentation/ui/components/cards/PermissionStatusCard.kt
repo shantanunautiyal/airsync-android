@@ -34,7 +34,9 @@ fun PermissionStatusCard(
     missingPermissions: List<String>,
     onGrantPermissions: () -> Unit,
     onRefreshPermissions: () -> Unit,
-    onRequestNotificationPermission: (() -> Unit)? = null
+    onRequestNotificationPermission: (() -> Unit)? = null,
+    onRequestNearbyDevicesPermission: (() -> Unit)? = null,
+    onRequestCallLogPermission: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val criticalPermissions = PermissionUtil.getCriticalMissingPermissions(context)
@@ -138,6 +140,22 @@ fun PermissionStatusCard(
                                     isCritical = false
                                 )
                             }
+                            "Nearby Devices" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Improves Wi-Fi device discovery",
+                                    onExplainClick = { showDialog = PermissionType.NEARBY_DEVICES },
+                                    isCritical = false
+                                )
+                            }
+                            "Call Log" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Required for sharing call history",
+                                    onExplainClick = { showDialog = PermissionType.CALL_LOG },
+                                    isCritical = false
+                                )
+                            }
                         }
                     }
                 }
@@ -209,6 +227,12 @@ fun PermissionStatusCard(
                     }
                     PermissionType.WALLPAPER_ACCESS -> {
                         PermissionUtil.openManageExternalStorageSettings(context)
+                    }
+                    PermissionType.NEARBY_DEVICES -> {
+                        onRequestNearbyDevicesPermission?.invoke()
+                    }
+                    PermissionType.CALL_LOG -> {
+                        onRequestCallLogPermission?.invoke()
                     }
                 }
             }

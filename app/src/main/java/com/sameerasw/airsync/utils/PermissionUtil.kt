@@ -108,6 +108,60 @@ object PermissionUtil {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     }
 
+    /**
+     * Check if NEARBY_WIFI_DEVICES permission is granted (Android 13+)
+     */
+    fun isNearbyDevicesPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.NEARBY_WIFI_DEVICES
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required on older versions
+        }
+    }
+
+    /**
+     * Check if NEARBY_WIFI_DEVICES permission is required for this Android version
+     */
+    fun isNearbyDevicesPermissionRequired(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    fun hasReadCallLogPermission(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_CALL_LOG
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun hasReadSmsPermission(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun hasSendSmsPermission(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.SEND_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun hasReadStoragePermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_IMAGES
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
     fun openNotificationListenerSettings(context: Context) {
         val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -119,7 +173,13 @@ object PermissionUtil {
      */
     fun hasManageExternalStoragePermission(): Boolean {
             return try {
-                android.os.Environment.isExternalStorageManager()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    android.os.Environment.isExternalStorageManager()
+                } else {
+                    // For older versions, this permission doesn't exist, so we can't check it.
+                    // We rely on READ_EXTERNAL_STORAGE which is requested at runtime.
+                    true
+                }
             } catch (_: Exception) {
                 false
             }
@@ -130,11 +190,13 @@ object PermissionUtil {
      */
     fun openManageExternalStorageSettings(context: Context) {
             try {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = "package:${context.packageName}".toUri()
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = "package:${context.packageName}".toUri()
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
                 }
-                context.startActivity(intent)
             } catch (_: Exception) {
                 // Fallback to app settings
                 openAppSpecificBatterySettings(context)
@@ -144,8 +206,8 @@ object PermissionUtil {
     /**
      * Check if wallpaper access is available
      */
-    fun hasWallpaperAccess(): Boolean {
-        return hasManageExternalStoragePermission()
+    fun hasWallpaperAccess(context: Context): Boolean {
+        return hasReadStoragePermission(context)
     }
 
     fun getAllMissingPermissions(context: Context): List<String> {
@@ -155,6 +217,7 @@ object PermissionUtil {
         if (!isNotificationListenerEnabled(context)) {
             missing.add("Notification Access")
         }
+
 
         // Check POST_NOTIFICATIONS permission (Android 13+)
         if (isNotificationPermissionRequired() && !isPostNotificationPermissionGranted(context)) {
@@ -167,8 +230,25 @@ object PermissionUtil {
         }
 
         // Check wallpaper access permission (optional)
-        if (!hasWallpaperAccess()) {
+        if (!hasWallpaperAccess(context)) {
             missing.add("Wallpaper Access")
+        }
+
+        // Check for Nearby Devices permission (Android 13+)
+        if (isNearbyDevicesPermissionRequired() && !isNearbyDevicesPermissionGranted(context)) {
+            missing.add("Nearby Devices")
+        }
+
+        if (!hasReadCallLogPermission(context)) {
+            missing.add("Read Call Log")
+        }
+
+        if (!hasReadSmsPermission(context)) {
+            missing.add("Read SMS")
+        }
+
+        if (!hasSendSmsPermission(context)) {
+            missing.add("Send SMS")
         }
 
         return missing
@@ -183,6 +263,18 @@ object PermissionUtil {
         // Notification listener is critical for the app's main functionality
         if (!isNotificationListenerEnabled(context)) {
             critical.add("Notification Access")
+        }
+
+        if (!hasReadCallLogPermission(context)) {
+            critical.add("Read Call Log")
+        }
+
+        if (!hasReadSmsPermission(context)) {
+            critical.add("Read SMS")
+        }
+
+        if (!hasSendSmsPermission(context)) {
+            critical.add("Send SMS")
         }
 
         return critical
@@ -205,8 +297,13 @@ object PermissionUtil {
         }
 
         // Wallpaper access is optional for wallpaper sync feature
-        if (!hasWallpaperAccess()) {
+        if (!hasWallpaperAccess(context)) {
             optional.add("Wallpaper Access")
+        }
+
+        // Nearby devices is optional for better Wi-Fi discovery
+        if (isNearbyDevicesPermissionRequired() && !isNearbyDevicesPermissionGranted(context)) {
+            optional.add("Nearby Devices")
         }
 
         return optional

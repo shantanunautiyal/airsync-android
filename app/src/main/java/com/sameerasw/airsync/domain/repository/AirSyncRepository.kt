@@ -1,11 +1,13 @@
 package com.sameerasw.airsync.domain.repository
 
+import android.content.Context
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.NotificationApp
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import kotlinx.coroutines.flow.Flow
 
 interface AirSyncRepository {
+    suspend fun sendAllData(context: Context)
     suspend fun saveIpAddress(ipAddress: String)
     fun getIpAddress(): Flow<String>
 
@@ -68,4 +70,11 @@ interface AirSyncRepository {
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>
 
+    // Phone log sync settings
+    suspend fun setPhoneLogSyncEnabled(enabled: Boolean)
+    fun getPhoneLogSyncEnabled(): Flow<Boolean>
+
+    // Message sync settings
+    suspend fun setMessageSyncEnabled(enabled: Boolean)
+    fun getMessageSyncEnabled(): Flow<Boolean>
 }

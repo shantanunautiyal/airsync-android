@@ -14,8 +14,10 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class AirSyncWidgetProvider : AppWidgetProvider() {
 
@@ -49,43 +51,50 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
 
-        when (intent.action) {
-            AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
-                updateAllWidgets(context)
-            }
-            ACTION_DISCONNECT -> {
-                try {
-                    // Mark manual disconnect and disconnect
-                    runBlocking {
-                        DataStoreManager(context).setUserManuallyDisconnected(true)
+        val pendingResult = goAsync()
+        val coroutineScope = CoroutineScope(Dispatchers.IO)
+
+        coroutineScope.launch {
+            try {
+                when (intent.action) {
+                    AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
+                        updateAllWidgets(context)
                     }
-                    WebSocketUtil.disconnect(context)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Widget disconnect failed: ${e.message}")
-                }
-                updateAllWidgets(context)
-            }
-            ACTION_RECONNECT -> {
-                try {
-                    val ds = DataStoreManager(context)
-                    runBlocking { ds.setUserManuallyDisconnected(false) }
-                    // Try to connect using last connected device
-                    val last = runBlocking { ds.getLastConnectedDevice().first() }
-                    if (last != null) {
-                        WebSocketUtil.connect(
-                            context = context,
-                            ipAddress = last.ipAddress,
-                            port = last.port.toIntOrNull() ?: 6996,
-                            symmetricKey = last.symmetricKey,
-                            manualAttempt = true,
-                            onConnectionStatus = { updateAllWidgets(context) },
-                            onHandshakeTimeout = { updateAllWidgets(context) }
-                        )
+                    ACTION_DISCONNECT -> {
+                        try {
+                            // Mark manual disconnect and disconnect
+                            DataStoreManager(context).setUserManuallyDisconnected(true)
+                            WebSocketUtil.disconnect(context)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Widget disconnect failed: ${e.message}")
+                        }
+                        updateAllWidgets(context)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Widget reconnect failed: ${e.message}")
+                    ACTION_RECONNECT -> {
+                        try {
+                            val ds = DataStoreManager(context)
+                            ds.setUserManuallyDisconnected(false)
+                            // Try to connect using last connected device
+                            val last = ds.getLastConnectedDevice().first()
+                            if (last != null) {
+                                WebSocketUtil.connect(
+                                    context = context,
+                                    ipAddress = last.ipAddress,
+                                    port = last.port.toIntOrNull() ?: 6996,
+                                    symmetricKey = last.symmetricKey,
+                                    manualAttempt = true,
+                                    onConnectionStatus = { updateAllWidgets(context) },
+                                    onHandshakeTimeout = { updateAllWidgets(context) }
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Widget reconnect failed: ${e.message}")
+                        }
+                        updateAllWidgets(context)
+                    }
                 }
-                updateAllWidgets(context)
+            } finally {
+                pendingResult.finish()
             }
         }
     }
@@ -95,102 +104,106 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         widgetId: Int
     ) {
-        val views = RemoteViews(context.packageName, R.layout.widget_airsync)
+        val coroutineScope = CoroutineScope(Dispatchers.IO)
+        coroutineScope.launch {
+            val views = RemoteViews(context.packageName, R.layout.widget_airsync)
 
-        try {
-            val ds = DataStoreManager(context)
-            val isConnected = WebSocketUtil.isConnected()
-            val isConnecting = WebSocketUtil.isConnecting()
-            val lastDevice = runBlocking { ds.getLastConnectedDevice().first() }
+            try {
+                val ds = DataStoreManager(context)
+                val isConnected = WebSocketUtil.isConnected()
+                val isConnecting = WebSocketUtil.isConnecting()
+                val lastDevice = ds.getLastConnectedDevice().first()
 
-            // Device image (large preview) and name
-            val previewRes = DevicePreviewResolver.getPreviewRes(lastDevice)
-            views.setImageViewResource(R.id.widget_device_image, previewRes)
-            // Dim the device image when not connected (including while connecting)
-            val alphaFloat = if (isConnected) 1.0f else 0.6f
-            val alphaInt = if (isConnected) 255 else 153 // 0.6 * 255 ≈ 153
-            // Apply both view alpha and image alpha for broader device compatibility
-            views.setFloat(R.id.widget_device_image, "setAlpha", alphaFloat)
-            views.setInt(R.id.widget_device_image, "setImageAlpha", alphaInt)
-            views.setTextViewText(R.id.widget_device_name, lastDevice?.name ?: "AirSync")
+                // Device image (large preview) and name
+                val previewRes = DevicePreviewResolver.getPreviewRes(lastDevice)
+                views.setImageViewResource(R.id.widget_device_image, previewRes)
+                // Dim the device image when not connected (including while connecting)
+                val alphaFloat = if (isConnected) 1.0f else 0.6f
+                val alphaInt = if (isConnected) 255 else 153 // 0.6 * 255 ≈ 153
+                // Apply both view alpha and image alpha for broader device compatibility
+                views.setFloat(R.id.widget_device_image, "setAlpha", alphaFloat)
+                views.setInt(R.id.widget_device_image, "setImageAlpha", alphaInt)
+                views.setTextViewText(R.id.widget_device_name, lastDevice?.name ?: "AirSync")
 
-            // Read persisted Mac status snapshot
-            val macStatus = runBlocking { DataStoreManager(context).getMacStatusForWidget().first() }
+                // Read persisted Mac status snapshot
+                val macStatus = DataStoreManager(context).getMacStatusForWidget().first()
 
-            // Battery overlay and secondary line
-            if (isConnected && macStatus.batteryLevel != null) {
-                val pct = macStatus.batteryLevel.coerceIn(0, 100)
-                views.setTextViewText(R.id.widget_battery_text, "$pct%")
-                views.setViewVisibility(R.id.widget_battery_container, android.view.View.VISIBLE)
-                // Hide secondary line when connected (we will use media info instead)
-                views.setViewVisibility(R.id.widget_secondary_line, android.view.View.GONE)
-            } else {
-                views.setViewVisibility(R.id.widget_battery_container, android.view.View.GONE)
-                val secondaryText = when {
-                    lastDevice != null -> {
-                        val lastSeenMs = lastDevice.lastConnected
-                        if (lastSeenMs > 0) formatLastSeen(lastSeenMs) else "Last seen: unknown"
+                // Battery overlay and secondary line
+                if (isConnected && macStatus.batteryLevel != null) {
+                    val pct = macStatus.batteryLevel.coerceIn(0, 100)
+                    views.setTextViewText(R.id.widget_battery_text, "$pct%")
+                    views.setViewVisibility(R.id.widget_battery_container, android.view.View.VISIBLE)
+                    // Hide secondary line when connected (we will use media info instead)
+                    views.setViewVisibility(R.id.widget_secondary_line, android.view.View.GONE)
+                } else {
+                    views.setViewVisibility(R.id.widget_battery_container, android.view.View.GONE)
+                    val secondaryText = when {
+                        lastDevice != null -> {
+                            val lastSeenMs = lastDevice.lastConnected
+                            if (lastSeenMs > 0) formatLastSeen(lastSeenMs) else "Last seen: unknown"
+                        }
+                        else -> ""
                     }
-                    else -> ""
+                    views.setTextViewText(R.id.widget_secondary_line, secondaryText)
+                    views.setViewVisibility(R.id.widget_secondary_line, if (secondaryText.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE)
                 }
-                views.setTextViewText(R.id.widget_secondary_line, secondaryText)
-                views.setViewVisibility(R.id.widget_secondary_line, if (secondaryText.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE)
-            }
 
-            // Media info when connected: show title - artist if present
-            if (isConnected && !macStatus.title.isNullOrBlank()) {
-                val mediaLine = if (!macStatus.artist.isNullOrBlank()) "${macStatus.title} — ${macStatus.artist}" else macStatus.title
-                views.setTextViewText(R.id.widget_media_info, mediaLine)
-                views.setViewVisibility(R.id.widget_media_info, android.view.View.VISIBLE)
-            } else {
-                views.setViewVisibility(R.id.widget_media_info, android.view.View.GONE)
-            }
-
-
-            // Open app when tapping outer container (fallback/default)
-            val openAppIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            val openAppPendingIntent = PendingIntent.getActivity(
-                context, 0, openAppIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_container, openAppPendingIntent)
-
-            // Toggle overlay hint visibility: show when can reconnect (disconnected, have last device, not currently connecting)
-            val showTapHint = (!isConnected && lastDevice != null && !isConnecting)
-            views.setViewVisibility(
-                R.id.widget_tap_hint,
-                if (showTapHint) android.view.View.VISIBLE else android.view.View.GONE
-            )
-
-            // Make the device image tap only reconnect (no disconnect action from widget)
-            when {
-                isConnected -> {
-                    // When connected, tapping image opens the app (no disconnect from widget)
-                    views.setOnClickPendingIntent(R.id.widget_device_image, openAppPendingIntent)
+                // Media info when connected: show title - artist if present
+                if (isConnected && !macStatus.title.isNullOrBlank()) {
+                    val mediaLine = if (!macStatus.artist.isNullOrBlank()) "${macStatus.title} — ${macStatus.artist}" else macStatus.title
+                    views.setTextViewText(R.id.widget_media_info, mediaLine)
+                    views.setViewVisibility(R.id.widget_media_info, android.view.View.VISIBLE)
+                } else {
+                    views.setViewVisibility(R.id.widget_media_info, android.view.View.GONE)
                 }
-                !isConnected && lastDevice != null && !isConnecting -> {
-                    val reconnectIntent = Intent(context, AirSyncWidgetProvider::class.java).apply {
-                        action = ACTION_RECONNECT
+
+
+                // Open app when tapping outer container (fallback/default)
+                val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                val openAppPendingIntent = PendingIntent.getActivity(
+                    context, 0, openAppIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(R.id.widget_container, openAppPendingIntent)
+
+                // Toggle overlay hint visibility: show when can reconnect (disconnected, have last device, not currently connecting)
+                val showTapHint = (!isConnected && lastDevice != null && !isConnecting)
+                views.setViewVisibility(
+                    R.id.widget_tap_hint,
+                    if (showTapHint) android.view.View.VISIBLE else android.view.View.GONE
+                )
+
+                // Make the device image tap only reconnect (no disconnect action from widget)
+                when {
+                    isConnected -> {
+                        // When connected, tapping image opens the app (no disconnect from widget)
+                        views.setOnClickPendingIntent(R.id.widget_device_image, openAppPendingIntent)
                     }
-                    val reconnectPI = PendingIntent.getBroadcast(
-                        context, 2, reconnectIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    views.setOnClickPendingIntent(R.id.widget_device_image, reconnectPI)
+                    !isConnected && lastDevice != null && !isConnecting -> {
+                        val reconnectIntent = Intent(context, AirSyncWidgetProvider::class.java).apply {
+                            action = ACTION_RECONNECT
+                            component = ComponentName(context, AirSyncWidgetProvider::class.java)
+                        }
+                        val reconnectPI = PendingIntent.getBroadcast(
+                            context, 2, reconnectIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        views.setOnClickPendingIntent(R.id.widget_device_image, reconnectPI)
+                    }
+                    else -> {
+                        // While connecting or if no device is saved, just open the app
+                        views.setOnClickPendingIntent(R.id.widget_device_image, openAppPendingIntent)
+                    }
                 }
-                else -> {
-                    // While connecting or if no device is saved, just open the app
-                    views.setOnClickPendingIntent(R.id.widget_device_image, openAppPendingIntent)
-                }
+
+                appWidgetManager.updateAppWidget(widgetId, views)
+                Log.d(TAG, "Widget $widgetId updated")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating widget $widgetId: ${e.message}")
             }
-
-            appWidgetManager.updateAppWidget(widgetId, views)
-            Log.d(TAG, "Widget $widgetId updated")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating widget $widgetId: ${e.message}")
         }
     }
 

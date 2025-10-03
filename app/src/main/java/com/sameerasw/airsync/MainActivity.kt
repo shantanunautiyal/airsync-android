@@ -1,6 +1,10 @@
 package com.sameerasw.airsync
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -34,8 +39,48 @@ import kotlinx.coroutines.flow.Flow
 
 class MainActivity : ComponentActivity() {
 
+    // Broadcast receiver for mirror requests (kept as a property so we can unregister)
+    private var mirrorReceiver: BroadcastReceiver? = null
+
+    // ActivityResult launcher for MediaProjection permission
+    private val projectionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        try {
+            if (result.resultCode == RESULT_OK && result.data != null) {
+                // Use defaults or previous requested size; for now use 1280x720 and 4 Mbps
+                com.sameerasw.airsync.mirror.MirroringManager.startFromResult(
+                    this,
+                    result.resultCode,
+                    result.data,
+                    1280,
+                    720,
+                    4
+                )
+                // Notify Mac that mirroring started
+                val resp = org.json.JSONObject()
+                resp.put("type", "startMirrorResponse")
+                val d = org.json.JSONObject()
+                d.put("success", true)
+                resp.put("data", d)
+                com.sameerasw.airsync.utils.WebSocketUtil.sendMessage(com.sameerasw.airsync.utils.JsonUtil.toSingleLine(resp.toString()))
+            } else {
+                val resp = org.json.JSONObject()
+                resp.put("type", "startMirrorResponse")
+                val d = org.json.JSONObject()
+                d.put("success", false)
+                d.put("message", "Permission denied")
+                resp.put("data", d)
+                com.sameerasw.airsync.utils.WebSocketUtil.sendMessage(com.sameerasw.airsync.utils.JsonUtil.toSingleLine(resp.toString()))
+            }
+        } catch (e: Exception) {
+            // Log unexpected exceptions during projection handling to help debugging crashes
+            android.util.Log.e("MainActivity", "Error in projectionLauncher callback: ${e.message}", e)
+        }
+    }
+
     // Permission launcher for Android 13+ notification permission
-    private val notificationPermissionLauncher = registerForActivityResult(
+    private val callLogPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
     }
@@ -43,6 +88,27 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        mirrorReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                try {
+                    if (intent == null) return
+                    // Request MediaProjection permission via Activity Result API
+                    val mgr = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
+                    val captureIntent = mgr.createScreenCaptureIntent()
+                    projectionLauncher.launch(captureIntent)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error launching projection intent: ${e.message}", e)
+                }
+            }
+        }
+        ContextCompat.registerReceiver(
+            this,
+            mirrorReceiver,
+            IntentFilter("com.sameerasw.airsync.ACTION_REQUEST_MIRROR"),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
         // Enable full edge-to-edge drawing for both status and navigation bars
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
@@ -161,11 +227,11 @@ class MainActivity : ComponentActivity() {
                                 pcName = pcName,
                                 isPlus = isPlus,
                                 symmetricKey = symmetricKey,
-                                onRequestNotificationPermission = {
-                                    requestNotificationPermission()
-                                },
                                 showAboutDialog = showAboutDialog,
-                                onDismissAbout = { showAboutDialog = false }
+                                onDismissAbout = { showAboutDialog = false },
+                                onRequestCallLogPermission = {
+                                    requestCallLogPermission()
+                                }
                             )
                         }
                     }
@@ -174,11 +240,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (!PermissionUtil.isPostNotificationPermissionGranted(this)) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+    override fun onDestroy() {
+        super.onDestroy()
+        // Unregister mirror receiver if registered to avoid leaks/crashes
+        try {
+            mirrorReceiver?.let { unregisterReceiver(it) }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Error unregistering mirrorReceiver: ${e.message}")
+        }
+        mirrorReceiver = null
+    }
+
+    private fun requestCallLogPermission() {
+        if (!PermissionUtil.hasReadCallLogPermission(this)) {
+            callLogPermissionLauncher.launch(Manifest.permission.READ_CALL_LOG)
         }
     }
 }

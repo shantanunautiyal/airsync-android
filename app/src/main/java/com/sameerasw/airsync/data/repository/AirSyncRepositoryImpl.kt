@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.data.repository
 
+import android.content.Context
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
@@ -10,6 +11,10 @@ import kotlinx.coroutines.flow.Flow
 class AirSyncRepositoryImpl(
     private val dataStoreManager: DataStoreManager
 ) : AirSyncRepository {
+
+    override suspend fun sendAllData(context: Context) {
+        dataStoreManager.sendAllData(context)
+    }
 
     override suspend fun saveIpAddress(ipAddress: String) {
         dataStoreManager.saveIpAddress(ipAddress)
@@ -156,6 +161,22 @@ class AirSyncRepositoryImpl(
 
     override fun getUserManuallyDisconnected(): Flow<Boolean> {
         return dataStoreManager.getUserManuallyDisconnected()
+    }
+
+    override suspend fun setPhoneLogSyncEnabled(enabled: Boolean) {
+        dataStoreManager.setPhoneLogSyncEnabled(enabled)
+    }
+
+    override fun getPhoneLogSyncEnabled(): Flow<Boolean> {
+        return dataStoreManager.getPhoneLogSyncEnabled()
+    }
+
+    override suspend fun setMessageSyncEnabled(enabled: Boolean) {
+        dataStoreManager.setMessageSyncEnabled(enabled)
+    }
+
+    override fun getMessageSyncEnabled(): Flow<Boolean> {
+        return dataStoreManager.getMessageSyncEnabled()
     }
 
 }

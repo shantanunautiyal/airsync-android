@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,7 +38,14 @@ fun NotificationSyncCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        enabled = !isNotificationEnabled,
+                        onClick = {
+                            if (!isNotificationEnabled) onGrantPermissions()
+                        }
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -48,11 +56,7 @@ fun NotificationSyncCard(
                 Switch(
                     checked = isNotificationSyncEnabled && isNotificationEnabled,
                     onCheckedChange = { enabled ->
-                        if (isNotificationEnabled) {
-                            onToggleSync(enabled)
-                        } else {
-                            onGrantPermissions()
-                        }
+                        onToggleSync(enabled)
                     },
                     enabled = isNotificationEnabled
                 )

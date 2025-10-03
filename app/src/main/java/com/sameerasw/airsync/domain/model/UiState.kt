@@ -26,9 +26,14 @@ data class UiState(
     val isContinueBrowsingEnabled: Boolean = true,
     val isSendNowPlayingEnabled: Boolean = true,
     val isKeepPreviousLinkEnabled: Boolean = true,
-    // Mac device status
     val macDeviceStatus: MacDeviceStatus? = null,
-    // Auth failure dialog
     val showAuthFailureDialog: Boolean = false,
-    val authFailureMessage: String = ""
+    val authFailureMessage: String = "",
+    // Health Connect State
+    val healthConnectAvailability: String = "NotSupported",
+    val hasHealthConnectPermissions: Boolean = false,
+    val isHealthConnectEnabled: Boolean = false,
+    val isPhoneLogSyncEnabled: Boolean = false,
+    val isMessageSyncEnabled: Boolean = false,
+    val requestHealthPermission: Boolean = false
 )

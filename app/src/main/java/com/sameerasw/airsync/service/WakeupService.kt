@@ -320,43 +320,52 @@ class WakeupService : Service() {
             // Clear manual disconnect flag since this is an external wake-up request
             dataStoreManager.setUserManuallyDisconnected(false)
 
+            var encryptionKey: String? = null
             // Look up stored encryption key from previous connections
-            val encryptionKey = findStoredEncryptionKey(dataStoreManager, macIp, macPort, macName)
-            
-            if (encryptionKey == null) {
-                Log.w(TAG, "No stored encryption key found for $macName at $macIp:$macPort")
-                return
-            }
-            
-            Log.d(TAG, "Found stored encryption key for $macName")
+            withContext(Dispatchers.IO) {
+                encryptionKey = findStoredEncryptionKey(dataStoreManager, macIp, macPort, macName)
 
-            // Update device information and last connected timestamp
-            val ourIp = DeviceInfoUtil.getWifiIpAddress(this@WakeupService)
-            if (ourIp != null) {
-                // Update the network device connection with current timestamp
-                dataStoreManager.saveNetworkDeviceConnection(
-                    deviceName = macName,
-                    ourIp = ourIp,
-                    clientIp = macIp,
-                    port = macPort.toString(),
-                    isPlus = true, // Assume Plus features for wake-up capability
-                    symmetricKey = encryptionKey,
-                    model = "Mac",
-                    deviceType = "desktop"
-                )
-                
-                // Update last connected device
-                val connectedDevice = com.sameerasw.airsync.domain.model.ConnectedDevice(
-                    name = macName,
-                    ipAddress = macIp,
-                    port = macPort.toString(),
-                    lastConnected = System.currentTimeMillis(),
-                    isPlus = true,
-                    symmetricKey = encryptionKey,
-                    model = "Mac",
-                    deviceType = "desktop"
-                )
-                dataStoreManager.saveLastConnectedDevice(connectedDevice)
+                if (encryptionKey == null) {
+                    Log.w(TAG, "No stored encryption key found for $macName at $macIp:$macPort")
+                    return@withContext
+                }
+
+                Log.d(TAG, "Found stored encryption key for $macName")
+
+                // Update device information and last connected timestamp
+                val ourIp = DeviceInfoUtil.getWifiIpAddress(this@WakeupService)
+                if (ourIp != null) {
+                    // Update the network device connection with current timestamp
+                    dataStoreManager.saveNetworkDeviceConnection(
+                        deviceName = macName,
+                        ourIp = ourIp,
+                        clientIp = macIp,
+                        port = macPort.toString(),
+                        isPlus = true, // Assume Plus features for wake-up capability
+                        symmetricKey = encryptionKey,
+                        model = "Mac",
+                        deviceType = "desktop"
+                    )
+
+                    // Update last connected device
+                    val connectedDevice = com.sameerasw.airsync.domain.model.ConnectedDevice(
+                        name = macName,
+                        ipAddress = macIp,
+                        port = macPort.toString(),
+                        lastConnected = System.currentTimeMillis(),
+                        isPlus = true,
+                        symmetricKey = encryptionKey,
+                        model = "Mac",
+                        deviceType = "desktop"
+                    )
+                    dataStoreManager.saveLastConnectedDevice(connectedDevice)
+                }
+            }
+
+            // If key is still null after lookup, we cannot proceed.
+            if (encryptionKey == null) {
+                Log.w(TAG, "Cannot connect: encryption key is null after lookup.")
+                return
             }
 
             // Attempt to connect to the Mac

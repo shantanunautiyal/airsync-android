@@ -54,10 +54,17 @@ class DataStoreManager(private val context: Context) {
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
         // New: Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
+        private val HEALTH_CONNECT_ENABLED = booleanPreferencesKey("health_connect_enabled")
+        private val PHONE_LOG_SYNC_ENABLED = booleanPreferencesKey("phone_log_sync_enabled")
+        private val MESSAGE_SYNC_ENABLED = booleanPreferencesKey("message_sync_enabled")
 
         // Network-aware device connections
         private val NETWORK_DEVICES_PREFIX = "network_device_"
         private val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
+    }
+
+    suspend fun sendAllData(context: Context) {
+        // TODO: Not yet implemented
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -528,6 +535,42 @@ class DataStoreManager(private val context: Context) {
     suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long) {
         context.dataStore.edit { preferences ->
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = timestamp.toString()
+        }
+    }
+
+    suspend fun setHealthConnectEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[HEALTH_CONNECT_ENABLED] = enabled
+        }
+    }
+
+    fun getHealthConnectEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[HEALTH_CONNECT_ENABLED] == true // Default to disabled
+        }
+    }
+
+    suspend fun setPhoneLogSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PHONE_LOG_SYNC_ENABLED] = enabled
+        }
+    }
+
+    fun getPhoneLogSyncEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[PHONE_LOG_SYNC_ENABLED] == true // Default to disabled
+        }
+    }
+
+    suspend fun setMessageSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[MESSAGE_SYNC_ENABLED] = enabled
+        }
+    }
+
+    fun getMessageSyncEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[MESSAGE_SYNC_ENABLED] == true // Default to disabled
         }
     }
 }
