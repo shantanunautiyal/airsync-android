@@ -54,6 +54,7 @@ class DataStoreManager(private val context: Context) {
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
         // New: Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
+        private val TAILSCALE_SUPPORT_ENABLED = booleanPreferencesKey("tailscale_support_enabled")
 
         // Network-aware device connections
         private val NETWORK_DEVICES_PREFIX = "network_device_"
@@ -193,6 +194,18 @@ class DataStoreManager(private val context: Context) {
     fun getKeepPreviousLinkEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[KEEP_PREVIOUS_LINK_ENABLED] != false // Default to enabled
+        }
+    }
+
+    suspend fun setTailscaleSupportEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[TAILSCALE_SUPPORT_ENABLED] = enabled
+        }
+    }
+
+    fun getTailscaleSupportEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { prefs ->
+            prefs[TAILSCALE_SUPPORT_ENABLED] ?: false
         }
     }
 

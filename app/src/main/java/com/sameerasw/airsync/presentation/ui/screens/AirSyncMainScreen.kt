@@ -55,9 +55,9 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCa
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
-// Removed QrScannerRow; functionality moved to FAB
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
+import com.sameerasw.airsync.presentation.ui.components.cards.TailscaleSupportCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import org.json.JSONObject
@@ -473,7 +473,12 @@ fun AirSyncMainScreen(
                         onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
                     )
 
-                    DeviceInfoCard(
+
+                        // Tailscale Support Card
+                        TailscaleSupportCard(context)
+
+
+                        DeviceInfoCard(
                         deviceName = uiState.deviceNameInput,
                         localIp = deviceInfo.localIp,
                         onDeviceNameChange = { viewModel.updateDeviceName(it) }
