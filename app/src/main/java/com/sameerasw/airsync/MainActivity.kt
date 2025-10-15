@@ -172,6 +172,7 @@ class MainActivity : ComponentActivity() {
                                 pcName = pcName,
                                 isPlus = isPlus,
                                 symmetricKey = symmetricKey,
+                                shouldTriggerReconnect = shouldTriggerReconnect,
                                 onRequestNotificationPermission = {
                                     requestNotificationPermission()
                                 },
