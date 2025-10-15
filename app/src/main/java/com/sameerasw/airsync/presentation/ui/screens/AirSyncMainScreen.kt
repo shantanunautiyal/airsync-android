@@ -364,6 +364,13 @@ fun AirSyncMainScreen(
         }
     }
 
+    // Refresh permissions when returning from settings
+    LaunchedEffect(uiState.showPermissionDialog) {
+        if (!uiState.showPermissionDialog) {
+            viewModel.refreshPermissions(context)
+        }
+    }
+
     fun launchScanner(context: Context) {
         val lensIntent = Intent("com.google.vr.apps.ornament.app.lens.LensLauncherActivity.MAIN")
         lensIntent.setPackage("com.google.ar.lens")
