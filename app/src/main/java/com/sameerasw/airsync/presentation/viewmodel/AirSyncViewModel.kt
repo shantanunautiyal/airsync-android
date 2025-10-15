@@ -173,6 +173,7 @@ class AirSyncViewModel(
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
+            val isSmartspacerShowWhenDisconnected = repository.getSmartspacerShowWhenDisconnected().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -626,6 +627,19 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isKeepPreviousLinkEnabled = enabled)
         viewModelScope.launch {
             repository.setKeepPreviousLinkEnabled(enabled)
+        }
+    }
+
+    fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isSmartspacerShowWhenDisconnected = enabled)
+        viewModelScope.launch {
+            repository.setSmartspacerShowWhenDisconnected(enabled)
+        }
+        // Notify Smartspacer to update immediately
+        appContext?.let { context ->
+            try {
+                AirSyncDeviceTarget.notifyChange(context)
+            } catch (_: Exception) {}
         }
     }
 

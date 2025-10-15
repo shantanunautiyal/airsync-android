@@ -112,6 +112,7 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -593,20 +594,23 @@ fun AirSyncMainScreen(
                             onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                         )
 
-                        ClipboardSyncCard(
-                            isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                            onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
-                            isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
-                            onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
-                            isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
-                            continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
-                            isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                            onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
-                            isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                            onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
-                        )
-
-                        TailscaleSupportCard(context)
+                    // Clipboard Sync Card
+                    SyncFeaturesCard(
+                        isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                        onToggleClipboardSync = { enabled ->
+                            viewModel.setClipboardSyncEnabled(enabled)
+                        },
+                        isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
+                        onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
+                        isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
+                        continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                        isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                        onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
+                        isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
+                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
+                        isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
+                        onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
+                    )
 
                         ExpandNetworkingCard(context)
 

@@ -29,6 +29,7 @@ data class UiState(
     val showMirroringDialog: Boolean = false,
     val mirroringWebSocketUrl: String? = null,
     val mirroringOptions: MirroringOptions? = null,
+    val isSmartspacerShowWhenDisconnected: Boolean = false,
     // Mac device status
     val macDeviceStatus: MacDeviceStatus? = null,
     // Auth failure dialog
