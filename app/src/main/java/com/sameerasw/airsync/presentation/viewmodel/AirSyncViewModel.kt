@@ -19,6 +19,7 @@ import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.service.WakeupService
+import com.sameerasw.airsync.smartspacer.AirSyncDeviceTarget
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -65,6 +66,14 @@ class AirSyncViewModel(
                 response = if (isConnected) "Connected successfully!" else "Disconnected"
             )
 
+            // Notify Smartspacer of connection status change
+            appContext?.let { context ->
+                try {
+                    AirSyncDeviceTarget.notifyChange(context)
+                } catch (_: Exception) {
+                    // Smartspacer might not be installed, ignore
+                }
+            }
         }
     }
 
@@ -369,6 +378,14 @@ class AirSyncViewModel(
             // Refresh network devices list
             loadNetworkDevices()
 
+            // Notify Smartspacer of device update
+            appContext?.let { context ->
+                try {
+                    AirSyncDeviceTarget.notifyChange(context)
+                } catch (_: Exception) {
+                    // Smartspacer might not be installed, ignore
+                }
+            }
         }
     }
 

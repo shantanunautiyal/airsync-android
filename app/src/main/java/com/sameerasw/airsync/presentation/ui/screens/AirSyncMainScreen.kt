@@ -90,6 +90,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
@@ -111,22 +112,6 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-<<<<<<< HEAD
-=======
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
-import com.sameerasw.airsync.ui.theme.minCornerRadius
-import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
-import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
-import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
-import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
-import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
-import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
->>>>>>> e87f53e (Expand networking)
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -614,11 +599,9 @@ fun AirSyncMainScreen(
                             onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
                         )
 
-<<<<<<< HEAD
                         TailscaleSupportCard(context)
-=======
+
                         ExpandNetworkingCard(context)
->>>>>>> e87f53e (Expand networking)
 
                         DeviceInfoCard(
                             deviceName = uiState.deviceNameInput,

@@ -54,6 +54,9 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
+    // Smartspacer SDK
+    implementation("com.kieronquinn.smartspacer:sdk-plugin:1.1")
+
     // Material Components (XML themes: Theme.Material3.*)
     implementation(libs.material)
 
