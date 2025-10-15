@@ -25,6 +25,11 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
         val context = provideContext()
         val isConnected = WebSocketUtil.isConnected()
 
+        // Get the Smartspacer setting
+        val showWhenDisconnected = runBlocking {
+            DataStoreManager(context).getSmartspacerShowWhenDisconnected().first()
+        }
+
         // Get last connected device info
         val lastDevice = runBlocking {
             DataStoreManager(context).getLastConnectedDevice().first()
@@ -32,6 +37,11 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
 
         // Don't show target if never connected
         if (lastDevice == null && !isConnected) {
+            return emptyList()
+        }
+
+        // If not connected and user disabled "show when disconnected", hide the target
+        if (!isConnected && !showWhenDisconnected) {
             return emptyList()
         }
 

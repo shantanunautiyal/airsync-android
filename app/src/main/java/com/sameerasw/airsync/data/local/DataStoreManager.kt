@@ -54,6 +54,8 @@ class DataStoreManager(private val context: Context) {
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
         // New: Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
+        // New: Always show in Smartspacer toggle
+        private val SMARTSPACER_SHOW_WHEN_DISCONNECTED = booleanPreferencesKey("smartspacer_show_when_disconnected")
         private val EXPAND_NETWORKING_ENABLED = booleanPreferencesKey("expand_networking_enabled")
 
         // Network-aware device connections
@@ -194,6 +196,19 @@ class DataStoreManager(private val context: Context) {
     fun getKeepPreviousLinkEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[KEEP_PREVIOUS_LINK_ENABLED] != false // Default to enabled
+        }
+    }
+
+    // New: Always show in Smartspacer toggle
+    suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] = enabled
+        }
+    }
+
+    fun getSmartspacerShowWhenDisconnected(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] ?: false
         }
     }
 

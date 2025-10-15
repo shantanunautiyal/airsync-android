@@ -49,7 +49,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
-import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
+import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
@@ -450,7 +450,7 @@ fun AirSyncMainScreen(
                     )
 
                     // Clipboard Sync Card
-                    ClipboardSyncCard(
+                    SyncFeaturesCard(
                         isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
                         onToggleClipboardSync = { enabled ->
                             viewModel.setClipboardSyncEnabled(enabled)
@@ -462,7 +462,9 @@ fun AirSyncMainScreen(
                         isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
                         onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
                         isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
+                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
+                        isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
+                        onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
                     )
 
                         ExpandNetworkingCard(context)

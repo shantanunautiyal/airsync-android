@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 
 @Composable
-fun ClipboardSyncCard(
+fun SyncFeaturesCard(
     isClipboardSyncEnabled: Boolean,
     onToggleClipboardSync: (Boolean) -> Unit,
     // Continue Browsing props
@@ -34,6 +34,9 @@ fun ClipboardSyncCard(
     // New: Keep previous link props
     isKeepPreviousLinkEnabled: Boolean,
     onToggleKeepPreviousLink: (Boolean) -> Unit,
+    // New: Smartspacer props
+    isSmartspacerShowWhenDisconnected: Boolean,
+    onToggleSmartspacerShowWhenDisconnected: (Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -135,7 +138,7 @@ fun ClipboardSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Send now playing", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Share media playback details (title, artist, artwork) with desktop",
+                        "Share media playback details with desktop",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -143,6 +146,28 @@ fun ClipboardSyncCard(
                 Switch(
                     checked = isSendNowPlayingEnabled,
                     onCheckedChange = onToggleSendNowPlaying
+                )
+            }
+
+            // Smartspacer toggle displayed under Send now playing
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Smartspacer", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Show Smartspacer when disconnected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isSmartspacerShowWhenDisconnected,
+                    onCheckedChange = onToggleSmartspacerShowWhenDisconnected
                 )
             }
 

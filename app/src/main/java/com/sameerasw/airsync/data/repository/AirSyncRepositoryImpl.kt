@@ -150,6 +150,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getKeepPreviousLinkEnabled()
     }
 
+    override suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
+        dataStoreManager.setSmartspacerShowWhenDisconnected(enabled)
+    }
+
+    override fun getSmartspacerShowWhenDisconnected(): Flow<Boolean> {
+        return dataStoreManager.getSmartspacerShowWhenDisconnected()
+    }
+
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
         dataStoreManager.setUserManuallyDisconnected(disconnected)
     }
