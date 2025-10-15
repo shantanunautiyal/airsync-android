@@ -72,7 +72,6 @@ fun AirSyncMainScreen(
     pcName: String? = null,
     isPlus: Boolean = false,
     symmetricKey: String? = null,
-    shouldTriggerReconnect: Boolean = false,
     onNavigateToApps: () -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
     showAboutDialog: Boolean = false,
@@ -167,32 +166,6 @@ fun AirSyncMainScreen(
 
         // Start network monitoring for dynamic Wi-Fi changes
         viewModel.startNetworkMonitoring(context)
-    }
-
-    // Handle reconnection trigger from Smartspacer (WIP - Needs fixing)
-    LaunchedEffect(shouldTriggerReconnect, uiState.isConnected) {
-        if (shouldTriggerReconnect && !uiState.isConnected && uiState.lastConnectedDevice != null) {
-
-            delay(300)
-            // Check if we can use network-aware connection first
-            val networkAwareDevice = viewModel.getNetworkAwareLastConnectedDevice()
-            if (networkAwareDevice != null) {
-                // Use network-aware device IP for current network
-                viewModel.updateIpAddress(networkAwareDevice.ipAddress)
-                viewModel.updatePort(networkAwareDevice.port)
-                viewModel.updateSymmetricKey(networkAwareDevice.symmetricKey)
-            } else {
-                // Fallback to legacy stored device
-                uiState.lastConnectedDevice?.let { device ->
-                    viewModel.updateIpAddress(device.ipAddress)
-                    viewModel.updatePort(device.port)
-                    viewModel.updateSymmetricKey(device.symmetricKey)
-                }
-            }
-            // Trigger connection
-            delay(100)
-            connect()
-        }
     }
 
     // Mark QR dialog as processed when it's shown or when already connected

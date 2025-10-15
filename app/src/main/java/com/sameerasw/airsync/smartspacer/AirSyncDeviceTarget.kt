@@ -84,10 +84,8 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
         } else {
-            // When disconnected, open the app (user can trigger reconnection from there)
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("trigger_reconnect", true)
             }
         }
 

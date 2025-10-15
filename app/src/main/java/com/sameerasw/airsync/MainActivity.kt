@@ -88,9 +88,6 @@ class MainActivity : ComponentActivity() {
 
         val isFromQrScan = data != null
 
-        // Check if opened from Smartspacer to trigger reconnection
-        val shouldTriggerReconnect = intent?.getBooleanExtra("trigger_reconnect", false) == true
-
         setContent {
             AirSyncTheme {
                 val navController = rememberNavController()
@@ -164,7 +161,6 @@ class MainActivity : ComponentActivity() {
                                 pcName = pcName,
                                 isPlus = isPlus,
                                 symmetricKey = symmetricKey,
-                                shouldTriggerReconnect = shouldTriggerReconnect,
                                 onRequestNotificationPermission = {
                                     requestNotificationPermission()
                                 },
