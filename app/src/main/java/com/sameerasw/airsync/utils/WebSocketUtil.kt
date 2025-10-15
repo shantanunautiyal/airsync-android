@@ -261,6 +261,13 @@ object WebSocketUtil {
     }
 
     private suspend fun isLocalNetwork(context: Context, ipAddress: String): Boolean {
+        // Check if expand networking is enabled - if so, allow all IPs
+        val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
+        val expandNetworkingEnabled = ds.getExpandNetworkingEnabled().first()
+        if (expandNetworkingEnabled) {
+            return true
+        }
+
         // Check standard private IP ranges (RFC 1918)
         if (ipAddress.startsWith("192.168.") || ipAddress.startsWith("10.")) {
             return true
@@ -277,12 +284,6 @@ object WebSocketUtil {
         }
         // Check localhost
         if (ipAddress == "127.0.0.1" || ipAddress == "localhost") {
-            return true
-        }
-        // Check Tailscale (100.x.x.x) if enabled
-        val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
-        val tailscaleEnabled = ds.getTailscaleSupportEnabled().first()
-        if (tailscaleEnabled && ipAddress.startsWith("100.")) {
             return true
         }
         return false
