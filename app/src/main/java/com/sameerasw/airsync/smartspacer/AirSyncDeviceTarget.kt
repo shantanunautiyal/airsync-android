@@ -38,9 +38,35 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
         val deviceName = lastDevice?.name ?: "Unknown Device"
         val deviceModel = lastDevice?.model
 
-        // Build subtitle with device model if available
+        // Get Mac status (battery and media info)
+        val macStatus = runBlocking {
+            DataStoreManager(context).getMacStatusForWidget().first()
+        }
+
+        // Build subtitle with battery, media info, or device model
         val subtitle = when {
-            isConnected && deviceModel != null -> "$deviceModel"
+            isConnected && macStatus.batteryLevel != null -> {
+                // Show battery percentage when connected
+                val batteryText = "${macStatus.batteryLevel}%"
+                // Add media info if available
+                if (!macStatus.title.isNullOrBlank()) {
+                    if (!macStatus.artist.isNullOrBlank()) {
+                        "$batteryText • ${macStatus.title} — ${macStatus.artist}"
+                    } else {
+                        "$batteryText • ${macStatus.title}"
+                    }
+                } else {
+                    batteryText
+                }
+            }
+            isConnected && !macStatus.title.isNullOrBlank() -> {
+                // Show media info only if no battery
+                if (!macStatus.artist.isNullOrBlank()) {
+                    "${macStatus.title} — ${macStatus.artist}"
+                } else {
+                    macStatus.title
+                }
+            }
             isConnected -> "Connected"
             deviceModel != null -> "Disconnected • $deviceModel"
             else -> "Disconnected • Tap to reconnect"

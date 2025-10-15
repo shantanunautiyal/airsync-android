@@ -72,6 +72,7 @@ fun AirSyncMainScreen(
     pcName: String? = null,
     isPlus: Boolean = false,
     symmetricKey: String? = null,
+    shouldTriggerReconnect: Boolean = false,
     onNavigateToApps: () -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
     showAboutDialog: Boolean = false,
@@ -102,11 +103,96 @@ fun AirSyncMainScreen(
     // Pager state for swipeable tabs (0 = Connect, 1 = Settings)
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
 
+    fun connect() {
+        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
+        viewModel.setUserManuallyDisconnected(false)
+
+        WebSocketUtil.connect(
+            context = context,
+            ipAddress = uiState.ipAddress,
+            port = uiState.port.toIntOrNull() ?: 6996,
+            symmetricKey = uiState.symmetricKey,
+            manualAttempt = true,
+            onHandshakeTimeout = {
+                scope.launch(Dispatchers.Main) {
+                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
+                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+                    WebSocketUtil.disconnect(context)
+                    viewModel.showAuthFailure(
+                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
+                    )
+                }
+            },
+            onConnectionStatus = { connected ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
+                    if (connected) {
+                        viewModel.setResponse("Connected successfully!")
+                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
+                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
+                    } else {
+                        viewModel.setResponse("Failed to connect")
+                    }
+                }
+            },
+            onMessage = { response ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setResponse("Received: $response")
+                    try {
+                        val json = JSONObject(response)
+                        if (json.optString("type") == "clipboardUpdate") {
+                            val data = json.optJSONObject("data")
+                            val text = data?.optString("text")
+                            if (!text.isNullOrEmpty()) {
+                                ClipboardSyncManager.handleClipboardUpdate(context, text)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        )
+    }
+
+    fun disconnect() {
+        scope.launch {
+            viewModel.setUserManuallyDisconnectedAwait(true)
+            WebSocketUtil.disconnect(context)
+            viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+            viewModel.setResponse("Disconnected")
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
 
         // Start network monitoring for dynamic Wi-Fi changes
         viewModel.startNetworkMonitoring(context)
+    }
+
+    // Handle reconnection trigger from Smartspacer (WIP - Needs fixing)
+    LaunchedEffect(shouldTriggerReconnect, uiState.isConnected) {
+        if (shouldTriggerReconnect && !uiState.isConnected && uiState.lastConnectedDevice != null) {
+
+            delay(300)
+            // Check if we can use network-aware connection first
+            val networkAwareDevice = viewModel.getNetworkAwareLastConnectedDevice()
+            if (networkAwareDevice != null) {
+                // Use network-aware device IP for current network
+                viewModel.updateIpAddress(networkAwareDevice.ipAddress)
+                viewModel.updatePort(networkAwareDevice.port)
+                viewModel.updateSymmetricKey(networkAwareDevice.symmetricKey)
+            } else {
+                // Fallback to legacy stored device
+                uiState.lastConnectedDevice?.let { device ->
+                    viewModel.updateIpAddress(device.ipAddress)
+                    viewModel.updatePort(device.port)
+                    viewModel.updateSymmetricKey(device.symmetricKey)
+                }
+            }
+            // Trigger connection
+            delay(100)
+            connect()
+        }
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
@@ -158,63 +244,6 @@ fun AirSyncMainScreen(
         }
     }
 
-    // Connection management functions
-    fun connect() {
-        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
-
-        viewModel.setUserManuallyDisconnected(false)
-
-        WebSocketUtil.connect(
-            context = context,
-            ipAddress = uiState.ipAddress,
-            port = uiState.port.toIntOrNull() ?: 6996,
-            symmetricKey = uiState.symmetricKey,
-            manualAttempt = true,
-            onHandshakeTimeout = {
-                scope.launch(Dispatchers.Main) {
-                    // Strong haptic feedback
-                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
-                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
-                    WebSocketUtil.disconnect(context)
-                    viewModel.showAuthFailure(
-                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
-                    )
-                }
-            },
-            onConnectionStatus = { connected ->
-                scope.launch(Dispatchers.Main) {
-                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
-                    if (connected) {
-                        viewModel.setResponse("Connected successfully!")
-                        // Get plus status from current temporary device or use QR code value
-                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
-                    } else {
-                        viewModel.setResponse("Failed to connect")
-                    }
-                }
-            },
-            onMessage = { response ->
-                scope.launch(Dispatchers.Main) {
-                    viewModel.setResponse("Received: $response")
-                    // Handle clipboard updates from desktop
-                    try {
-                        val json = JSONObject(response)
-                        if (json.optString("type") == "clipboardUpdate") {
-                            val data = json.optJSONObject("data")
-                            val text = data?.optString("text")
-                            if (!text.isNullOrEmpty()) {
-                                ClipboardSyncManager.handleClipboardUpdate(context, text)
-                            }
-                        }
-                    } catch (_: Exception) {
-                        // Not a clipboard update, ignore
-                    }
-                }
-            }
-        )
-    }
-
     // Auth failure dialog
     if (uiState.showAuthFailureDialog) {
         AlertDialog(
@@ -233,16 +262,6 @@ fun AirSyncMainScreen(
         )
     }
 
-    fun disconnect() {
-        // Set manual disconnect flag BEFORE disconnecting to prevent auto-reconnect trigger
-        // Use an awaited write to avoid a race where auto-reconnect reads the old value.
-        scope.launch {
-            viewModel.setUserManuallyDisconnectedAwait(true)
-            WebSocketUtil.disconnect(context)
-            viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
-            viewModel.setResponse("Disconnected")
-        }
-    }
 
     fun launchScanner(context: Context) {
         val lensIntent = Intent("com.google.vr.apps.ornament.app.lens.LensLauncherActivity.MAIN")
