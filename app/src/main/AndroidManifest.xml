@@ -138,6 +138,27 @@
                 <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
             </intent-filter>
         </receiver>
+
+        <!-- Smartspacer Target Provider -->
+        <provider
+            android:name=".smartspacer.AirSyncDeviceTarget"
+            android:authorities="${applicationId}.target.airsync_device"
+            android:permission="com.kieronquinn.app.smartspacer.permission.ACCESS_SMARTSPACER_TARGETS"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.kieronquinn.app.smartspacer.TARGET" />
+            </intent-filter>
+        </provider>
+
+        <!-- Smartspacer Target Update Receiver -->
+        <receiver
+            android:name=".smartspacer.AirSyncTargetUpdateReceiver"
+            android:exported="true"
+            android:permission="com.kieronquinn.app.smartspacer.permission.SEND_UPDATE_BROADCAST">
+            <intent-filter>
+                <action android:name="com.kieronquinn.app.smartspacer.REQUEST_TARGET_UPDATE" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <queries>
