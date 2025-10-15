@@ -57,7 +57,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDevic
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
-import com.sameerasw.airsync.presentation.ui.components.cards.TailscaleSupportCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import org.json.JSONObject
@@ -473,9 +473,7 @@ fun AirSyncMainScreen(
                         onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
                     )
 
-
-                        // Tailscale Support Card
-                        TailscaleSupportCard(context)
+                        ExpandNetworkingCard(context)
 
 
                         DeviceInfoCard(

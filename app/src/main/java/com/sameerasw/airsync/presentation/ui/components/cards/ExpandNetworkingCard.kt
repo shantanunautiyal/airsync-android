@@ -16,10 +16,10 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 import kotlinx.coroutines.launch
 
 @Composable
-fun TailscaleSupportCard(context: Context) {
+fun ExpandNetworkingCard(context: Context) {
     val ds = remember { DataStoreManager(context) }
     val scope = rememberCoroutineScope()
-    val enabledFlow = ds.getTailscaleSupportEnabled()
+    val enabledFlow = ds.getExpandNetworkingEnabled()
     var enabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -47,9 +47,9 @@ fun TailscaleSupportCard(context: Context) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("Enable Tailscale support")
+                Text("Expand networking")
                 Text(
-                    "Connection to 100.x.x.x IP",
+                    "Allow connecting to device outside the local network",
                     modifier = Modifier.padding(top = 4.dp),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -59,11 +59,10 @@ fun TailscaleSupportCard(context: Context) {
                 onCheckedChange = {
                     enabled = it
                     scope.launch {
-                        ds.setTailscaleSupportEnabled(it)
+                        ds.setExpandNetworkingEnabled(it)
                     }
                 }
             )
         }
     }
 }
-
