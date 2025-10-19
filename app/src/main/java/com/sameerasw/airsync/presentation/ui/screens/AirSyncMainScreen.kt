@@ -803,10 +803,12 @@ fun AirSyncMainScreen(
                                     strokeWidth = 2.dp,
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                             }
                             Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
                         }
 
+                        // Icon Sync Message Display
                         AnimatedVisibility(
                             visible = uiState.iconSyncMessage.isNotEmpty(),
                             enter = expandVertically() + fadeIn(),
