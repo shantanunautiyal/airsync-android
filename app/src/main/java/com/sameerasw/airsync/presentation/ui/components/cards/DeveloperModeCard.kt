@@ -17,8 +17,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun DeveloperModeCard(
@@ -31,6 +33,8 @@ fun DeveloperModeCard(
     onExportData: () -> Unit,
     onImportData: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Card(modifier = Modifier.fillMaxWidth().padding(top=20.dp),
         shape = RoundedCornerShape(
             topStart = ExtraCornerRadius,
@@ -48,7 +52,10 @@ fun DeveloperModeCard(
                 Text("Developer Mode", style = MaterialTheme.typography.titleMedium)
                 Switch(
                     checked = isDeveloperMode,
-                    onCheckedChange = onToggleDeveloperMode
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleDeveloperMode(enabled)
+                    }
                 )
             }
 
@@ -64,7 +71,10 @@ fun DeveloperModeCard(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = onSendDeviceInfo,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onSendDeviceInfo()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
@@ -72,7 +82,10 @@ fun DeveloperModeCard(
                     }
 
                     Button(
-                        onClick = onSendNotification,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onSendNotification()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
@@ -80,7 +93,10 @@ fun DeveloperModeCard(
                     }
 
                     Button(
-                        onClick = onSendDeviceStatus,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onSendDeviceStatus()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
@@ -90,7 +106,10 @@ fun DeveloperModeCard(
                     // New: export/import split buttons
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = onExportData,
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                onExportData()
+                            },
                             modifier = Modifier.weight(1f),
                             enabled = !isLoading
                         ) {
@@ -98,7 +117,10 @@ fun DeveloperModeCard(
                         }
 
                         Button(
-                            onClick = onImportData,
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                onImportData()
+                            },
                             modifier = Modifier.weight(1f),
                             enabled = !isLoading
                         ) {

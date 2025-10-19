@@ -30,11 +30,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.DevicePreviewResolver
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun ConnectionStatusCard(
@@ -45,6 +47,8 @@ fun ConnectionStatusCard(
     lastConnected: Boolean,
     uiState: UiState,
 ) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+
     val cardShape = if (!isConnected) {
         RoundedCornerShape(
             topStart = ExtraCornerRadius,
@@ -170,7 +174,10 @@ fun ConnectionStatusCard(
                 )
 
                 if (isConnected) {
-                    OutlinedButton(onClick = onDisconnect) {
+                    OutlinedButton(onClick = {
+                        HapticUtil.performClick(haptics)
+                        onDisconnect()
+                    }) {
                         Text("Disconnect")
                     }
                 }

@@ -15,9 +15,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun NotificationSyncCard(
@@ -26,8 +28,10 @@ fun NotificationSyncCard(
     onToggleSync: (Boolean) -> Unit,
     onGrantPermissions: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Card(
-        modifier = Modifier.fillMaxWidth().padding(top=20.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
         shape = RoundedCornerShape(
             topStart = ExtraCornerRadius,
             topEnd = ExtraCornerRadius,
@@ -49,8 +53,10 @@ fun NotificationSyncCard(
                     checked = isNotificationSyncEnabled && isNotificationEnabled,
                     onCheckedChange = { enabled ->
                         if (isNotificationEnabled) {
+                            if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
                             onToggleSync(enabled)
                         } else {
+                            HapticUtil.performClick(haptics)
                             onGrantPermissions()
                         }
                     },

@@ -1,15 +1,10 @@
-
 package com.sameerasw.airsync.presentation.ui.screens
 
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.util.Log
-import androidx.core.content.ContextCompat
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.provider.MediaStore
@@ -35,7 +30,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -78,7 +72,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -86,7 +79,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
@@ -95,7 +87,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDevic
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.TailscaleSupportCard
+import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
@@ -104,15 +96,16 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.HapticUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.TestNotificationUtil
 import com.sameerasw.airsync.utils.WallpaperHandler
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -151,11 +144,9 @@ fun AirSyncMainScreen(
     val settingsScrollState = rememberScrollState()
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
-    val navCallbackState = rememberUpdatedState(onNavigateToApps)
-    LaunchedEffect(navCallbackState.value) {
-    }
     var fabVisible by remember { mutableStateOf(true) }
     var fabExpanded by remember { mutableStateOf(true) }
+    var loadingHapticsJob by remember { mutableStateOf<Job?>(null) }
 
     val isMirroring by ScreenCaptureService.isStreaming.collectAsState()
 
@@ -295,6 +286,7 @@ fun AirSyncMainScreen(
         }
     }
 
+    // Hide FAB on scroll down, show on scroll up for the active tab
     LaunchedEffect(pagerState.currentPage) {
         val state = if (pagerState.currentPage == 0) connectScrollState else settingsScrollState
         var last = state.value
@@ -306,17 +298,31 @@ fun AirSyncMainScreen(
         }
     }
 
+    // Expand FAB on first launch and whenever variant changes (connect <-> disconnect), then collapse after 5s
     LaunchedEffect(uiState.isConnected) {
         fabExpanded = true
+        // Give users a hint for a short period, then collapse to icon-only
         delay(5000)
         fabExpanded = false
     }
 
+    // Start/stop clipboard sync based on connection status and settings
     LaunchedEffect(uiState.isConnected, uiState.isClipboardSyncEnabled) {
         if (uiState.isConnected && uiState.isClipboardSyncEnabled) {
             ClipboardSyncManager.startSync(context)
         } else {
             ClipboardSyncManager.stopSync(context)
+        }
+    }
+
+    // Start/stop loading haptics when connecting
+    LaunchedEffect(uiState.isConnecting) {
+        if (uiState.isConnecting) {
+            loadingHapticsJob?.cancel()
+            loadingHapticsJob = HapticUtil.startLoadingHaptics(haptics)
+        } else {
+            loadingHapticsJob?.cancel()
+            loadingHapticsJob = null
         }
     }
 
@@ -347,7 +353,7 @@ fun AirSyncMainScreen(
             manualAttempt = true,
             onHandshakeTimeout = {
                 scope.launch(Dispatchers.Main) {
-                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
+                    HapticUtil.performError(haptics)
                     viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
                     WebSocketUtil.disconnect(context)
                     viewModel.showAuthFailure("Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code.")
@@ -357,10 +363,12 @@ fun AirSyncMainScreen(
                 scope.launch(Dispatchers.Main) {
                     viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
                     if (connected) {
+                        HapticUtil.performSuccess(haptics)
                         viewModel.setResponse("Connected successfully!")
                         val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
                         viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
                     } else {
+                        HapticUtil.performError(haptics)
                         viewModel.setResponse("Failed to connect")
                     }
                 }
@@ -500,6 +508,7 @@ fun AirSyncMainScreen(
             AnimatedVisibility(visible = fabVisible) {
                 ExtendedFloatingActionButton(
                     onClick = {
+                        HapticUtil.performClick(haptics)
                         if (uiState.isConnected) {
                             disconnect()
                         } else {
@@ -543,12 +552,22 @@ fun AirSyncMainScreen(
                         },
                         alwaysShowLabel = true,
                         selected = pagerState.currentPage == index,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } }
+                        onClick = {
+                            HapticUtil.performLightTick(haptics)
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        }
                     )
                 }
             }
         }
     ) { innerPadding ->
+        // Track page changes for haptic feedback on swipe
+        LaunchedEffect(pagerState.currentPage) {
+            snapshotFlow { pagerState.currentPage }.collect { page ->
+                HapticUtil.performLightTick(haptics)
+            }
+        }
+
         HorizontalPager(
             modifier = modifier.fillMaxSize(),
             state = pagerState
@@ -677,23 +696,23 @@ fun AirSyncMainScreen(
                             onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                         )
 
-                    // Clipboard Sync Card
-                    SyncFeaturesCard(
-                        isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                        onToggleClipboardSync = { enabled ->
-                            viewModel.setClipboardSyncEnabled(enabled)
-                        },
-                        isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
-                        onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
-                        isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
-                        continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
-                        isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                        onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
-                        isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
-                        isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
-                        onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
-                    )
+                        // Clipboard Sync Card
+                        SyncFeaturesCard(
+                            isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                            onToggleClipboardSync = { enabled ->
+                                viewModel.setClipboardSyncEnabled(enabled)
+                            },
+                            isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
+                            onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
+                            isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
+                            continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                            isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                            onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
+                            isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
+                            onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
+                            isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
+                            onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
+                        )
 
                         ExpandNetworkingCard(context)
 
@@ -757,13 +776,16 @@ fun AirSyncMainScreen(
                                 onImportData = {
                                     // Launch picker to select a file to import
                                     openDocLauncher.launch(arrayOf("application/json"))
-                                },
-                                uiState = uiState
+                                }
                             )
                         }
 
+                        // Manual Icon Sync Button
                         OutlinedButton(
-                            onClick = { viewModel.manualSyncAppIcons(context) },
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                viewModel.manualSyncAppIcons(context)
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = if (uiState.isDeveloperModeVisible) 0.dp else 20.dp),
@@ -781,7 +803,6 @@ fun AirSyncMainScreen(
                                     strokeWidth = 2.dp,
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
                             }
                             Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
                         }
@@ -814,7 +835,10 @@ fun AirSyncMainScreen(
                                             MaterialTheme.colorScheme.onPrimaryContainer
                                         else MaterialTheme.colorScheme.onErrorContainer
                                     )
-                                    TextButton(onClick = { viewModel.clearIconSyncMessage() }) {
+                                    TextButton(onClick = {
+                                        HapticUtil.performClick(haptics)
+                                        viewModel.clearIconSyncMessage()
+                                    }) {
                                         Text("Dismiss")
                                     }
                                 }
