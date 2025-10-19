@@ -570,6 +570,7 @@ class DataStoreManager(private val context: Context) {
         val prefs = context.dataStore.data.first()
         val exportObj = JSONObject()
         val dataObj = JSONObject()
+        val mutedArray = org.json.JSONArray()
 
         prefs.asMap().forEach { (key, value) ->
             try {
@@ -582,6 +583,15 @@ class DataStoreManager(private val context: Context) {
                     if (lower.contains("data:image") || lower.contains("base64,") || value.length > 10000) {
                         // mark skipped
                         return@forEach
+                    }
+                }
+
+                // Collect muted apps: keys like app_<package>_enabled with value false
+                if (key.name.startsWith("app_") && key.name.endsWith("_enabled")) {
+                    val pkg = key.name.removePrefix("app_").removeSuffix("_enabled")
+                    val enabled = (value as? Boolean) ?: true
+                    if (!enabled) {
+                        mutedArray.put(pkg)
                     }
                 }
 
@@ -617,6 +627,8 @@ class DataStoreManager(private val context: Context) {
 
         exportObj.put("version", 1)
         exportObj.put("preferences", dataObj)
+        // Include list of apps explicitly disabled for notification syncing so import can restore this
+        exportObj.put("muted_apps", mutedArray)
         return exportObj.toString()
     }
 
@@ -628,6 +640,13 @@ class DataStoreManager(private val context: Context) {
         try {
             val root = JSONObject(json)
             val prefsObj = root.optJSONObject("preferences") ?: return false
+            val mutedApps = mutableListOf<String>()
+            val mutedJson = root.optJSONArray("muted_apps")
+            if (mutedJson != null) {
+                for (i in 0 until mutedJson.length()) {
+                    try { mutedApps.add(mutedJson.getString(i)) } catch (_: Exception) {}
+                }
+            }
 
             context.dataStore.edit { preferences ->
                 val keys = prefsObj.keys()
@@ -668,6 +687,14 @@ class DataStoreManager(private val context: Context) {
                         // ignore specific key import errors
                     }
                 }
+
+                // Apply muted apps (explicitly disable per-app notification flags)
+                mutedApps.forEach { pkg ->
+                    try {
+                        val enabledKey = booleanPreferencesKey("app_${pkg}_enabled")
+                        preferences[enabledKey] = false
+                    } catch (_: Exception) {}
+                }
             }
 
             return true
@@ -677,4 +704,3 @@ class DataStoreManager(private val context: Context) {
         }
     }
 }
-
