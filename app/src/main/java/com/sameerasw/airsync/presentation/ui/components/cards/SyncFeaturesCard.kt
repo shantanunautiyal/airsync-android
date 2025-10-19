@@ -15,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun SyncFeaturesCard(
@@ -38,6 +40,8 @@ fun SyncFeaturesCard(
     isSmartspacerShowWhenDisconnected: Boolean,
     onToggleSmartspacerShowWhenDisconnected: (Boolean) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(
@@ -63,7 +67,10 @@ fun SyncFeaturesCard(
                 }
                 Switch(
                     checked = isClipboardSyncEnabled,
-                    onCheckedChange = onToggleClipboardSync
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleClipboardSync(enabled)
+                    }
                 )
             }
             // Continue Browsing toggle displayed under clipboard sync
@@ -99,7 +106,10 @@ fun SyncFeaturesCard(
                 Spacer(modifier = Modifier.padding(end = 8.dp))
                 Switch(
                     checked = isContinueBrowsingEnabled,
-                    onCheckedChange = onToggleContinueBrowsing,
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleContinueBrowsing(enabled)
+                    },
                     enabled = isContinueBrowsingToggleEnabled
                 )
             }
@@ -122,7 +132,10 @@ fun SyncFeaturesCard(
                 }
                 Switch(
                     checked = isKeepPreviousLinkEnabled,
-                    onCheckedChange = onToggleKeepPreviousLink,
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleKeepPreviousLink(enabled)
+                    },
                     enabled = isContinueBrowsingToggleEnabled
                 )
             }
@@ -145,7 +158,10 @@ fun SyncFeaturesCard(
                 }
                 Switch(
                     checked = isSendNowPlayingEnabled,
-                    onCheckedChange = onToggleSendNowPlaying
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleSendNowPlaying(enabled)
+                    }
                 )
             }
 
@@ -167,7 +183,10 @@ fun SyncFeaturesCard(
                 }
                 Switch(
                     checked = isSmartspacerShowWhenDisconnected,
-                    onCheckedChange = onToggleSmartspacerShowWhenDisconnected
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleSmartspacerShowWhenDisconnected(enabled)
+                    }
                 )
             }
 

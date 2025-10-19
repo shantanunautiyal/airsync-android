@@ -46,6 +46,7 @@ import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.TestNotificationUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.HapticUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCa
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import org.json.JSONObject
+import kotlinx.coroutines.Job
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -102,6 +104,7 @@ fun AirSyncMainScreen(
     }
     var fabVisible by remember { mutableStateOf(true) }
     var fabExpanded by remember { mutableStateOf(true) }
+    var loadingHapticsJob by remember { mutableStateOf<Job?>(null) }
 
     // For export/import flow
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
@@ -300,6 +303,17 @@ fun AirSyncMainScreen(
         }
     }
 
+    // Start/stop loading haptics when connecting
+    LaunchedEffect(uiState.isConnecting) {
+        if (uiState.isConnecting) {
+            loadingHapticsJob?.cancel()
+            loadingHapticsJob = HapticUtil.startLoadingHaptics(haptics)
+        } else {
+            loadingHapticsJob?.cancel()
+            loadingHapticsJob = null
+        }
+    }
+
     // Auth failure dialog
     if (uiState.showAuthFailureDialog) {
         AlertDialog(
@@ -369,6 +383,7 @@ fun AirSyncMainScreen(
             AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
                 ExtendedFloatingActionButton(
                     onClick = {
+                        HapticUtil.performClick(haptics)
                         if (uiState.isConnected) {
                             disconnect()
                         } else {
@@ -413,12 +428,22 @@ fun AirSyncMainScreen(
                         },
                         alwaysShowLabel = true,
                         selected = pagerState.currentPage == index,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } }
+                        onClick = {
+                            HapticUtil.performLightTick(haptics)
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        }
                     )
                 }
             }
         }
     ) { innerPadding ->
+        // Track page changes for haptic feedback on swipe
+        LaunchedEffect(pagerState.currentPage) {
+            snapshotFlow { pagerState.currentPage }.collect { page ->
+                HapticUtil.performLightTick(haptics)
+            }
+        }
+
         HorizontalPager(
             modifier = modifier.fillMaxSize(),
             state = pagerState
@@ -620,7 +645,10 @@ fun AirSyncMainScreen(
 
                     // Manual Icon Sync Button
                     OutlinedButton(
-                        onClick = { viewModel.manualSyncAppIcons(context) },
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            viewModel.manualSyncAppIcons(context)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = if (uiState.isDeveloperModeVisible) 0.dp else 20.dp),
@@ -672,7 +700,10 @@ fun AirSyncMainScreen(
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     else MaterialTheme.colorScheme.onErrorContainer
                                 )
-                                TextButton(onClick = { viewModel.clearIconSyncMessage() }) {
+                                TextButton(onClick = {
+                                    HapticUtil.performClick(haptics)
+                                    viewModel.clearIconSyncMessage()
+                                }) {
                                     Text("Dismiss")
                                 }
                             }
