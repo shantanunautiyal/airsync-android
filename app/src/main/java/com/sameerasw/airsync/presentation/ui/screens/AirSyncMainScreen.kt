@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -93,14 +95,95 @@ fun AirSyncMainScreen(
     val haptics = LocalHapticFeedback.current
     val connectScrollState = rememberScrollState()
     val settingsScrollState = rememberScrollState()
+    var hasProcessedQrDialog by remember { mutableStateOf(false) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val navCallbackState = rememberUpdatedState(onNavigateToApps)
+    LaunchedEffect(navCallbackState.value) {
+    }
     var fabVisible by remember { mutableStateOf(true) }
     var fabExpanded by remember { mutableStateOf(true) }
 
-    // Track if we've already processed the QR code dialog to prevent re-showing
-    var hasProcessedQrDialog by remember { mutableStateOf(false) }
+    // For export/import flow
+    var pendingExportJson by remember { mutableStateOf<String?>(null) }
 
-    // Pager state for swipeable tabs (0 = Connect, 1 = Settings)
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    // CreateDocument launcher for export (MIME application/json)
+    val createDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) {
+            Toast.makeText(context, "Export cancelled", Toast.LENGTH_SHORT).show()
+            viewModel.setLoading(false)
+            return@rememberLauncherForActivityResult
+        }
+
+        // Write pendingExportJson to uri
+        scope.launch(Dispatchers.IO) {
+            try {
+                val json = pendingExportJson
+                if (json == null) {
+                    // Nothing to write
+                    viewModel.setLoading(false)
+                    return@launch
+                }
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(json.toByteArray(Charsets.UTF_8))
+                }
+                scope.launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
+                    viewModel.setLoading(false)
+                    pendingExportJson = null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                scope.launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    viewModel.setLoading(false)
+                    pendingExportJson = null
+                }
+            }
+        }
+    }
+
+    // OpenDocument launcher for import (allow picking JSON)
+    val openDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) {
+            Toast.makeText(context, "Import cancelled", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+
+        viewModel.setLoading(true)
+        scope.launch(Dispatchers.IO) {
+            try {
+                val input = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                if (input == null) {
+                    scope.launch(Dispatchers.Main) {
+                        Toast.makeText(context, "Failed to read file", Toast.LENGTH_LONG).show()
+                        viewModel.setLoading(false)
+                    }
+                    return@launch
+                }
+
+                val success = viewModel.importDataFromJson(context, input)
+                scope.launch(Dispatchers.Main) {
+                    if (success) {
+                        Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
+                        viewModel.initializeState(context)
+                    } else {
+                        Toast.makeText(context, "Import failed or invalid file", Toast.LENGTH_LONG).show()
+                    }
+                    viewModel.setLoading(false)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                scope.launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Import error: ${e.message}", Toast.LENGTH_LONG).show()
+                    viewModel.setLoading(false)
+                }
+            }
+        }
+    }
 
     fun connect() {
         viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
@@ -337,7 +420,7 @@ fun AirSyncMainScreen(
         }
     ) { innerPadding ->
         HorizontalPager(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             state = pagerState
         ) { page ->
             when (page) {
@@ -510,7 +593,28 @@ fun AirSyncMainScreen(
                                 val message = DeviceInfoUtil.generateDeviceStatusJson(context)
                                 sendMessage(message)
                             },
-                            uiState = uiState
+                            // Export/Import actions
+                            onExportData = {
+                                viewModel.setLoading(true)
+                                scope.launch(Dispatchers.IO) {
+                                    val json = viewModel.exportAllDataToJson(context)
+                                    if (json == null) {
+                                        scope.launch(Dispatchers.Main) {
+                                            Toast.makeText(context, "Export failed", Toast.LENGTH_LONG).show()
+                                            viewModel.setLoading(false)
+                                        }
+                                    } else {
+                                        pendingExportJson = json
+                                        scope.launch(Dispatchers.Main) {
+                                            createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
+                                        }
+                                    }
+                                }
+                            },
+                            onImportData = {
+                                // Launch picker to select a file to import
+                                openDocLauncher.launch(arrayOf("application/json"))
+                            }
                         )
                     }
 

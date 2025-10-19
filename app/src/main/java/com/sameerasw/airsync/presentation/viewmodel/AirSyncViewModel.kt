@@ -625,4 +625,25 @@ class AirSyncViewModel(
         }
     }
 
+    // Expose DataStore export/import helpers
+    suspend fun exportAllDataToJson(context: Context): String? {
+        return try {
+            val manager = DataStoreManager(context)
+            manager.exportAllDataToJson()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun importDataFromJson(context: Context, json: String): Boolean {
+        return try {
+            val manager = DataStoreManager(context)
+            manager.importAllDataFromJson(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
 }

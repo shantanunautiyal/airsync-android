@@ -14,6 +14,9 @@ import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import org.json.JSONObject
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "airsync_settings")
 
@@ -558,4 +561,120 @@ class DataStoreManager(private val context: Context) {
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = timestamp.toString()
         }
     }
+
+    /**
+     * Export all DataStore preferences to a JSON string.
+     * Excludes very large strings and anything that looks like a base64 image (data:image/...base64,...)
+     */
+    suspend fun exportAllDataToJson(): String {
+        val prefs = context.dataStore.data.first()
+        val exportObj = JSONObject()
+        val dataObj = JSONObject()
+
+        prefs.asMap().forEach { (key, value) ->
+            try {
+                // Skip nulls
+                if (value == null) return@forEach
+
+                // If string looks like an embedded image or is very large, skip
+                if (value is String) {
+                    val lower = value.lowercase()
+                    if (lower.contains("data:image") || lower.contains("base64,") || value.length > 10000) {
+                        // mark skipped
+                        return@forEach
+                    }
+                }
+
+                val entry = JSONObject()
+                when (value) {
+                    is String -> {
+                        entry.put("type", "string")
+                        entry.put("value", value)
+                    }
+                    is Boolean -> {
+                        entry.put("type", "boolean")
+                        entry.put("value", value)
+                    }
+                    is Int -> {
+                        entry.put("type", "int")
+                        entry.put("value", value)
+                    }
+                    is Long -> {
+                        entry.put("type", "long")
+                        entry.put("value", value)
+                    }
+                    else -> {
+                        // Fallback to string representation
+                        entry.put("type", "string")
+                        entry.put("value", value.toString())
+                    }
+                }
+                dataObj.put(key.name, entry)
+            } catch (_: Exception) {
+                // ignore problematic entries
+            }
+        }
+
+        exportObj.put("version", 1)
+        exportObj.put("preferences", dataObj)
+        return exportObj.toString()
+    }
+
+    /**
+     * Import preferences from JSON produced by exportAllDataToJson.
+     * Only writes keys present in the JSON; missing keys are left unchanged.
+     */
+    suspend fun importAllDataFromJson(json: String): Boolean {
+        try {
+            val root = JSONObject(json)
+            val prefsObj = root.optJSONObject("preferences") ?: return false
+
+            context.dataStore.edit { preferences ->
+                val keys = prefsObj.keys()
+                while (keys.hasNext()) {
+                    val keyName = keys.next()
+                    try {
+                        val entry = prefsObj.getJSONObject(keyName)
+                        val type = entry.optString("type", "string")
+                        when (type) {
+                            "boolean" -> {
+                                val key = booleanPreferencesKey(keyName)
+                                val v = entry.getBoolean("value")
+                                preferences[key] = v
+                            }
+                            "int" -> {
+                                val key = intPreferencesKey(keyName)
+                                val v = entry.getInt("value")
+                                preferences[key] = v
+                            }
+                            "long" -> {
+                                val key = longPreferencesKey(keyName)
+                                val v = entry.getLong("value")
+                                preferences[key] = v
+                            }
+                            else -> {
+                                val key = stringPreferencesKey(keyName)
+                                val v = entry.optString("value", "")
+                                // Skip if value looks like embedded image or very large
+                                val lower = v.lowercase()
+                                if (lower.contains("data:image") || lower.contains("base64,") || v.length > 10000) {
+                                    // skip this key
+                                } else {
+                                    preferences[key] = v
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // ignore specific key import errors
+                    }
+                }
+            }
+
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
 }
+
