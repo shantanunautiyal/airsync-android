@@ -20,9 +20,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun LastConnectedDeviceCard(
@@ -31,6 +33,8 @@ fun LastConnectedDeviceCard(
     onToggleAutoReconnect: (Boolean) -> Unit,
     onQuickConnect: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(
@@ -83,7 +87,10 @@ fun LastConnectedDeviceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Auto reconnect", style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = isAutoReconnectEnabled, onCheckedChange = onToggleAutoReconnect)
+                Switch(checked = isAutoReconnectEnabled, onCheckedChange = { enabled ->
+                    if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                    onToggleAutoReconnect(enabled)
+                })
             }
 
             // Display device model and type if available
@@ -108,7 +115,10 @@ fun LastConnectedDeviceCard(
 
 
             Button(
-                onClick = onQuickConnect,
+                onClick = {
+                    HapticUtil.performClick(haptics)
+                    onQuickConnect()
+                },
                 modifier = Modifier.fillMaxWidth().requiredHeight(65.dp).padding(top = 16.dp),
                 shape = RoundedCornerShape(
                     topStart = minCornerRadius,
