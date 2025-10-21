@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
@@ -95,6 +96,7 @@ fun AirSyncMainScreen(
     val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val connectScrollState = rememberScrollState()
     val settingsScrollState = rememberScrollState()
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
@@ -306,8 +308,7 @@ fun AirSyncMainScreen(
     // Start/stop loading haptics when connecting
     LaunchedEffect(uiState.isConnecting) {
         if (uiState.isConnecting) {
-            loadingHapticsJob?.cancel()
-            loadingHapticsJob = HapticUtil.startLoadingHaptics(haptics)
+            loadingHapticsJob = HapticUtil.startLoadingHaptics(haptics, lifecycle)
         } else {
             loadingHapticsJob?.cancel()
             loadingHapticsJob = null
