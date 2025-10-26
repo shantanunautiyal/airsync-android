@@ -47,6 +47,34 @@ object HapticUtil {
     }
 
     /**
+     * Perform a success haptic - for successful connections
+     */
+    fun performSuccess(haptics: HapticFeedback?) {
+        try {
+            haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+            CoroutineScope(Dispatchers.Main).launch {
+                delay(100)
+                haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Perform an error haptic - for failed connections
+     */
+    fun performError(haptics: HapticFeedback?) {
+        try {
+            haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+            CoroutineScope(Dispatchers.Main).launch {
+                delay(100)
+                haptics?.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                delay(100)
+                haptics?.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
      * Start repeating haptic ticks for loading states
      * Returns a Job that can be cancelled to stop the haptics
      */

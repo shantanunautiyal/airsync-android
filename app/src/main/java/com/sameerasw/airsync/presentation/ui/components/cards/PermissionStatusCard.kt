@@ -35,7 +35,6 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.QuickSettingsUtil
-import com.sameerasw.airsync.utils.HapticUtil
 
 enum class PermissionType {
     NOTIFICATION_ACCESS,
