@@ -8,6 +8,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.DeviceInfo
+import com.sameerasw.airsync.domain.model.MirroringOptions
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
@@ -233,6 +234,23 @@ class AirSyncViewModel(
                 try { WakeupService.startService(context) } catch (_: Exception) {}
             }
         }
+    }
+
+    fun onMirroringRequest(fps: Int, quality: Float, maxWidth: Int, bitrateKbps: Int) {
+        val url = "ws://${_uiState.value.ipAddress}:6997"
+        _uiState.value = _uiState.value.copy(
+            showMirroringDialog = true,
+            mirroringWebSocketUrl = url,
+            mirroringOptions = MirroringOptions(fps, quality, maxWidth, bitrateKbps)
+        )
+    }
+
+    fun dismissMirroringDialog() {
+        _uiState.value = _uiState.value.copy(showMirroringDialog = false)
+    }
+
+    fun clearMirroringUrl() {
+        _uiState.value = _uiState.value.copy(mirroringWebSocketUrl = null)
     }
 
     fun updateIpAddress(ipAddress: String) {

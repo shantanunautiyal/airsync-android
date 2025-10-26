@@ -31,8 +31,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.Flow
+import android.content.Intent
 
 class MainActivity : ComponentActivity() {
+
+    private var showMirroringDialog by mutableStateOf(false)
+    private var mirroringOptions by mutableStateOf<Bundle?>(null)
 
     // Permission launcher for Android 13+ notification permission
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -84,6 +88,10 @@ class MainActivity : ComponentActivity() {
                 isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
                 symmetricKey = paramMap["key"]
             }
+        }
+
+        if (intent != null) {
+            handleIntent(intent)
         }
 
         val isFromQrScan = data != null
@@ -165,12 +173,28 @@ class MainActivity : ComponentActivity() {
                                     requestNotificationPermission()
                                 },
                                 showAboutDialog = showAboutDialog,
-                                onDismissAbout = { showAboutDialog = false }
+                                onDismissAbout = { showAboutDialog = false },
+                                showMirroringDialog = showMirroringDialog,
+                                mirroringOptions = mirroringOptions,
+                                onDismissMirroringDialog = { showMirroringDialog = false }
                             )
                         }
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == "com.sameerasw.airsync.MIRROR_REQUEST") {
+            mirroringOptions = intent.extras
+            showMirroringDialog = true
         }
     }
 

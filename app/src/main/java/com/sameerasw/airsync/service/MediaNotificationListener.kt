@@ -488,7 +488,7 @@ class MediaNotificationListener : NotificationListenerService() {
                 val notification = sbn.notification
                 val extras = notification.extras
 
-                val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
+                val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
                 val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
                 val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
 
@@ -623,9 +623,9 @@ class MediaNotificationListener : NotificationListenerService() {
             return true
         }
 
-        // Skip notifications without meaningful content
         val extras = sbn.notification.extras
-        val title = extras.getString(Notification.EXTRA_TITLE)
+        // Skip notifications without meaningful content
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
 
         return title.isNullOrEmpty() && text.isNullOrEmpty()

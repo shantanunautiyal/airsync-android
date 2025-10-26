@@ -1,10 +1,12 @@
+
 package com.sameerasw.airsync.utils
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
-import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
+import com.sameerasw.airsync.domain.model.MirroringOptions
 import com.sameerasw.airsync.service.MediaNotificationListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +47,29 @@ object WebSocketMessageHandler {
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
                 "macInfo" -> handleMacInfo(context, data)
+                "requestWallpaper" -> handleRequestWallpaper(context)
+                "mirrorRequest" -> {
+                    val options = data?.optJSONObject("options")
+                    val fps = options?.optInt("fps", 30) ?: 30
+                    val quality = (options?.optDouble("quality", 0.8) ?: 0.8).toFloat()
+                    val maxWidth = options?.optInt("maxWidth", 1280) ?: 1280
+                    val bitrateKbps = options?.optInt("bitrateKbps", 12000) ?: 12000
+
+                    val mirroringOptions = MirroringOptions(
+                        fps = fps,
+                        quality = quality,
+                        maxWidth = maxWidth,
+                        bitrateKbps = bitrateKbps
+                    )
+
+                    val intent = Intent("com.sameerasw.airsync.MIRROR_REQUEST").apply {
+                        `package` = context.packageName
+                        putExtra("mirroringOptions", mirroringOptions)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.sendBroadcast(intent)
+                    Log.d(TAG, "Sent broadcast for mirror request with options: $mirroringOptions")
+                }
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -325,6 +350,7 @@ object WebSocketMessageHandler {
     }
 
     private fun handleDisconnectRequest(context: Context) {
+        if (!WebSocketUtil.isConnected()) return
         try {
             // Mark as intentional disconnect to prevent auto-reconnect
             kotlinx.coroutines.runBlocking {
@@ -369,6 +395,7 @@ object WebSocketMessageHandler {
 
             // Pause/resume media listener based on Mac media playback status
             val hasActiveMedia = isPlaying && (title.isNotEmpty() || artist.isNotEmpty())
+            isReceivingPlayingMedia = hasActiveMedia
             if (hasActiveMedia) {
                 MediaNotificationListener.pauseMediaListener()
             } else {
@@ -669,6 +696,12 @@ object WebSocketMessageHandler {
                 val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
                 WebSocketUtil.sendMessage(resp)
             }
+        }
+    }
+
+    private fun handleRequestWallpaper(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            WallpaperHandler.sendWallpaper(context)
         }
     }
 }

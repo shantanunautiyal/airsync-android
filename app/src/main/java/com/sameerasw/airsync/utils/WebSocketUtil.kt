@@ -191,6 +191,7 @@ object WebSocketUtil {
                                 try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
                                 onConnectionStatusChanged?.invoke(true)
                                 notifyConnectionStatusListeners(true)
+                                com.sameerasw.airsync.service.ScreenCaptureService.instance?.resendConfig()
                                 try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                             }
                         }

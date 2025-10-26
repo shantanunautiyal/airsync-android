@@ -11,10 +11,15 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
 import androidx.core.content.ContextCompat
+import com.sameerasw.airsync.service.InputAccessibilityService
 import com.sameerasw.airsync.service.MediaNotificationListener
 import androidx.core.net.toUri
 
 object PermissionUtil {
+
+    const val ACCESSIBILITY_SERVICE = "Accessibility Service"
+    const val NOTIFICATION_ACCESS = "Notification Access"
+    const val BACKGROUND_APP_USAGE = "Background App Usage"
 
     fun isNotificationListenerEnabled(context: Context): Boolean {
         val componentName = ComponentName(context, MediaNotificationListener::class.java)
@@ -22,24 +27,24 @@ object PermissionUtil {
         return !TextUtils.isEmpty(flat) && flat.contains(componentName.flattenToString())
     }
 
-    /**
-     * Check if the app is whitelisted from battery optimization
-     */
-    fun isBatteryOptimizationDisabled(context: Context): Boolean {
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    fun isInputAccessibilityServiceEnabled(context: Context): Boolean {
+        val componentName = ComponentName(context, InputAccessibilityService::class.java)
+        val enabledServices = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        )
+        return enabledServices?.contains(componentName.flattenToString()) == true
     }
 
-    /**
-     * Check if battery optimization permission is required for this Android version
-     */
+    fun isBatteryOptimizationDisabled(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
     fun isBatteryOptimizationPermissionRequired(): Boolean {
         return true // for min API level
     }
 
-    /**
-     * Open battery optimization settings for the app
-     */
     fun openBatteryOptimizationSettings(context: Context) {
         try {
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -48,14 +53,10 @@ object PermissionUtil {
             }
             context.startActivity(intent)
         } catch (_: Exception) {
-            // Fallback to app-specific battery settings
             openAppSpecificBatterySettings(context)
         }
     }
 
-    /**
-     * Open app-specific battery settings as alternative
-     */
     fun openAppSpecificBatterySettings(context: Context) {
         try {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -64,14 +65,10 @@ object PermissionUtil {
             }
             context.startActivity(intent)
         } catch (_: Exception) {
-            // Final fallback to general battery optimization settings
             openGeneralBatteryOptimizationSettings(context)
         }
     }
 
-    /**
-     * Open general battery optimization settings as fallback
-     */
     fun openGeneralBatteryOptimizationSettings(context: Context) {
         try {
             val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
@@ -79,17 +76,18 @@ object PermissionUtil {
             }
             context.startActivity(intent)
         } catch (_: Exception) {
-            // Final fallback to general settings
-            val intent = Intent(Settings.ACTION_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(intent)
+            openAppSettings(context)
         }
     }
 
-    /**
-     * Check if POST_NOTIFICATIONS permission is granted (Android 13+)
-     */
+    fun openAppSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    }
+
     fun isPostNotificationPermissionGranted(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
@@ -97,13 +95,10 @@ object PermissionUtil {
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else {
-            true // Not required on older versions
+            true
         }
     }
 
-    /**
-     * Check if notification permissions are required for this Android version
-     */
     fun isNotificationPermissionRequired(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     }
@@ -114,101 +109,71 @@ object PermissionUtil {
         context.startActivity(intent)
     }
 
-    /**
-     * Check if MANAGE_EXTERNAL_STORAGE permission is granted (Android 11+)
-     */
-    fun hasManageExternalStoragePermission(): Boolean {
-            return try {
-                android.os.Environment.isExternalStorageManager()
-            } catch (_: Exception) {
-                false
-            }
-        }
+    fun openAccessibilitySettings(context: Context) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        context.startActivity(intent)
+    }
 
-    /**
-     * Open MANAGE_EXTERNAL_STORAGE permission settings
-     */
-    fun openManageExternalStorageSettings(context: Context) {
-            try {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = "package:${context.packageName}".toUri()
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(intent)
-            } catch (_: Exception) {
-                // Fallback to app settings
-                openAppSpecificBatterySettings(context)
-            }
+    fun hasReadMediaImagesPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_IMAGES
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
         }
-
-    /**
-     * Check if wallpaper access is available
-     */
-    fun hasWallpaperAccess(): Boolean {
-        return hasManageExternalStoragePermission()
     }
 
     fun getAllMissingPermissions(context: Context): List<String> {
         val missing = mutableListOf<String>()
 
-        // Check notification listener permission (always required)
         if (!isNotificationListenerEnabled(context)) {
-            missing.add("Notification Access")
+            missing.add(NOTIFICATION_ACCESS)
         }
 
-        // Check POST_NOTIFICATIONS permission (Android 13+)
+        if (!isInputAccessibilityServiceEnabled(context)) {
+            missing.add(ACCESSIBILITY_SERVICE)
+        }
+
         if (isNotificationPermissionRequired() && !isPostNotificationPermissionGranted(context)) {
-            missing.add("Post Notifications")
+            missing.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Check battery optimization permission
         if (isBatteryOptimizationPermissionRequired() && !isBatteryOptimizationDisabled(context)) {
-            missing.add("Background App Usage")
+            missing.add(BACKGROUND_APP_USAGE)
         }
 
-        // Check wallpaper access permission (optional)
-        if (!hasWallpaperAccess()) {
-            missing.add("Wallpaper Access")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasReadMediaImagesPermission(context)) {
+            missing.add(Manifest.permission.READ_MEDIA_IMAGES)
         }
 
         return missing
     }
 
-    /**
-     * Get permissions that are critical for app functionality
-     */
     fun getCriticalMissingPermissions(context: Context): List<String> {
         val critical = mutableListOf<String>()
-
-        // Notification listener is critical for the app's main functionality
         if (!isNotificationListenerEnabled(context)) {
-            critical.add("Notification Access")
+            critical.add(NOTIFICATION_ACCESS)
         }
-
+        if (!isInputAccessibilityServiceEnabled(context)) {
+            critical.add(ACCESSIBILITY_SERVICE)
+        }
         return critical
     }
 
-    /**
-     * Get permissions that are optional but recommended
-     */
     fun getOptionalMissingPermissions(context: Context): List<String> {
         val optional = mutableListOf<String>()
-
-        // POST_NOTIFICATIONS is recommended but not critical
         if (isNotificationPermissionRequired() && !isPostNotificationPermissionGranted(context)) {
-            optional.add("Post Notifications")
+            optional.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-
-        // Battery optimization is recommended for better reliability
         if (isBatteryOptimizationPermissionRequired() && !isBatteryOptimizationDisabled(context)) {
-            optional.add("Background App Usage")
+            optional.add(BACKGROUND_APP_USAGE)
         }
-
-        // Wallpaper access is optional for wallpaper sync feature
-        if (!hasWallpaperAccess()) {
-            optional.add("Wallpaper Access")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasReadMediaImagesPermission(context)) {
+            optional.add(Manifest.permission.READ_MEDIA_IMAGES)
         }
-
         return optional
     }
 }

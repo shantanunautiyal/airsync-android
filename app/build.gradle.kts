@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-parcelize")
 }
 
 android {
@@ -54,34 +55,34 @@ dependencies {
     implementation(libs.androidx.material3)
 
     // Material Components (XML themes: Theme.Material3.*)
-    implementation("com.google.android.material:material:1.12.0")
+    implementation(libs.material)
 
     // Android 12+ SplashScreen API with backward compatibility attributes
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation(libs.androidx.core.splashscreen)
 
-    implementation ("androidx.compose.material3:material3:1.5.0-alpha03")
-    implementation("androidx.compose.material:material-icons-core:1.7.8")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation (libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // DataStore for state persistence
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("androidx.datastore:datastore-core:1.1.1")
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.core)
 
     // ViewModel and state handling
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.compose.runtime:runtime-livedata:1.7.0")
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.compose.runtime.livedata)
 
     // Navigation Compose
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation(libs.androidx.navigation.compose)
 
     // WebSocket support
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.okhttp)
 
     // JSON parsing for GitHub API
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.gson)
 
     // Media session support for Mac media player
-    implementation("androidx.media:media:1.7.0")
+    implementation(libs.androidx.media)
 
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)

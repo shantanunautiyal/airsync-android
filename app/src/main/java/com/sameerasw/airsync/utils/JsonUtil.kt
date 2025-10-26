@@ -171,4 +171,39 @@ object JsonUtil {
         val statePart = newState?.let { ",\"state\":$it" } ?: ""
         return """{"type":"toggleNowPlayingResponse","data":{"success":$success$statePart,"message":"${escape(message)}"}}"""
     }
+
+    /**
+     * Creates a JSON for a mirror request to start or stop screen mirroring.
+     */
+    fun createMirrorRequestJson(
+        action: String, // "start" or "stop"
+        mode: String = "device",
+        packageName: String = "",
+        fps: Int = 30,
+        quality: Float = 0.6f,
+        maxWidth: Int = 1280
+    ): String {
+        return """{"type":"mirrorRequest","data":{"action":"$action","mode":"$mode","package":"$packageName","options":{"transport":"websocket","fps":$fps,"quality":$quality,"maxWidth":$maxWidth}}}"""
+    }
+
+    /**
+     * Creates a JSON to signal that mirroring is starting with specific parameters.
+     */
+    fun createMirrorStartJson(fps: Int, quality: Float, width: Int, height: Int): String {
+        return """{"type":"mirrorStart","data":{"fps":$fps,"quality":$quality,"width":$width,"height":$height}}"""
+    }
+
+    /**
+     * Creates a JSON for a single mirror frame.
+     */
+    fun createMirrorFrameJson(frameBase64: String, pts: Long, isConfig: Boolean): String {
+        return """{"type":"mirrorFrame","data":{"frame":"$frameBase64","pts":$pts,"isConfig":$isConfig}}"""
+    }
+
+    /**
+     * Creates a JSON to stop the mirroring session.
+     */
+    fun createMirrorStopJson(): String {
+        return """{"type":"mirrorStop","data":{}}"""
+    }
 }

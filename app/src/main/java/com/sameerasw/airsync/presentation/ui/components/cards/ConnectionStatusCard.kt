@@ -13,11 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -36,7 +36,6 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.DevicePreviewResolver
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ConnectionStatusCard(
     isConnected: Boolean,
@@ -68,8 +67,7 @@ fun ConnectionStatusCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 20.dp)
-            .defaultMinSize(minHeight = if (isConnected) 160.dp else 50.dp)
-            .animateContentSize(),
+            .defaultMinSize(minHeight = if (isConnected) 160.dp else 50.dp),
         shape = cardShape,
     ) {
         Column(
@@ -162,7 +160,7 @@ fun ConnectionStatusCard(
                 }
 
                 if (isConnecting) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { LoadingIndicator() }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
                 }
 
                 Text(
