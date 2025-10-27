@@ -10,18 +10,17 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
-import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
-import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.ThirdPartyCallDetector
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -366,6 +365,42 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onNotificationPosted(sbn)
         sbn?.let { notification ->
             Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getString(Notification.EXTRA_TITLE)}")
+
+            // Detect incoming calls from third-party apps (WhatsApp, Skype, Google Meet, etc.)
+            try {
+                val title = notification.notification?.extras?.getString(Notification.EXTRA_TITLE) ?: ""
+                val body = notification.notification?.extras?.getString(Notification.EXTRA_TEXT) ?: ""
+
+                // First check if this is a dialer call (incoming or outgoing)
+                val (contactName, callType) = ThirdPartyCallDetector.detectDialerCallNotification(
+                    notification.packageName,
+                    title,
+                    body
+                ) ?: Pair(null, null)
+
+                if (contactName != null && callType != null) {
+                    Log.d(TAG, "Dialer call detected: $callType - $contactName")
+                    ThirdPartyCallDetector.recordDialerCall(contactName, callType)
+                } else {
+                    // Then check for third-party app calls
+                    val (callerName, appName) = ThirdPartyCallDetector.detectCallFromNotification(
+                        notification.packageName,
+                        title,
+                        body
+                    ) ?: Pair(null, null)
+
+                    if (callerName != null && appName != null) {
+                        Log.d(TAG, "Incoming call detected from $appName: $callerName")
+                        ThirdPartyCallDetector.recordThirdPartyIncomingCall(
+                            notification.packageName,
+                            callerName,
+                            appName
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error detecting call from notification: ${e.message}")
+            }
 
             // Skip media processing if media listener is paused or globally disabled
             if (!isMediaListenerPaused && isNowPlayingEnabled) {

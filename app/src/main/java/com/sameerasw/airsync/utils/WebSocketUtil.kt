@@ -189,6 +189,10 @@ object WebSocketUtil {
                                     kotlinx.coroutines.runBlocking { ds.setUserManuallyDisconnected(false) }
                                 } catch (_: Exception) { }
                                 try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
+                                // Start call monitoring service
+                                try {
+                                    com.sameerasw.airsync.service.CallMonitoringService.startMonitoring(context)
+                                } catch (_: Exception) { }
                                 onConnectionStatusChanged?.invoke(true)
                                 notifyConnectionStatusListeners(true)
                                 try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
@@ -212,6 +216,10 @@ object WebSocketUtil {
                         isConnecting.set(false)
                         handshakeCompleted.set(false)
                         handshakeTimeoutJob?.cancel()
+                        // Stop call monitoring service
+                        try {
+                            com.sameerasw.airsync.service.CallMonitoringService.stopMonitoring(context)
+                        } catch (_: Exception) { }
                         onConnectionStatusChanged?.invoke(false)
                         // Clear continue browsing notifs on disconnect
                         try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
@@ -304,6 +312,10 @@ object WebSocketUtil {
         }
     }
 
+    fun isConnected(): Boolean {
+        return isConnected.get() && isSocketOpen.get()
+    }
+
     fun disconnect(context: Context? = null) {
         Log.d(TAG, "Disconnecting WebSocket")
         isConnected.set(false)
@@ -359,9 +371,9 @@ object WebSocketUtil {
         appContext = null
     }
 
-    fun isConnected(): Boolean {
-        return isConnected.get()
-    }
+//    fun isConnected(): Boolean {
+//        return isConnected.get()
+//    }
 
     fun isConnecting(): Boolean {
         return isConnecting.get()
