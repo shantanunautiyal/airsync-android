@@ -76,42 +76,51 @@ fun FileTransferScreen(
             
             isSending = true
             
-            selectedFiles.forEach { uri ->
+            // Send files sequentially to avoid state conflicts
+            for (uri in selectedFiles) {
                 try {
                     val fileName = FileTransferUtil.getFileName(context, uri)
                     val fileSize = FileTransferUtil.getFileSize(context, uri)
                     val id = uri.toString()
                     
-                    // Add to transfer list
-                    transferItems = transferItems + TransferItem(
-                        id = id,
-                        name = fileName,
-                        size = fileSize,
-                        progress = 0f,
-                        status = TransferStatus.PENDING
-                    )
+                    // Add to transfer list on main thread
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        transferItems = transferItems + TransferItem(
+                            id = id,
+                            name = fileName,
+                            size = fileSize,
+                            progress = 0f,
+                            status = TransferStatus.PENDING
+                        )
+                    }
                     
                     // Send file
                     FileTransferUtil.sendFile(context, uri) { progress, status ->
-                        // Update transfer item progress
-                        transferItems = transferItems.map { item ->
-                            if (item.id == id) {
-                                item.copy(progress = progress, status = status)
-                            } else {
-                                item
+                        // Update transfer item progress on main thread
+                        scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                            transferItems = transferItems.map { item ->
+                                if (item.id == id) {
+                                    item.copy(progress = progress, status = status)
+                                } else {
+                                    item
+                                }
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    errorMessage = "Failed to send file: ${e.message}"
-                    showError = true
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        errorMessage = "Failed to send file: ${e.message}"
+                        showError = true
+                    }
                     android.util.Log.e("FileTransferScreen", "Error sending file", e)
                 }
             }
             
             // Clear selected files after sending
-            selectedFiles = emptyList()
-            isSending = false
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                selectedFiles = emptyList()
+                isSending = false
+            }
         }
     }
     

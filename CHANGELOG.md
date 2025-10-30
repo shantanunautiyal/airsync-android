@@ -133,10 +133,12 @@
 ### Android
 - ✅ **Fixed screen capture invalid parameters** - Added default MirroringOptions when null
 - ✅ **Added file transfer rate limiting** - 10ms delay every 10 chunks to prevent network overload
+- ✅ **Fixed file transfer screen crash** - Send files sequentially, update UI on main thread
 
 ### macOS  
 - ✅ **Fixed mirror button stuck disabled** - Reset mirror state on disconnect
-- ✅ **Checksum verification** - Already using SHA256, mismatch warnings don't block file save
+- ✅ **Fixed large file checksum mismatch** - Added serial queue for file operations, wait for all chunks before verification
+- ✅ **Improved file transfer reliability** - Thread-safe chunk writing with proper synchronization
 
 ## Known Issues / TODO
 
