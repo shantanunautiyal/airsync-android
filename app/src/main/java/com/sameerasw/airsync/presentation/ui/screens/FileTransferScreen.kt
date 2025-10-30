@@ -47,55 +47,71 @@ fun FileTransferScreen(
     val scope = rememberCoroutineScope()
     
     var transferItems by remember { mutableStateOf<List<TransferItem>>(emptyList()) }
+    var selectedFiles by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var isConnected by remember { mutableStateOf(WebSocketUtil.isConnected()) }
     var showError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var isSending by remember { mutableStateOf(false) }
     
     // File picker launcher
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
-            scope.launch {
-                if (!WebSocketUtil.isConnected()) {
-                    errorMessage = "Not connected to Mac. Please connect first."
-                    showError = true
-                    return@launch
-                }
-                
-                uris.forEach { uri ->
-                    try {
-                        val fileName = FileTransferUtil.getFileName(context, uri)
-                        val fileSize = FileTransferUtil.getFileSize(context, uri)
-                        val id = uri.toString()
-                        
-                        // Add to transfer list
-                        transferItems = transferItems + TransferItem(
-                            id = id,
-                            name = fileName,
-                            size = fileSize,
-                            progress = 0f,
-                            status = TransferStatus.PENDING
-                        )
-                        
-                        // Send file
-                        FileTransferUtil.sendFile(context, uri) { progress, status ->
-                            // Update transfer item progress
-                            transferItems = transferItems.map { item ->
-                                if (item.id == id) {
-                                    item.copy(progress = progress, status = status)
-                                } else {
-                                    item
-                                }
+            selectedFiles = uris
+            android.util.Log.d("FileTransferScreen", "Selected ${uris.size} files")
+        }
+    }
+    
+    // Function to send selected files
+    fun sendSelectedFiles() {
+        if (selectedFiles.isEmpty()) return
+        
+        scope.launch {
+            if (!WebSocketUtil.isConnected()) {
+                errorMessage = "Not connected to Mac. Please connect first."
+                showError = true
+                return@launch
+            }
+            
+            isSending = true
+            
+            selectedFiles.forEach { uri ->
+                try {
+                    val fileName = FileTransferUtil.getFileName(context, uri)
+                    val fileSize = FileTransferUtil.getFileSize(context, uri)
+                    val id = uri.toString()
+                    
+                    // Add to transfer list
+                    transferItems = transferItems + TransferItem(
+                        id = id,
+                        name = fileName,
+                        size = fileSize,
+                        progress = 0f,
+                        status = TransferStatus.PENDING
+                    )
+                    
+                    // Send file
+                    FileTransferUtil.sendFile(context, uri) { progress, status ->
+                        // Update transfer item progress
+                        transferItems = transferItems.map { item ->
+                            if (item.id == id) {
+                                item.copy(progress = progress, status = status)
+                            } else {
+                                item
                             }
                         }
-                    } catch (e: Exception) {
-                        errorMessage = "Failed to send file: ${e.message}"
-                        showError = true
-                        android.util.Log.e("FileTransferScreen", "Error sending file", e)
                     }
+                } catch (e: Exception) {
+                    errorMessage = "Failed to send file: ${e.message}"
+                    showError = true
+                    android.util.Log.e("FileTransferScreen", "Error sending file", e)
                 }
             }
+            
+            // Clear selected files after sending
+            selectedFiles = emptyList()
+            isSending = false
         }
     }
     
@@ -170,11 +186,77 @@ fun FileTransferScreen(
             Button(
                 onClick = { filePickerLauncher.launch("*/*") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = isConnected
+                enabled = isConnected && !isSending
             ) {
                 Icon(Icons.Default.AttachFile, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Select Files")
+            }
+            
+            // Show selected files
+            if (selectedFiles.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "${selectedFiles.size} file(s) selected",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        selectedFiles.take(3).forEach { uri ->
+                            Text(
+                                "• ${FileTransferUtil.getFileName(context, uri)}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        
+                        if (selectedFiles.size > 3) {
+                            Text(
+                                "... and ${selectedFiles.size - 3} more",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { sendSelectedFiles() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isSending
+                            ) {
+                                if (isSending) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(if (isSending) "Sending..." else "Send Now")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = { selectedFiles = emptyList() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isSending
+                            ) {
+                                Text("Cancel")
+                            }
+                        }
+                    }
+                }
             }
             
             if (!isConnected) {

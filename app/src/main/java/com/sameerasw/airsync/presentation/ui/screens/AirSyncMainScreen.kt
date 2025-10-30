@@ -729,6 +729,55 @@ fun AirSyncMainScreen(
 
                         ExpandNetworkingCard(context)
 
+                        // Background Sync Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(ExtraCornerRadius)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "Background Sync",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                        )
+                                        Text(
+                                            "Keep syncing notifications, health data, calls & messages in background",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    var isBackgroundSyncEnabled by remember { 
+                                        mutableStateOf(com.sameerasw.airsync.service.BackgroundSyncService.isRunning()) 
+                                    }
+                                    
+                                    androidx.compose.material3.Switch(
+                                        checked = isBackgroundSyncEnabled,
+                                        onCheckedChange = { enabled: Boolean ->
+                                            HapticUtil.performLightTick(haptics)
+                                            isBackgroundSyncEnabled = enabled
+                                            if (enabled) {
+                                                com.sameerasw.airsync.service.BackgroundSyncService.start(context)
+                                            } else {
+                                                com.sameerasw.airsync.service.BackgroundSyncService.stop(context)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
                         // File Transfer Card
                         Card(
                             modifier = Modifier.fillMaxWidth(),

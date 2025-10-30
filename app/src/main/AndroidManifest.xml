@@ -261,6 +261,12 @@
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
 
+        <!-- Background Sync Service for continuous data syncing -->
+        <service
+            android:name=".service.BackgroundSyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 
     <queries>
