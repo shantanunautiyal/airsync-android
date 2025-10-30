@@ -3,6 +3,7 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.service.MediaNotificationListener
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +42,6 @@ object WebSocketMessageHandler {
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
-                "callControl" -> handleCallControl(context, data)
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
                 "macInfo" -> handleMacInfo(context, data)
@@ -668,72 +668,6 @@ object WebSocketMessageHandler {
                 Log.e(TAG, "Error handling toggleNowPlaying: ${e.message}")
                 val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
                 WebSocketUtil.sendMessage(resp)
-            }
-        }
-    }
-
-    private fun handleCallControl(context: Context, data: JSONObject?) {
-        try {
-            if (data == null) {
-                Log.e(TAG, "Call control data is null")
-                return
-            }
-
-            val action = data.optString("action", "")
-            var success = false
-            var message = ""
-
-            try {
-                when (action) {
-                    "accept" -> {
-                        success = CallControlUtil.acceptCall(context)
-                        message = if (success) "Call accepted" else "Failed to accept call"
-                    }
-                    "decline" -> {
-                        success = CallControlUtil.declineCall(context)
-                        message = if (success) "Call declined" else "Failed to decline call"
-                    }
-                    "end" -> {
-                        success = CallControlUtil.endCall(context)
-                        message = if (success) "Call ended" else "Failed to end call"
-                    }
-                    "mute" -> {
-                        success = CallControlUtil.muteCall(context)
-                        message = if (success) "Microphone toggled" else "Failed to toggle mute"
-                    }
-                    "speaker" -> {
-                        success = CallControlUtil.toggleSpeaker(context)
-                        message = if (success) "Speaker toggled" else "Failed to toggle speaker"
-                    }
-                    "dtmf" -> {
-                        val tone = data.optString("tone", "")
-                        if (tone.isNotEmpty()) {
-                            success = CallControlUtil.sendDTMF(context, tone[0])
-                            message = if (success) "DTMF tone sent: $tone" else "Failed to send DTMF tone"
-                        } else {
-                            message = "No DTMF tone specified"
-                        }
-                    }
-                    else -> {
-                        message = "Unknown call control action: $action"
-                    }
-                }
-            } catch (e: SecurityException) {
-                success = false
-                message = "Permission denied: ${e.message}"
-                Log.w(TAG, "Permission error in call control: ${e.message}")
-            }
-
-            val response = JsonUtil.createCallControlResponse(action, success, message)
-            CoroutineScope(Dispatchers.Main).launch {
-                WebSocketUtil.sendMessage(response)
-                Log.d(TAG, "Call control action '$action' result: $success - $message")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling call control: ${e.message}")
-            val response = JsonUtil.createCallControlResponse("unknown", false, "Error: ${e.message}")
-            CoroutineScope(Dispatchers.Main).launch {
-                WebSocketUtil.sendMessage(response)
             }
         }
     }

@@ -171,33 +171,4 @@ object JsonUtil {
         val statePart = newState?.let { ",\"state\":$it" } ?: ""
         return """{"type":"toggleNowPlayingResponse","data":{"success":$success$statePart,"message":"${escape(message)}"}}"""
     }
-
-    /**
-     * Creates a JSON string for call state updates (incoming, outgoing, active, ended)
-     */
-    fun createCallStateJson(
-        id: String,
-        phoneNumber: String,
-        callerName: String,
-        callType: String, // INCOMING or OUTGOING
-        callStatus: String, // RINGING, ACTIVE, HELD, DISCONNECTED
-        packageName: String = "com.android.phone",
-        duration: Long = 0L
-    ): String {
-        return """{"type":"callState","data":{"id":"$id","phoneNumber":"${escape(phoneNumber)}","callerName":"${escape(callerName)}","callType":"$callType","callStatus":"$callStatus","packageName":"$packageName","duration":$duration}}"""
-    }
-
-    /**
-     * Creates a response JSON for call control actions (accept, decline, end, mute, speaker)
-     */
-    fun createCallControlResponse(action: String, success: Boolean, message: String = ""): String {
-        return """{"type":"callControlResponse","data":{"action":"$action","success":$success,"message":"${escape(message)}"}}"""
-    }
-
-    /**
-     * Creates a response JSON for DTMF tone sending
-     */
-    fun createDTMFResponse(tone: Char, success: Boolean, message: String = ""): String {
-        return """{"type":"dtmfResponse","data":{"tone":"$tone","success":$success,"message":"${escape(message)}"}}"""
-    }
 }
