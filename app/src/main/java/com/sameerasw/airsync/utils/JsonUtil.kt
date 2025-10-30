@@ -333,4 +333,11 @@ object JsonUtil {
         val checksumPart = checksum?.let { ",\"checksum\":\"$it\"" } ?: ""
         return """{"type":"fileTransfer","data":{"fileName":"${escape(fileName)}","fileSize":$fileSize,"chunks":[$chunksJson]$checksumPart}}"""
     }
+
+    /**
+     * Creates a response JSON for Mac media control action
+     */
+    fun createMacMediaControlResponse(action: String, success: Boolean, message: String = ""): String {
+        return """{"type":"macMediaControlResponse","data":{"action":"${escape(action)}","success":$success,"message":"${escape(message)}"}}"""
+    }
 }

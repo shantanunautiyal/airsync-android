@@ -40,6 +40,7 @@ object WebSocketMessageHandler {
                 "fileTransferComplete" -> handleFileTransferComplete(context, data)
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
+                "macMediaControl" -> handleMacMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
                 "notificationAction" -> handleNotificationAction(data)
                 "disconnectRequest" -> handleDisconnectRequest(context)
@@ -446,6 +447,85 @@ object WebSocketMessageHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Error handling media control: ${e.message}")
             sendMediaControlResponse("unknown", false, "Error: ${e.message}")
+        }
+    }
+
+    private fun handleMacMediaControl(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Mac media control data is null")
+                sendMacMediaControlResponse("unknown", false, "No data provided")
+                return
+            }
+
+            val action = data.optString("action")
+            var success = false
+            var message: String
+
+            Log.d(TAG, "Handling Mac media control action: $action")
+
+            when (action) {
+                "playPause" -> {
+                    success = MediaControlUtil.playPause(context)
+                    message = if (success) "Play/pause toggled" else "Failed to toggle play/pause"
+                }
+                "play" -> {
+                    success = MediaControlUtil.playPause(context)
+                    message = if (success) "Playback started" else "Failed to start playback"
+                }
+                "pause" -> {
+                    success = MediaControlUtil.playPause(context)
+                    message = if (success) "Playback paused" else "Failed to pause playback"
+                }
+                "next" -> {
+                    SyncManager.suppressMediaUpdatesForSkip()
+                    success = MediaControlUtil.skipNext(context)
+                    message = if (success) "Skipped to next track" else "Failed to skip to next track"
+                }
+                "previous" -> {
+                    SyncManager.suppressMediaUpdatesForSkip()
+                    success = MediaControlUtil.skipPrevious(context)
+                    message = if (success) "Skipped to previous track" else "Failed to skip to previous track"
+                }
+                "stop" -> {
+                    success = MediaControlUtil.stop(context)
+                    message = if (success) "Playback stopped" else "Failed to stop playback"
+                }
+                "toggleLike" -> {
+                    success = MediaControlUtil.toggleLike(context)
+                    message = if (success) "Like toggled" else "Failed to toggle like"
+                }
+                "like" -> {
+                    success = MediaControlUtil.like(context)
+                    message = if (success) "Liked" else "Failed to like"
+                }
+                "unlike" -> {
+                    success = MediaControlUtil.unlike(context)
+                    message = if (success) "Unliked" else "Failed to unlike"
+                }
+                else -> {
+                    Log.w(TAG, "Unknown Mac media control action: $action")
+                    message = "Unknown action: $action"
+                }
+            }
+
+            Log.d(TAG, "Mac media control result: action=$action, success=$success, message=$message")
+            sendMacMediaControlResponse(action, success, message)
+
+            // Send updated media state after successful control
+            if (success) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val delayMs = when (action) {
+                        "next", "previous" -> 1200L
+                        else -> 400L
+                    }
+                    delay(delayMs)
+                    SyncManager.onMediaStateChanged(context)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling Mac media control: ${e.message}", e)
+            sendMacMediaControlResponse("unknown", false, "Error: ${e.message}")
         }
     }
 
@@ -1152,6 +1232,14 @@ object WebSocketMessageHandler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping mirroring", e)
+        }
+    }
+
+    private fun sendMacMediaControlResponse(action: String, success: Boolean, message: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val response = JsonUtil.createMacMediaControlResponse(action, success, message)
+            WebSocketUtil.sendMessage(response)
+            Log.d(TAG, "Sent Mac media control response: action=$action, success=$success")
         }
     }
 }

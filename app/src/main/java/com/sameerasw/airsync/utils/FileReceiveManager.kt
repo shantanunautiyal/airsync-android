@@ -64,22 +64,38 @@ object FileReceiveManager {
         }
         
         try {
-            // Decode base64 chunk
-            val decodedChunk = Base64.decode(chunkData, Base64.NO_WRAP)
+            // Decode base64 chunk - try multiple decoding strategies
+            val decodedChunk = try {
+                Base64.decode(chunkData, Base64.NO_WRAP)
+            } catch (e: Exception) {
+                Log.w(TAG, "NO_WRAP decode failed, trying DEFAULT: ${e.message}")
+                try {
+                    Base64.decode(chunkData, Base64.DEFAULT)
+                } catch (e2: Exception) {
+                    Log.e(TAG, "All decode strategies failed: ${e2.message}")
+                    throw e2
+                }
+            }
             
             // Store chunk
             if (chunkIndex >= 0 && chunkIndex < transfer.totalChunks) {
+                // Check if chunk already received (duplicate)
+                if (transfer.receivedChunks[chunkIndex].isNotEmpty()) {
+                    Log.w(TAG, "Duplicate chunk $chunkIndex received, replacing")
+                    transfer.bytesReceived -= transfer.receivedChunks[chunkIndex].size
+                }
+                
                 transfer.receivedChunks[chunkIndex] = decodedChunk
                 transfer.bytesReceived += decodedChunk.size
                 
-                Log.d(TAG, "Received chunk $chunkIndex/${transfer.totalChunks} for ${transfer.fileName} (${transfer.bytesReceived}/${transfer.fileSize} bytes)")
+                Log.d(TAG, "Received chunk $chunkIndex/${transfer.totalChunks} for ${transfer.fileName} (${decodedChunk.size} bytes, total: ${transfer.bytesReceived}/${transfer.fileSize})")
                 return true
             } else {
                 Log.e(TAG, "Invalid chunk index: $chunkIndex (expected 0-${transfer.totalChunks - 1})")
                 return false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error receiving chunk: ${e.message}", e)
+            Log.e(TAG, "Error receiving chunk $chunkIndex: ${e.message}", e)
             return false
         }
     }
@@ -103,34 +119,63 @@ object FileReceiveManager {
                 .map { it.index }
             
             if (missingChunks.isNotEmpty()) {
-                return Result.failure(Exception("Missing chunks: $missingChunks"))
+                Log.e(TAG, "Missing ${missingChunks.size} chunks: $missingChunks")
+                return Result.failure(Exception("Missing ${missingChunks.size} chunks: ${missingChunks.take(10)}..."))
             }
             
-            // Combine all chunks
-            val fileData = transfer.receivedChunks.fold(ByteArray(0)) { acc, chunk ->
-                acc + chunk
+            // Combine all chunks in order
+            Log.d(TAG, "Combining ${transfer.receivedChunks.size} chunks...")
+            val fileData = ByteArray(transfer.fileSize.toInt())
+            var offset = 0
+            
+            transfer.receivedChunks.forEachIndexed { index, chunk ->
+                if (chunk.isEmpty()) {
+                    Log.e(TAG, "Empty chunk at index $index during assembly!")
+                    return Result.failure(Exception("Empty chunk at index $index"))
+                }
+                
+                // Copy chunk data to correct position
+                System.arraycopy(chunk, 0, fileData, offset, chunk.size)
+                offset += chunk.size
+                
+                if (index % 100 == 0) {
+                    Log.d(TAG, "Assembled chunk $index/${transfer.receivedChunks.size} (offset: $offset)")
+                }
             }
             
-            // Verify file size
-            if (fileData.size.toLong() != transfer.fileSize) {
+            // Verify final file size
+            if (offset.toLong() != transfer.fileSize) {
+                Log.e(TAG, "File size mismatch after assembly: expected ${transfer.fileSize}, got $offset")
                 return Result.failure(
-                    Exception("File size mismatch: expected ${transfer.fileSize}, got ${fileData.size}")
+                    Exception("File size mismatch: expected ${transfer.fileSize}, got $offset")
                 )
             }
             
+            Log.d(TAG, "File assembled: ${fileData.size} bytes")
+            
             // Verify checksum if provided
             transfer.expectedChecksum?.let { expectedChecksum ->
+                Log.d(TAG, "Calculating checksum for verification...")
                 val actualChecksum = calculateChecksum(fileData)
-                if (actualChecksum != expectedChecksum) {
-                    Log.e(TAG, "Checksum mismatch!")
-                    Log.e(TAG, "Expected: $expectedChecksum")
-                    Log.e(TAG, "Actual:   $actualChecksum")
+                
+                // Normalize checksums (remove any whitespace, convert to lowercase)
+                val normalizedExpected = expectedChecksum.trim().lowercase()
+                val normalizedActual = actualChecksum.trim().lowercase()
+                
+                if (normalizedActual != normalizedExpected) {
+                    Log.e(TAG, "=== CHECKSUM MISMATCH ===")
+                    Log.e(TAG, "Expected: $normalizedExpected")
+                    Log.e(TAG, "Actual:   $normalizedActual")
+                    Log.e(TAG, "File size: ${fileData.size} bytes")
+                    Log.e(TAG, "Chunks: ${transfer.receivedChunks.size}")
+                    Log.e(TAG, "First 100 bytes (hex): ${fileData.take(100).joinToString("") { "%02x".format(it) }}")
+                    
                     return Result.failure(
-                        Exception("Checksum mismatch: expected $expectedChecksum, got $actualChecksum")
+                        Exception("Checksum mismatch: expected $normalizedExpected, got $normalizedActual")
                     )
                 }
-                Log.d(TAG, "Checksum verified: $actualChecksum")
-            }
+                Log.d(TAG, "✓ Checksum verified: $actualChecksum")
+            } ?: Log.w(TAG, "No checksum provided, skipping verification")
             
             // Save file
             val uri = saveFile(context, transfer.fileName, fileData)
@@ -138,7 +183,7 @@ object FileReceiveManager {
             // Clean up
             activeTransfers.remove(transferId)
             
-            Log.d(TAG, "File transfer completed successfully: ${transfer.fileName}")
+            Log.d(TAG, "✓ File transfer completed successfully: ${transfer.fileName}")
             return Result.success(uri)
             
         } catch (e: Exception) {

@@ -56,12 +56,13 @@ object FileTransferUtil {
             
             // Send chunks
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                val chunk = if (bytesRead < CHUNK_SIZE) {
-                    buffer.copyOf(bytesRead)
-                } else {
-                    buffer
-                }
+                // Always create a new array with exact size to avoid buffer reuse issues
+                val chunk = buffer.copyOf(bytesRead)
                 
+                // Update digest for checksum verification
+                digest.update(chunk)
+                
+                // Encode to base64 with NO_WRAP to avoid newlines
                 val base64Chunk = Base64.encodeToString(chunk, Base64.NO_WRAP)
                 
                 // Send chunk
@@ -76,7 +77,9 @@ object FileTransferUtil {
                 val progress = totalBytesRead.toFloat() / fileSize
                 onProgress(progress, TransferStatus.TRANSFERRING)
                 
-                Log.d(TAG, "Sent chunk $chunkIndex/$totalChunks")
+                if (chunkIndex % 100 == 0 || chunkIndex == totalChunks) {
+                    Log.d(TAG, "Sent chunk $chunkIndex/$totalChunks (${chunk.size} bytes)")
+                }
             }
             
             inputStream.close()
@@ -105,14 +108,19 @@ object FileTransferUtil {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(8192)
         var bytesRead: Int
+        var totalBytes = 0L
         
         while (inputStream.read(buffer).also { bytesRead = it } != -1) {
             digest.update(buffer, 0, bytesRead)
+            totalBytes += bytesRead
         }
         
         inputStream.close()
         
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        val checksum = digest.digest().joinToString("") { "%02x".format(it) }
+        Log.d(TAG, "Calculated checksum for $totalBytes bytes: $checksum")
+        
+        return checksum
     }
     
     private fun escapeJson(str: String): String {
