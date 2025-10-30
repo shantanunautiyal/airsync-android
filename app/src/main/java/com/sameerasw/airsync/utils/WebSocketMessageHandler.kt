@@ -1,4 +1,3 @@
-
 package com.sameerasw.airsync.utils
 
 import android.content.Context
@@ -7,7 +6,9 @@ import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.domain.model.MirroringOptions
+import com.sameerasw.airsync.service.InputAccessibilityService
 import com.sameerasw.airsync.service.MediaNotificationListener
+import com.sameerasw.airsync.service.ScreenCaptureService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,12 +49,39 @@ object WebSocketMessageHandler {
                 "status" -> handleMacDeviceStatus(context, data)
                 "macInfo" -> handleMacInfo(context, data)
                 "requestWallpaper" -> handleRequestWallpaper(context)
+                "inputEvent" -> handleInputEvent(context, data)
+                "navAction" -> handleNavAction(context, data)
+                "stopMirroring" -> handleStopMirroring(context)
+                // SMS and Messaging
+                "requestSmsThreads" -> handleRequestSmsThreads(context, data)
+                "requestSmsMessages" -> handleRequestSmsMessages(context, data)
+                "sendSms" -> handleSendSms(context, data)
+                "markSmsRead" -> handleMarkSmsRead(context, data)
+                // Call Logs
+                "requestCallLogs" -> handleRequestCallLogs(context, data)
+                "markCallLogRead" -> handleMarkCallLogRead(context, data)
+                // Call Actions
+                "callAction" -> handleCallAction(context, data)
+                // Health Data
+                "requestHealthSummary" -> handleRequestHealthSummary(context, data)
+                "requestHealthData" -> handleRequestHealthData(context, data)
                 "mirrorRequest" -> {
                     val options = data?.optJSONObject("options")
-                    val fps = options?.optInt("fps", 30) ?: 30
-                    val quality = (options?.optDouble("quality", 0.8) ?: 0.8).toFloat()
+                    val rawFps = options?.optInt("fps", 30) ?: 30
+                    // Clamp FPS to reasonable range (10-60)
+                    val fps = rawFps.coerceIn(10, 60)
+                    if (rawFps != fps) {
+                        Log.w(TAG, "FPS value $rawFps out of range, clamped to $fps")
+                    }
+                    
+                    val quality = (options?.optDouble("quality", 0.6) ?: 0.6).toFloat().coerceIn(0.3f, 1.0f)
                     val maxWidth = options?.optInt("maxWidth", 1280) ?: 1280
-                    val bitrateKbps = options?.optInt("bitrateKbps", 12000) ?: 12000
+                    val rawBitrate = options?.optInt("bitrateKbps", 4000) ?: 4000
+                    // Clamp bitrate to reasonable range (1-8 Mbps)
+                    val bitrateKbps = rawBitrate.coerceIn(1000, 8000)
+                    if (rawBitrate != bitrateKbps) {
+                        Log.w(TAG, "Bitrate $rawBitrate out of range, clamped to $bitrateKbps")
+                    }
 
                     val mirroringOptions = MirroringOptions(
                         fps = fps,
@@ -62,13 +90,10 @@ object WebSocketMessageHandler {
                         bitrateKbps = bitrateKbps
                     )
 
-                    val intent = Intent("com.sameerasw.airsync.MIRROR_REQUEST").apply {
-                        `package` = context.packageName
-                        putExtra("mirroringOptions", mirroringOptions)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.sendBroadcast(intent)
-                    Log.d(TAG, "Sent broadcast for mirror request with options: $mirroringOptions")
+                    Log.d(TAG, "Mirror request with options: fps=$fps, quality=$quality, maxWidth=$maxWidth, bitrate=${bitrateKbps}kbps")
+                    
+                    // Use helper to prevent duplicate popups
+                    MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
                 }
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
@@ -78,6 +103,151 @@ object WebSocketMessageHandler {
             Log.e(TAG, "Error handling incoming message: ${e.message}")
         }
     }
+
+    private fun handleInputEvent(context: Context, data: JSONObject?) {
+        if (data == null) {
+            Log.e(TAG, "Input event data is null")
+            sendInputEventResponse("unknown", false, "No data provided")
+            return
+        }
+
+        val service = InputAccessibilityService.instance
+        if (service == null) {
+            Log.e(TAG, "InputAccessibilityService not available")
+            sendInputEventResponse(data.optString("type", "unknown"), false, "Accessibility service not enabled")
+            return
+        }
+
+        // Mac sends "type" field, not "inputType"
+        val inputType = data.optString("type", data.optString("inputType", ""))
+        var success = false
+        var message = ""
+
+        try {
+            when (inputType) {
+                "tap" -> {
+                    val x = data.optDouble("x").toFloat()
+                    val y = data.optDouble("y").toFloat()
+                    service.injectTap(x, y)
+                    success = true
+                    message = "Tap injected at ($x, $y)"
+                    Log.d(TAG, message)
+                }
+                "longPress", "long_press" -> {
+                    val x = data.optDouble("x").toFloat()
+                    val y = data.optDouble("y").toFloat()
+                    service.injectLongPress(x, y)
+                    success = true
+                    message = "Long press injected at ($x, $y)"
+                    Log.d(TAG, message)
+                }
+                "swipe" -> {
+                    // Mac sends x1, y1, x2, y2 - map to startX, startY, endX, endY
+                    val startX = if (data.has("startX")) data.optDouble("startX").toFloat() else data.optDouble("x1").toFloat()
+                    val startY = if (data.has("startY")) data.optDouble("startY").toFloat() else data.optDouble("y1").toFloat()
+                    val endX = if (data.has("endX")) data.optDouble("endX").toFloat() else data.optDouble("x2").toFloat()
+                    val endY = if (data.has("endY")) data.optDouble("endY").toFloat() else data.optDouble("y2").toFloat()
+                    val duration = data.optLong("durationMs", data.optLong("duration", 300L))
+                    service.injectSwipe(startX, startY, endX, endY, duration)
+                    success = true
+                    message = "Swipe injected from ($startX, $startY) to ($endX, $endY)"
+                    Log.d(TAG, message)
+                }
+                "scroll" -> {
+                    val x = data.optDouble("x").toFloat()
+                    val y = data.optDouble("y").toFloat()
+                    val deltaX = data.optDouble("deltaX").toFloat()
+                    val deltaY = data.optDouble("deltaY").toFloat()
+                    service.injectScroll(x, y, deltaX, deltaY)
+                    success = true
+                    message = "Scroll injected at ($x, $y) with delta ($deltaX, $deltaY)"
+                    Log.d(TAG, message)
+                }
+                "back" -> {
+                    success = service.performBack()
+                    message = if (success) "Back action performed" else "Back action failed"
+                    Log.d(TAG, message)
+                }
+                "home" -> {
+                    success = service.performHome()
+                    message = if (success) "Home action performed" else "Home action failed"
+                    Log.d(TAG, message)
+                }
+                "recents" -> {
+                    success = service.performRecents()
+                    message = if (success) "Recents action performed" else "Recents action failed"
+                    Log.d(TAG, message)
+                }
+                "notifications" -> {
+                    success = service.performNotifications()
+                    message = if (success) "Notifications action performed" else "Notifications action failed"
+                    Log.d(TAG, message)
+                }
+                "quickSettings" -> {
+                    success = service.performQuickSettings()
+                    message = if (success) "Quick settings action performed" else "Quick settings action failed"
+                    Log.d(TAG, message)
+                }
+                "powerDialog" -> {
+                    success = service.performPowerDialog()
+                    message = if (success) "Power dialog action performed" else "Power dialog action failed"
+                    Log.d(TAG, message)
+                }
+                else -> {
+                    Log.w(TAG, "Unknown input event type: $inputType")
+                    message = "Unknown input type: $inputType"
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling input event: ${e.message}", e)
+            message = "Error: ${e.message}"
+        }
+
+        sendInputEventResponse(inputType, success, message)
+    }
+
+    private fun sendInputEventResponse(inputType: String, success: Boolean, message: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val response = JsonUtil.createInputEventResponse(inputType, success, message)
+            WebSocketUtil.sendMessage(response)
+        }
+    }
+
+    private fun handleNavAction(context: Context, data: JSONObject?) {
+        if (data == null) {
+            Log.e(TAG, "Nav action data is null")
+            return
+        }
+
+        val service = InputAccessibilityService.instance
+        if (service == null) {
+            Log.e(TAG, "InputAccessibilityService not available for nav action")
+            return
+        }
+
+        val action = data.optString("action", "")
+        var success = false
+
+        try {
+            success = when (action) {
+                "back" -> service.performBack()
+                "home" -> service.performHome()
+                "recents" -> service.performRecents()
+                "notifications" -> service.performNotifications()
+                "quickSettings" -> service.performQuickSettings()
+                "powerDialog" -> service.performPowerDialog()
+                else -> {
+                    Log.w(TAG, "Unknown nav action: $action")
+                    false
+                }
+            }
+            Log.d(TAG, "Nav action '$action': ${if (success) "success" else "failed"}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling nav action: ${e.message}", e)
+        }
+    }
+
+
 
     private fun handleFileTransferInit(context: Context, data: JSONObject?) {
         try {
@@ -702,6 +872,286 @@ object WebSocketMessageHandler {
     private fun handleRequestWallpaper(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             WallpaperHandler.sendWallpaper(context)
+        }
+    }
+
+    // ========== SMS and Messaging Handlers ==========
+
+    private fun handleRequestSmsThreads(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val limit = data?.optInt("limit", 50) ?: 50
+                val threads = SmsUtil.getAllThreads(context, limit)
+                val json = JsonUtil.createSmsThreadsJson(threads)
+                WebSocketUtil.sendMessage(json)
+                Log.d(TAG, "Sent ${threads.size} SMS threads")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling request SMS threads", e)
+            }
+        }
+    }
+
+    private fun handleRequestSmsMessages(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "Request SMS messages data is null")
+                    return@launch
+                }
+
+                val threadId = data.optString("threadId")
+                val limit = data.optInt("limit", 100)
+
+                if (threadId.isEmpty()) {
+                    Log.e(TAG, "Thread ID is empty")
+                    return@launch
+                }
+
+                val messages = SmsUtil.getMessagesInThread(context, threadId, limit)
+                val json = JsonUtil.createSmsMessagesJson(messages)
+                WebSocketUtil.sendMessage(json)
+                Log.d(TAG, "Sent ${messages.size} messages for thread $threadId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling request SMS messages", e)
+            }
+        }
+    }
+
+    private fun handleSendSms(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "Send SMS data is null")
+                    val response = JsonUtil.createSmsSendResponse(false, "No data provided")
+                    WebSocketUtil.sendMessage(response)
+                    return@launch
+                }
+
+                val address = data.optString("address")
+                val message = data.optString("message")
+
+                if (address.isEmpty() || message.isEmpty()) {
+                    Log.e(TAG, "Address or message is empty")
+                    val response = JsonUtil.createSmsSendResponse(false, "Address or message is empty")
+                    WebSocketUtil.sendMessage(response)
+                    return@launch
+                }
+
+                val success = SmsUtil.sendSms(context, address, message)
+                val responseMessage = if (success) "SMS sent successfully" else "Failed to send SMS"
+                val response = JsonUtil.createSmsSendResponse(success, responseMessage)
+                WebSocketUtil.sendMessage(response)
+                Log.d(TAG, "SMS send result: $success")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling send SMS", e)
+                val response = JsonUtil.createSmsSendResponse(false, "Error: ${e.message}")
+                WebSocketUtil.sendMessage(response)
+            }
+        }
+    }
+
+    private fun handleMarkSmsRead(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "Mark SMS read data is null")
+                    return@launch
+                }
+
+                val messageId = data.optString("messageId")
+                if (messageId.isEmpty()) {
+                    Log.e(TAG, "Message ID is empty")
+                    return@launch
+                }
+
+                val success = SmsUtil.markAsRead(context, messageId)
+                Log.d(TAG, "Mark SMS as read result: $success")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling mark SMS read", e)
+            }
+        }
+    }
+
+    // ========== Call Log Handlers ==========
+
+    private fun handleRequestCallLogs(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val limit = data?.optInt("limit", 100) ?: 100
+                val sinceTimestamp = data?.optLong("since", 0) ?: 0
+
+                val callLogs = if (sinceTimestamp > 0) {
+                    CallLogUtil.getCallLogsSince(context, sinceTimestamp)
+                } else {
+                    CallLogUtil.getCallLogs(context, limit)
+                }
+
+                val json = JsonUtil.createCallLogsJson(callLogs)
+                WebSocketUtil.sendMessage(json)
+                Log.d(TAG, "Sent ${callLogs.size} call logs")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling request call logs", e)
+            }
+        }
+    }
+
+    private fun handleMarkCallLogRead(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "Mark call log read data is null")
+                    return@launch
+                }
+
+                val callId = data.optString("callId")
+                if (callId.isEmpty()) {
+                    Log.e(TAG, "Call ID is empty")
+                    return@launch
+                }
+
+                val success = CallLogUtil.markAsRead(context, callId)
+                Log.d(TAG, "Mark call log as read result: $success")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling mark call log read", e)
+            }
+        }
+    }
+
+    // ========== Call Action Handlers ==========
+
+    private fun handleCallAction(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (data == null) {
+                    Log.e(TAG, "Call action data is null")
+                    val response = JsonUtil.createCallActionResponse("unknown", false, "No data provided")
+                    WebSocketUtil.sendMessage(response)
+                    return@launch
+                }
+
+                val action = data.optString("action")
+                
+                // Note: Answering/ending calls programmatically requires ANSWER_PHONE_CALLS permission
+                // and is restricted on Android 9+. This is a placeholder for future implementation.
+                
+                when (action) {
+                    "answer" -> {
+                        // Requires ANSWER_PHONE_CALLS permission (Android 9+)
+                        // Implementation would use TelecomManager.acceptRingingCall()
+                        val response = JsonUtil.createCallActionResponse(action, false, "Answer call not implemented - requires system permissions")
+                        WebSocketUtil.sendMessage(response)
+                        Log.w(TAG, "Answer call action not implemented")
+                    }
+                    "reject" -> {
+                        // Requires ANSWER_PHONE_CALLS permission (Android 9+)
+                        // Implementation would use TelecomManager.endCall()
+                        val response = JsonUtil.createCallActionResponse(action, false, "Reject call not implemented - requires system permissions")
+                        WebSocketUtil.sendMessage(response)
+                        Log.w(TAG, "Reject call action not implemented")
+                    }
+                    "mute" -> {
+                        // Could be implemented with AudioManager
+                        val response = JsonUtil.createCallActionResponse(action, false, "Mute call not implemented")
+                        WebSocketUtil.sendMessage(response)
+                        Log.w(TAG, "Mute call action not implemented")
+                    }
+                    else -> {
+                        val response = JsonUtil.createCallActionResponse(action, false, "Unknown action")
+                        WebSocketUtil.sendMessage(response)
+                        Log.w(TAG, "Unknown call action: $action")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling call action", e)
+                val response = JsonUtil.createCallActionResponse("unknown", false, "Error: ${e.message}")
+                WebSocketUtil.sendMessage(response)
+            }
+        }
+    }
+
+    // ========== Health Data Handlers ==========
+
+    private fun handleRequestHealthSummary(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!HealthConnectUtil.isAvailable(context)) {
+                    Log.w(TAG, "Health Connect not available")
+                    return@launch
+                }
+
+                if (!HealthConnectUtil.hasPermissions(context)) {
+                    Log.w(TAG, "Health Connect permissions not granted")
+                    return@launch
+                }
+
+                // Get requested date from Mac, default to today
+                val requestedDate = data?.optLong("date", System.currentTimeMillis()) 
+                    ?: System.currentTimeMillis()
+                
+                Log.d(TAG, "Requesting health summary for date: $requestedDate")
+
+                // Use cache to reduce Health Connect queries
+                val summary = com.sameerasw.airsync.health.HealthDataCache.getSummaryWithCache(
+                    context,
+                    requestedDate
+                ) { date ->
+                    HealthConnectUtil.getSummaryForDate(context, date)
+                }
+                
+                if (summary != null) {
+                    val json = JsonUtil.createHealthSummaryJson(summary)
+                    WebSocketUtil.sendMessage(json)
+                    Log.d(TAG, "Sent health summary for date: $requestedDate")
+                } else {
+                    Log.w(TAG, "Failed to get health summary for date: $requestedDate")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling request health summary", e)
+            }
+        }
+    }
+
+    private fun handleRequestHealthData(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!HealthConnectUtil.isAvailable(context)) {
+                    Log.w(TAG, "Health Connect not available")
+                    return@launch
+                }
+
+                if (!HealthConnectUtil.hasPermissions(context)) {
+                    Log.w(TAG, "Health Connect permissions not granted")
+                    return@launch
+                }
+
+                val hours = data?.optInt("hours", 24) ?: 24
+                val healthData = HealthConnectUtil.getRecentHealthData(context, hours)
+                
+                if (healthData.isNotEmpty()) {
+                    val json = JsonUtil.createHealthDataJson(healthData)
+                    WebSocketUtil.sendMessage(json)
+                    Log.d(TAG, "Sent ${healthData.size} health data records")
+                } else {
+                    Log.w(TAG, "No health data available")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling request health data", e)
+            }
+        }
+    }
+
+    private fun handleStopMirroring(context: Context) {
+        Log.d(TAG, "Received stop mirroring request from Mac")
+        try {
+            val service = ScreenCaptureService.instance
+            if (service != null) {
+                service.stopMirroring()
+                Log.d(TAG, "Screen mirroring stopped successfully")
+            } else {
+                Log.w(TAG, "ScreenCaptureService not running")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping mirroring", e)
         }
     }
 }

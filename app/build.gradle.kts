@@ -17,7 +17,7 @@ android {
         minSdk = 30
         targetSdk = 36
         versionCode = 10
-        versionName = "2.1.3"
+        versionName = "2.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -55,7 +55,7 @@ dependencies {
     implementation(libs.androidx.material3)
 
     // Smartspacer SDK
-    implementation("com.kieronquinn.smartspacer:sdk-plugin:1.1")
+    implementation(libs.sdk.plugin)
 
     // Material Components (XML themes: Theme.Material3.*)
     implementation(libs.material)
@@ -86,6 +86,12 @@ dependencies {
 
     // Media session support for Mac media player
     implementation(libs.androidx.media)
+
+    // Health Connect SDK
+    implementation(libs.androidx.connect.client)
+
+    // DocumentFile for folder access
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)

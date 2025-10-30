@@ -77,14 +77,17 @@ object WebSocketUtil {
         // Cache application context for future cleanup even if callers don't pass context on disconnect
         appContext = context.applicationContext
 
-        if (isConnecting.get() || isConnected.get()) {
+        // If user initiates a manual attempt, force reset connection state and stop auto-reconnect
+        if (manualAttempt) {
+            // Force reset connection state for manual attempts to override stuck states
+            isConnecting.set(false)
+            isConnected.set(false)
+            isSocketOpen.set(false)
+            handshakeCompleted.set(false)
+            cancelAutoReconnect()
+        } else if (isConnecting.get() || isConnected.get()) {
             Log.d(TAG, "Already connected or connecting")
             return
-        }
-
-        // If user initiates a manual attempt, stop any auto-reconnect loop
-        if (manualAttempt) {
-            cancelAutoReconnect()
         }
 
         // Validate local network IP

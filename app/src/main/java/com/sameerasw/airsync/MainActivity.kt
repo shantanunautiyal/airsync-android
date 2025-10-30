@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
+import com.sameerasw.airsync.presentation.ui.screens.FileTransferScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import com.sameerasw.airsync.utils.PermissionUtil
 import java.net.URLDecoder
@@ -176,7 +177,17 @@ class MainActivity : ComponentActivity() {
                                 onDismissAbout = { showAboutDialog = false },
                                 showMirroringDialog = showMirroringDialog,
                                 mirroringOptions = mirroringOptions,
-                                onDismissMirroringDialog = { showMirroringDialog = false }
+                                onDismissMirroringDialog = { showMirroringDialog = false },
+                                onNavigateToFileTransfer = {
+                                    navController.navigate("fileTransfer")
+                                }
+                            )
+                        }
+                        composable("fileTransfer") {
+                            FileTransferScreen(
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                }
                             )
                         }
                     }

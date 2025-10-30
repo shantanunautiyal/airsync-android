@@ -74,6 +74,12 @@ class ScreenCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                // Prevent duplicate mirroring sessions
+                if (_isStreaming.value) {
+                    Log.w(TAG, "Screen mirroring already active, ignoring duplicate start request")
+                    return START_NOT_STICKY
+                }
+
                 startForegroundWithServiceType()
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)

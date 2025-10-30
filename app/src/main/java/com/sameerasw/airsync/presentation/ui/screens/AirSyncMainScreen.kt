@@ -37,10 +37,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
@@ -125,7 +128,8 @@ fun AirSyncMainScreen(
     onDismissAbout: () -> Unit = {},
     showMirroringDialog: Boolean = false,
     mirroringOptions: android.os.Bundle? = null,
-    onDismissMirroringDialog: () -> Unit = {}
+    onDismissMirroringDialog: () -> Unit = {},
+    onNavigateToFileTransfer: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -144,7 +148,7 @@ fun AirSyncMainScreen(
     val connectScrollState = rememberScrollState()
     val settingsScrollState = rememberScrollState()
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     var fabVisible by remember { mutableStateOf(true) }
     var fabExpanded by remember { mutableStateOf(true) }
     var loadingHapticsJob by remember { mutableStateOf<Job?>(null) }
@@ -413,7 +417,7 @@ fun AirSyncMainScreen(
         if (showMirroringDialog) {
             val fps = mirroringOptions?.getInt("fps", 30) ?: 30
             val quality = mirroringOptions?.getFloat("quality", 0.8f) ?: 0.8f
-            val maxWidth = mirroringOptions?.getInt("maxWidth", 1280) ?: 1280
+            val maxWidth = mirroringOptions?.getInt("maxWidth", 1920) ?: 1920
             val bitrateKbps = mirroringOptions?.getInt("bitrateKbps", 12000) ?: 12000
             viewModel.onMirroringRequest(fps, quality, maxWidth, bitrateKbps)
         }
@@ -529,9 +533,9 @@ fun AirSyncMainScreen(
             }
         },
         bottomBar = {
-            val items = listOf("Connect", "Settings")
-            val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.Settings)
-            val unselectedIcons = listOf(Icons.Outlined.Phonelink, Icons.Outlined.Settings)
+            val items = listOf("Connect", "Health", "Settings")
+            val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.FavoriteBorder, Icons.Filled.Settings)
+            val unselectedIcons = listOf(Icons.Outlined.Phonelink, Icons.Outlined.FavoriteBorder, Icons.Outlined.Settings)
             NavigationBar(
                 windowInsets = NavigationBarDefaults.windowInsets
             ) {
@@ -681,7 +685,15 @@ fun AirSyncMainScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
-                else -> {
+                1 -> {
+                    // Health page
+                    com.sameerasw.airsync.health.SimpleHealthScreen(
+                        onNavigateBack = {
+                            scope.launch { pagerState.animateScrollToPage(0) }
+                        }
+                    )
+                }
+                2 -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -716,6 +728,42 @@ fun AirSyncMainScreen(
                         )
 
                         ExpandNetworkingCard(context)
+
+                        // File Transfer Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(ExtraCornerRadius)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    "File Transfer",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                )
+                                Text(
+                                    "Send files and folders to your Mac",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Button(
+                                    onClick = {
+                                        HapticUtil.performClick(haptics)
+                                        onNavigateToFileTransfer()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = uiState.isConnected
+                                ) {
+                                    Icon(Icons.Default.AttachFile, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(if (uiState.isConnected) "Open File Transfer" else "Connect to Enable")
+                                }
+                            }
+                        }
 
                         DeviceInfoCard(
                             deviceName = uiState.deviceNameInput,

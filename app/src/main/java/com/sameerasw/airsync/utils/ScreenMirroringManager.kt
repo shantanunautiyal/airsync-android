@@ -10,13 +10,18 @@ import android.media.MediaFormat
 import android.media.projection.MediaProjection
 import android.os.Build
 import android.os.Handler
+import android.os.SystemClock
 import android.util.Log
-import com.sameerasw.airsync.domain.model.MirroringOptions // Make sure this import matches your project structure
+import android.view.InputDevice
+import android.view.MotionEvent
+import com.sameerasw.airsync.domain.model.MirroringOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ScreenMirroringManager(
     private val context: Context,
@@ -35,11 +40,15 @@ class ScreenMirroringManager(
 
     private var encoderWidth: Int = 0
     private var encoderHeight: Int = 0
+    
+    private val codecMutex = Mutex()
+    private var isStoppingCodec = false
 
     private companion object {
         private const val TAG = "ScreenMirroringManager"
         private const val MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_AVC // H.264
         private val START_CODE = byteArrayOf(0, 0, 0, 1) // Annex B Start Code
+        private const val TIMEOUT_US = 10000L // Reduced from 50000 to 10ms for lower latency
     }
 
     private fun computeEncoderSize(
@@ -71,7 +80,7 @@ class ScreenMirroringManager(
     }
 
     fun startMirroring() {
-        Log.d(TAG, "Starting mirroring (Attempting MAIN Profile)...")
+        Log.d(TAG, "Starting mirroring (Attempting Baseline Profile)...")
         try {
             val metrics = context.resources.displayMetrics
             val displayWidth = metrics.widthPixels
@@ -85,27 +94,56 @@ class ScreenMirroringManager(
             encoderHeight = height
             Log.d(TAG, "Encoder Resolution: ${encoderWidth}x${encoderHeight}")
 
+            // Calculate bitrate based on resolution and quality
+            // Base: 0.1 bits per pixel at 30fps, scaled by quality and actual fps
+            val pixelCount = encoderWidth * encoderHeight
+            val baseBitsPerPixel = 0.1f
+            val calculatedBitrate = (pixelCount * baseBitsPerPixel * mirroringOptions.fps * mirroringOptions.quality).toInt()
+            
+            // Use calculated bitrate but cap it at provided bitrateKbps
+            val finalBitrate = minOf(calculatedBitrate, mirroringOptions.bitrateKbps * 1000)
+            
+            Log.d(TAG, "Bitrate calculation: ${encoderWidth}x${encoderHeight} @ ${mirroringOptions.fps}fps, quality=${mirroringOptions.quality}")
+            Log.d(TAG, "Calculated bitrate: ${calculatedBitrate / 1000}kbps, capped at: ${finalBitrate / 1000}kbps")
+
             val format = MediaFormat.createVideoFormat(MIME_TYPE, encoderWidth, encoderHeight).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-                setInteger(MediaFormat.KEY_BIT_RATE, mirroringOptions.bitrateKbps * 1000)
+                setInteger(MediaFormat.KEY_BIT_RATE, finalBitrate)
                 setInteger(MediaFormat.KEY_FRAME_RATE, mirroringOptions.fps)
 
-                // --- Request Main Profile ---
-                Log.i(TAG, "Requesting AVCProfileMain")
-                setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileMain)
-
-                setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31) // Request 3.1
+                // --- FORCE Baseline Profile for VideoToolbox compatibility ---
+                Log.i(TAG, "FORCING AVCProfileBaseline for VideoToolbox compatibility")
+                setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+                setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31)
+                
+                // Additional constraints to force Baseline Profile
+                setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) // No B-frames in Baseline
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedBaseline)
+                    Log.i(TAG, "Also requesting Constrained Baseline Profile")
+                }
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
+                
+                // Use CBR for more consistent frame delivery
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+                }
+                
+                // Low latency optimizations
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    setInteger(MediaFormat.KEY_LATENCY, 0) // Request lowest latency
+                    setInteger(MediaFormat.KEY_PRIORITY, 0) // Realtime priority
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
                 }
             }
 
             Log.d(TAG, "Configuring MediaFormat: $format")
 
-            mediaCodec = findBestEncoder(MIME_TYPE) // Use the updated function
+            mediaCodec = findBestEncoder(MIME_TYPE)
             if (mediaCodec == null) {
-                Log.e(TAG, "❌ No suitable AVC encoder found supporting MAIN profile and Surface input.")
+                Log.e(TAG, "❌ No suitable AVC encoder found supporting Baseline profile and Surface input.")
                 stopMirroring()
                 return
             }
@@ -140,7 +178,6 @@ class ScreenMirroringManager(
         }
     }
 
-    // --- findBestEncoder still looks for MAIN Profile ---
     private fun findBestEncoder(mimeType: String): MediaCodec? {
         try {
             val codecList = MediaCodecList(MediaCodecList.ALL_CODECS)
@@ -157,15 +194,15 @@ class ScreenMirroringManager(
                 try {
                     val capabilities = codecInfo.getCapabilitiesForType(mimeType)
 
-                    val supportsMain = capabilities.profileLevels.any {
-                        it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileMain
+                    val supportsBaseline = capabilities.profileLevels.any {
+                        it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline
                     }
                     val supportsSurface = capabilities.colorFormats.any { it == MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface }
 
-                    Log.v(TAG, "    Supports Main Profile: $supportsMain, Supports Surface: $supportsSurface")
+                    Log.v(TAG, "    Supports Baseline Profile: $supportsBaseline, Supports Surface: $supportsSurface")
 
-                    if (!supportsMain || !supportsSurface) {
-                        Log.v(TAG, "    Skipping: Doesn't meet Main/Surface requirement.")
+                    if (!supportsBaseline || !supportsSurface) {
+                        Log.v(TAG, "    Skipping: Doesn't meet Baseline/Surface requirement.")
                         continue
                     }
 
@@ -180,8 +217,8 @@ class ScreenMirroringManager(
                 } catch (e: Exception) { Log.w(TAG, "    Could not check capabilities for ${codecInfo.name}: ${e.message}") }
             }
 
-            val prioritizedList = googleSoftwareEncoders + hardwareEncoders + otherSoftwareEncoders + qcomEncoders
-            Log.d(TAG, "Prioritized Encoder List (for Main Profile):")
+            val prioritizedList = qcomEncoders + hardwareEncoders + googleSoftwareEncoders + otherSoftwareEncoders
+            Log.d(TAG, "Prioritized Encoder List (for Baseline Profile):")
             prioritizedList.forEachIndexed { index, name -> Log.d(TAG, "  ${index + 1}. $name") }
 
             for (encoderName in prioritizedList) {
@@ -210,7 +247,6 @@ class ScreenMirroringManager(
         }
     }
 
-    // --- ** FIX: sanitizeSPS to check for Main Profile (0x4D = 77) ** ---
     private fun sanitizeSPS(spsData: ByteArray): ByteArray {
         if (spsData.isEmpty()) {
             Log.e(TAG, "SPS Sanitization Error: Input data is empty")
@@ -239,11 +275,10 @@ class ScreenMirroringManager(
         Log.d(TAG, "Original SPS Params - Profile: 0x${profileIdc.toString(16)}, " +
                 "Constraints: 0x${constraintFlags.toString(16)}, Level: 0x${levelIdc.toString(16)}")
 
-        // 1. Fix Profile to Main (0x4D = 77) if it isn't already
-        val mainProfileIdc = 77 // 0x4D
-        if (profileIdc != mainProfileIdc) {
-            sanitized[profileIndex] = mainProfileIdc.toByte()
-            Log.i(TAG, "Sanitized profile: 0x${profileIdc.toString(16)} -> 0x4D (Main)")
+        val baselineProfileIdc = 66 // 0x42
+        if (profileIdc != baselineProfileIdc) {
+            sanitized[profileIndex] = baselineProfileIdc.toByte()
+            Log.i(TAG, "Sanitized profile: 0x${profileIdc.toString(16)} -> 0x42 (Baseline)")
             modified = true
         }
 
@@ -270,17 +305,15 @@ class ScreenMirroringManager(
             byteArrayOf(0x67.toByte()) + sanitized
         }
     }
-    // --- End of sanitizeSPS ---
-
 
     private fun processEncodedData() {
         val bufferInfo = MediaCodec.BufferInfo()
         Log.d(TAG, "Encoding loop started on thread: ${Thread.currentThread().name}")
 
-        while (streamingJob?.isActive == true) {
+        while (streamingJob?.isActive == true && !isStoppingCodec) {
             try {
                 val codec = mediaCodec ?: break
-                val outputBufferIndex = codec.dequeueOutputBuffer(bufferInfo, 10000)
+                val outputBufferIndex = codec.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
 
                 when {
                     outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
@@ -303,7 +336,7 @@ class ScreenMirroringManager(
                             Log.d(TAG, "After strip - PPS [${ppsWithoutStartCode.size}]: ${ppsWithoutStartCode.take(8).joinToString(" ") { "%02X".format(it) }}...")
 
                             val finalSanitizedSPS = try {
-                                sanitizeSPS(spsWithoutStartCode) // Sanitize (for Main Profile + Level 3.1)
+                                sanitizeSPS(spsWithoutStartCode)
                             } catch (e: Exception) {
                                 Log.e(TAG, "SPS sanitization failed: ${e.message}. Using stripped fallback.")
                                 if (spsWithoutStartCode.isNotEmpty() && (spsWithoutStartCode[0].toInt() and 0x1F) == 7) spsWithoutStartCode
@@ -346,13 +379,54 @@ class ScreenMirroringManager(
                         }
                         codec.releaseOutputBuffer(outputBufferIndex, false)
                     }
-                    outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> Log.v(TAG, "dequeueOutputBuffer timed out.")
+                    outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                        // Don't log every timeout to reduce overhead
+                    }
                     else -> Log.w(TAG, "Unexpected output buffer index: $outputBufferIndex")
                 }
-            } catch (e: IllegalStateException) { Log.e(TAG, "Codec error.", e); break }
-            catch (e: Exception) { Log.e(TAG, "Encoding loop error", e); break }
+            } catch (e: IllegalStateException) {
+                if (!isStoppingCodec) {
+                    Log.e(TAG, "Codec error.", e)
+                }
+                break
+            }
+            catch (e: Exception) { 
+                if (!isStoppingCodec) {
+                    Log.e(TAG, "Encoding loop error", e)
+                }
+                break
+            }
         }
         Log.d(TAG, "Encoding loop finished on thread: ${Thread.currentThread().name}")
+    }
+    
+    // Touch input injection for remote control
+    fun injectTouchEvent(x: Float, y: Float, action: Int) {
+        try {
+            val displayMetrics = context.resources.displayMetrics
+            val scaledX = (x * displayMetrics.widthPixels).toInt()
+            val scaledY = (y * displayMetrics.heightPixels).toInt()
+            
+            val downTime = SystemClock.uptimeMillis()
+            val eventTime = SystemClock.uptimeMillis()
+            
+            val motionEvent = MotionEvent.obtain(
+                downTime,
+                eventTime,
+                action,
+                scaledX.toFloat(),
+                scaledY.toFloat(),
+                0
+            )
+            
+            // Inject the event using instrumentation or accessibility service
+            // Note: This requires proper permissions and setup
+            Log.d(TAG, "Touch event: action=$action, x=$scaledX, y=$scaledY")
+            
+            motionEvent.recycle()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to inject touch event", e)
+        }
     }
 
     fun resendConfig() {
@@ -368,16 +442,54 @@ class ScreenMirroringManager(
 
     fun stopMirroring() {
         Log.i(TAG, "Stopping mirroring...")
-        streamingJob?.cancel(); streamingJob = null
-        try { mediaCodec?.stop(); Log.d(TAG, "Codec stopped.") }
-        catch (e: Exception) { Log.e(TAG, "Error stopping codec", e) }
-        try { mediaCodec?.release(); Log.d(TAG, "Codec released.") }
-        catch (e: Exception) { Log.e(TAG, "Error releasing codec", e) }
+        isStoppingCodec = true
+        
+        // Cancel streaming job first
+        streamingJob?.cancel()
+        streamingJob = null
+        
+        // Give the encoding loop time to exit gracefully
+        Thread.sleep(100)
+        
+        // Stop codec safely
+        try {
+            mediaCodec?.let { codec ->
+                try {
+                    codec.stop()
+                    Log.d(TAG, "Codec stopped.")
+                } catch (e: IllegalStateException) {
+                    Log.w(TAG, "Codec already stopped or in invalid state")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping codec", e)
+        }
+        
+        // Release codec
+        try {
+            mediaCodec?.release()
+            Log.d(TAG, "Codec released.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing codec", e)
+        }
         mediaCodec = null
-        try { virtualDisplay?.release(); Log.d(TAG, "VirtualDisplay released.") }
-        catch (e: Exception) { Log.e(TAG, "Error releasing display", e) }
+        
+        // Release virtual display
+        try {
+            virtualDisplay?.release()
+            Log.d(TAG, "VirtualDisplay released.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing display", e)
+        }
         virtualDisplay = null
-        sps = null; pps = null; encoderWidth = 0; encoderHeight = 0
+        
+        // Reset state
+        sps = null
+        pps = null
+        encoderWidth = 0
+        encoderHeight = 0
+        isStoppingCodec = false
+        
         Log.i(TAG, "✅ Mirroring stopped.")
     }
 }

@@ -365,7 +365,7 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
         sbn?.let { notification ->
-            Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getString(Notification.EXTRA_TITLE)}")
+            Log.d(TAG, "Notification posted: ${notification.packageName} - ${notification.notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()}")
 
             // Skip media processing if media listener is paused or globally disabled
             if (!isMediaListenerPaused && isNowPlayingEnabled) {

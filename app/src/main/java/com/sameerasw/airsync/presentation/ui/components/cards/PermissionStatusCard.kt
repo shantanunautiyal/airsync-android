@@ -9,23 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,13 +26,6 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.QuickSettingsUtil
-
-enum class PermissionType {
-    NOTIFICATION_ACCESS,
-    POST_NOTIFICATIONS,
-    BACKGROUND_USAGE,
-    WALLPAPER_ACCESS
-}
 
 @Composable
 fun PermissionStatusCard(
@@ -53,9 +37,6 @@ fun PermissionStatusCard(
     val haptics = LocalHapticFeedback.current
     val criticalPermissions = PermissionUtil.getCriticalMissingPermissions(context)
     val optionalPermissions = PermissionUtil.getOptionalMissingPermissions(context)
-
-    // Dialog state management
-    var showDialog by remember { mutableStateOf<PermissionType?>(null) }
 
     if (missingPermissions.isNotEmpty()) {
         Card(
@@ -105,11 +86,19 @@ fun PermissionStatusCard(
 
                     criticalPermissions.forEach { permission ->
                         when (permission) {
-                            "Notification Access" -> {
+                            PermissionUtil.NOTIFICATION_ACCESS -> {
                                 PermissionButton(
-                                    permissionName = permission,
+                                    permissionName = "Notification Access",
                                     description = "Required for syncing notifications",
-                                    onExplainClick = { showDialog = PermissionType.NOTIFICATION_ACCESS },
+                                    onGrantClick = { onGrantPermission(permission) },
+                                    isCritical = true
+                                )
+                            }
+                            PermissionUtil.ACCESSIBILITY_SERVICE -> {
+                                PermissionButton(
+                                    permissionName = "Accessibility Service",
+                                    description = "Required for remote input",
+                                    onGrantClick = { onGrantPermission(permission) },
                                     isCritical = true
                                 )
                             }
@@ -133,27 +122,27 @@ fun PermissionStatusCard(
 
                     optionalPermissions.forEach { permission ->
                         when (permission) {
-                            "Post Notifications" -> {
+                            Manifest.permission.POST_NOTIFICATIONS -> {
                                 PermissionButton(
-                                    permissionName = permission,
+                                    permissionName = "Post Notifications",
                                     description = "Show connection status and alerts",
-                                    onExplainClick = { showDialog = PermissionType.POST_NOTIFICATIONS },
+                                    onGrantClick = { onGrantPermission(permission) },
                                     isCritical = false
                                 )
                             }
-                            "Background App Usage" -> {
+                            PermissionUtil.BACKGROUND_APP_USAGE -> {
                                 PermissionButton(
-                                    permissionName = permission,
+                                    permissionName = "Background App Usage",
                                     description = "Keep the app alive when inactive",
-                                    onExplainClick = { showDialog = PermissionType.BACKGROUND_USAGE },
+                                    onGrantClick = { onGrantPermission(permission) },
                                     isCritical = false
                                 )
                             }
-                            "Wallpaper Access" -> {
+                            Manifest.permission.READ_MEDIA_IMAGES -> {
                                 PermissionButton(
-                                    permissionName = permission,
+                                    permissionName = "Wallpaper Access",
                                     description = "Enables wallpaper sync",
-                                    onExplainClick = { showDialog = PermissionType.WALLPAPER_ACCESS },
+                                    onGrantClick = { onGrantPermission(permission) },
                                     isCritical = false
                                 )
                             }
@@ -218,7 +207,7 @@ fun PermissionStatusCard(
 private fun PermissionButton(
     permissionName: String,
     description: String,
-    onExplainClick: () -> Unit,
+    onGrantClick: () -> Unit,
     isCritical: Boolean
 ) {
     val haptics = LocalHapticFeedback.current
@@ -252,21 +241,21 @@ private fun PermissionButton(
             Button(
                 onClick = {
                     HapticUtil.performClick(haptics)
-                    onExplainClick()
+                    onGrantClick()
                 },
                 modifier = Modifier.padding(start = 8.dp)
             ) {
-                Text("Learn More")
+                Text("Grant")
             }
         } else {
             OutlinedButton(
                 onClick = {
                     HapticUtil.performClick(haptics)
-                    onExplainClick()
+                    onGrantClick()
                 },
                 modifier = Modifier.padding(start = 8.dp)
             ) {
-                Text("Learn More")
+                Text("Grant")
             }
         }
     }
