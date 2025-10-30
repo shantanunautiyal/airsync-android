@@ -62,6 +62,10 @@ class SmsReceiver : BroadcastReceiver() {
                 val json = JsonUtil.createSmsNotificationJson(message)
                 WebSocketUtil.sendMessage(json)
                 Log.d(TAG, "SMS notification sent")
+                
+                // Also sync updated SMS threads to macOS
+                kotlinx.coroutines.delay(500) // Wait for SMS to be written to database
+                com.sameerasw.airsync.utils.SyncManager.syncDataToMac(context)
             } catch (e: Exception) {
                 Log.e(TAG, "Error sending SMS notification", e)
             }

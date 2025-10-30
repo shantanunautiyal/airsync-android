@@ -111,17 +111,13 @@ class ScreenMirroringManager(
                 setInteger(MediaFormat.KEY_BIT_RATE, finalBitrate)
                 setInteger(MediaFormat.KEY_FRAME_RATE, mirroringOptions.fps)
 
-                // --- FORCE Baseline Profile for VideoToolbox compatibility ---
-                Log.i(TAG, "FORCING AVCProfileBaseline for VideoToolbox compatibility")
-                setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+                // --- Use Main Profile for VideoToolbox hardware decoding ---
+                Log.i(TAG, "Using AVCProfileMain for VideoToolbox hardware acceleration")
+                setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileMain)
                 setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31)
                 
-                // Additional constraints to force Baseline Profile
-                setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) // No B-frames in Baseline
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedBaseline)
-                    Log.i(TAG, "Also requesting Constrained Baseline Profile")
-                }
+                // Optimize for low latency
+                setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) // No B-frames for lower latency
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
                 
                 // Use CBR for more consistent frame delivery
@@ -143,7 +139,7 @@ class ScreenMirroringManager(
 
             mediaCodec = findBestEncoder(MIME_TYPE)
             if (mediaCodec == null) {
-                Log.e(TAG, "❌ No suitable AVC encoder found supporting Baseline profile and Surface input.")
+                Log.e(TAG, "❌ No suitable AVC encoder found supporting Main/High profile and Surface input.")
                 stopMirroring()
                 return
             }
@@ -194,14 +190,17 @@ class ScreenMirroringManager(
                 try {
                     val capabilities = codecInfo.getCapabilitiesForType(mimeType)
 
-                    val supportsBaseline = capabilities.profileLevels.any {
-                        it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline
+                    val supportsMain = capabilities.profileLevels.any {
+                        it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileMain
+                    }
+                    val supportsHigh = capabilities.profileLevels.any {
+                        it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileHigh
                     }
                     val supportsSurface = capabilities.colorFormats.any { it == MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface }
 
-                    Log.v(TAG, "    Supports Baseline Profile: $supportsBaseline, Supports Surface: $supportsSurface")
+                    Log.v(TAG, "    Supports Main Profile: $supportsMain, High Profile: $supportsHigh, Surface: $supportsSurface")
 
-                    if (!supportsBaseline || !supportsSurface) {
+                    if ((!supportsMain && !supportsHigh) || !supportsSurface) {
                         Log.v(TAG, "    Skipping: Doesn't meet Baseline/Surface requirement.")
                         continue
                     }

@@ -44,14 +44,16 @@ fun ExpandNetworkingCard(context: Context) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            Column {
-                Text("Expand networking")
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                Text("Expand networking", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Allow connecting to device outside the local network",
                     modifier = Modifier.padding(top = 4.dp),
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Switch(

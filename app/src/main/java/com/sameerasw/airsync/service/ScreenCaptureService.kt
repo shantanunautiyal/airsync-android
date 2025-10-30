@@ -115,6 +115,31 @@ class ScreenCaptureService : Service() {
         mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data)
         mediaProjection?.registerCallback(mediaProjectionCallback, backgroundHandler)
         screenMirroringManager = ScreenMirroringManager(this, mediaProjection!!, backgroundHandler!!, ::sendMirrorFrame, mirroringOptions)
+        
+        // Send mirrorStart message to Mac
+        sendMirrorStart(mirroringOptions)
+    }
+    
+    private fun sendMirrorStart(options: com.sameerasw.airsync.domain.model.MirroringOptions) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Get actual screen dimensions
+                val displayMetrics = resources.displayMetrics
+                val width = minOf(displayMetrics.widthPixels, options.maxWidth)
+                val height = (displayMetrics.heightPixels * width) / displayMetrics.widthPixels
+                
+                val json = JsonUtil.createMirrorStartJson(
+                    fps = options.fps,
+                    quality = options.quality,
+                    width = width,
+                    height = height
+                )
+                WebSocketUtil.sendMessage(json)
+                Log.d(TAG, "Sent mirrorStart: fps=${options.fps}, quality=${options.quality}, width=$width, height=$height")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending mirrorStart", e)
+            }
+        }
     }
 
     fun stopMirroring() {
@@ -125,9 +150,24 @@ class ScreenCaptureService : Service() {
         mediaProjection?.unregisterCallback(mediaProjectionCallback)
         mediaProjection?.stop()
         mediaProjection = null
+        
+        // Send mirrorStop message to Mac
+        sendMirrorStop()
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+    
+    private fun sendMirrorStop() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val json = """{"type":"mirrorStop","data":{}}"""
+                WebSocketUtil.sendMessage(json)
+                Log.d(TAG, "Sent mirrorStop to Mac")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending mirrorStop", e)
+            }
+        }
     }
 
     fun resendConfig() {

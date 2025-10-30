@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.content.Context as AndroidContext
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
@@ -163,7 +164,7 @@ fun AirSyncMainScreen(
                 action = ScreenCaptureService.ACTION_START
                 putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                 putExtra(ScreenCaptureService.EXTRA_DATA, result.data)
-                putExtra("mirroringOptions", uiState.mirroringOptions)
+                putExtra(ScreenCaptureService.EXTRA_MIRRORING_OPTIONS, uiState.mirroringOptions)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)
@@ -615,22 +616,36 @@ fun AirSyncMainScreen(
                             connectedDevice = uiState.lastConnectedDevice,
                             lastConnected = uiState.lastConnectedDevice != null,
                             uiState = uiState,
+
                         )
 
-                        AnimatedVisibility(visible = uiState.isConnected && isMirroring) {
+                        AnimatedVisibility(visible = uiState.isConnected) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                                Button(
-                                    onClick = {
-                                        val intent = Intent(context, ScreenCaptureService::class.java).apply {
-                                            action = ScreenCaptureService.ACTION_STOP
+                                if (isMirroring) {
+                                    Button(
+                                        onClick = {
+                                            val intent = Intent(context, ScreenCaptureService::class.java).apply {
+                                                action = ScreenCaptureService.ACTION_STOP
+                                            }
+                                            context.startService(intent)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error
+                                        )
+                                    ) {
+                                        Text("⏹ Stop Mirroring")
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = {
+                                            // Start mirroring - launch permission dialog
+                                            val mediaProjectionManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                            val screenCaptureIntent = mediaProjectionManager.createScreenCaptureIntent()
+                                            screenCaptureLauncher.launch(screenCaptureIntent)
                                         }
-                                        context.startService(intent)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.error
-                                    )
-                                ) {
-                                    Text("Stop Mirror")
+                                    ) {
+                                        Text("📱 Start Mirroring")
+                                    }
                                 }
                             }
                         }

@@ -57,13 +57,15 @@ object MacDeviceStatusManager {
             // Decode album art if available
             currentAlbumArt = decodeAlbumArt(albumArt)
 
-            // Start/update or stop the Mac media player service based on media state
-            if (title.isNotEmpty() || artist.isNotEmpty() || isPlaying) {
+            // Always show Mac media player when there's any media info from Mac
+            // This ensures the media controls are always visible in the sidebar/notification area
+            // even when music is paused, so users can control Mac playback at any time
+            if (title.isNotEmpty() || artist.isNotEmpty()) {
                 MacMediaPlayerService.startMacMedia(context, title, artist, isPlaying, currentAlbumArt)
                 Log.d(TAG, "Started/Updated Mac media player service")
             } else {
                 MacMediaPlayerService.stopMacMedia(context)
-                Log.d(TAG, "Stopped Mac media player service")
+                Log.d(TAG, "Stopped Mac media player service - no media info")
             }
 
             Log.d(TAG, "Mac device status updated - Playing: $isPlaying, Title: $title, Artist: $artist")

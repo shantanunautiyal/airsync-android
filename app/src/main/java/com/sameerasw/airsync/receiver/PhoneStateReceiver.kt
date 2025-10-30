@@ -102,6 +102,12 @@ class PhoneStateReceiver : BroadcastReceiver() {
             sendCallNotification(context, endedCall)
             currentCall = null
             callStartTime = 0
+            
+            // Sync updated call logs to macOS after call ends
+            CoroutineScope(Dispatchers.IO).launch {
+                kotlinx.coroutines.delay(1000) // Wait for call log to be written to database
+                com.sameerasw.airsync.utils.SyncManager.syncDataToMac(context)
+            }
         }
     }
 
