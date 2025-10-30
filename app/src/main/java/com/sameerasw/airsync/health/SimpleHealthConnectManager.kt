@@ -140,21 +140,33 @@ class SimpleHealthConnectManager(private val context: Context) {
         forceRefresh: Boolean = false
     ): HealthStats = withContext(Dispatchers.IO) {
         try {
-            val startOfDay = date.atStartOfDay(ZoneId.systemDefault())
+            // Use system default timezone
+            val zoneId = ZoneId.systemDefault()
+            val startOfDay = date.atStartOfDay(zoneId)
             val start = startOfDay.toInstant()
+            
+            // For today, use current time; for past dates, use end of day
             val end = if (date == java.time.LocalDate.now()) {
                 Instant.now()
             } else {
-                startOfDay.plusDays(1).toInstant()
+                startOfDay.plusDays(1).minusSeconds(1).toInstant()
             }
             
             val timestamp = start.toEpochMilli()
+            
+            Log.d(TAG, "=== Health Data Query ===")
+            Log.d(TAG, "Date: $date")
+            Log.d(TAG, "Timezone: $zoneId")
+            Log.d(TAG, "Start: $start (${startOfDay})")
+            Log.d(TAG, "End: $end")
+            Log.d(TAG, "Is Today: ${date == java.time.LocalDate.now()}")
             
             // Try cache first unless force refresh
             if (!forceRefresh) {
                 val cached = HealthDataCache.loadSummary(context, timestamp)
                 if (cached != null) {
                     Log.d(TAG, "Using cached health data for $date")
+                    Log.d(TAG, "Cached steps: ${cached.steps}, calories: ${cached.calories}")
                     return@withContext HealthStats(
                         steps = cached.steps?.toLong() ?: 0L,
                         calories = cached.calories?.toDouble() ?: 0.0,
@@ -178,11 +190,18 @@ class SimpleHealthConnectManager(private val context: Context) {
                 }
             }
             
-            Log.d(TAG, "Fetching fresh health data for $date from $start to $end")
+            Log.d(TAG, "Fetching fresh health data for $date")
             
             // Get heart rate stats
             val heartRateStats = getHeartRateStats(start, end)
             val bloodPressure = getBloodPressure(start, end)
+            
+            // Check permissions before fetching
+            val grantedPermissions = healthConnectClient.permissionController.getGrantedPermissions()
+            Log.d(TAG, "Granted permissions count: ${grantedPermissions.size}")
+            grantedPermissions.forEach { perm ->
+                Log.d(TAG, "  - $perm")
+            }
             
             // Fetch each metric individually with logging
             val steps = getSteps(start, end)
@@ -191,8 +210,13 @@ class SimpleHealthConnectManager(private val context: Context) {
             val sleep = getSleep(start, end)
             val activeMinutes = getActiveMinutes(start, end)
             
-            Log.d(TAG, "Basic metrics - Steps: $steps, Calories: $calories, Distance: $distance, Sleep: $sleep, Active: $activeMinutes")
-            Log.d(TAG, "Heart rate - Avg: ${heartRateStats.avg}, Min: ${heartRateStats.min}, Max: ${heartRateStats.max}")
+            Log.d(TAG, "=== Fetched Metrics ===")
+            Log.d(TAG, "Steps: $steps")
+            Log.d(TAG, "Calories: $calories")
+            Log.d(TAG, "Distance: $distance km")
+            Log.d(TAG, "Sleep: $sleep hours")
+            Log.d(TAG, "Active Minutes: $activeMinutes")
+            Log.d(TAG, "Heart Rate - Avg: ${heartRateStats.avg}, Min: ${heartRateStats.min}, Max: ${heartRateStats.max}")
             
             val stats = HealthStats(
                 steps = steps,
@@ -250,30 +274,36 @@ class SimpleHealthConnectManager(private val context: Context) {
     
     private suspend fun getSteps(start: Instant, end: Instant): Long {
         return try {
+            Log.d(TAG, "Querying steps from $start to $end")
             val response = healthConnectClient.aggregate(
                 AggregateRequest(
                     metrics = setOf(StepsRecord.COUNT_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
             )
-            response[StepsRecord.COUNT_TOTAL] ?: 0L
+            val steps = response[StepsRecord.COUNT_TOTAL] ?: 0L
+            Log.d(TAG, "Steps result: $steps")
+            steps
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting steps", e)
+            Log.e(TAG, "Error getting steps: ${e.message}", e)
             0L
         }
     }
     
     private suspend fun getCalories(start: Instant, end: Instant): Double {
         return try {
+            Log.d(TAG, "Querying calories from $start to $end")
             val response = healthConnectClient.aggregate(
                 AggregateRequest(
                     metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
             )
-            response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
+            val calories = response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
+            Log.d(TAG, "Calories result: $calories")
+            calories
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting calories", e)
+            Log.e(TAG, "Error getting calories: ${e.message}", e)
             0.0
         }
     }
