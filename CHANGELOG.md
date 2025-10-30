@@ -139,6 +139,13 @@
 - ✅ **Fixed mirror button stuck disabled** - Reset mirror state on disconnect
 - ✅ **Fixed large file checksum mismatch** - Added serial queue for file operations, wait for all chunks before verification
 - ✅ **Improved file transfer reliability** - Thread-safe chunk writing with proper synchronization
+- ✅ **Fixed Mac media control** - Use CGEvent instead of AppleScript (no permissions needed)
+- ✅ **Fixed mirror request crash** - Read AppState on main thread before processing
+- ✅ **Android can now control Mac music** - Play/pause/next/previous working
+
+### Known Issues
+- Mac media info (album art) may not display on Android - investigating
+- Scrolling during mirroring may be glitchy - performance optimization needed
 
 ## Known Issues / TODO
 
