@@ -160,11 +160,19 @@ fun AirSyncMainScreen(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
+            // Use provided options or default
+            val options = uiState.mirroringOptions ?: com.sameerasw.airsync.domain.model.MirroringOptions(
+                fps = 30,
+                quality = 0.6f,
+                maxWidth = 1280,
+                bitrateKbps = 4000
+            )
+            
             val serviceIntent = Intent(context, ScreenCaptureService::class.java).apply {
                 action = ScreenCaptureService.ACTION_START
                 putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
                 putExtra(ScreenCaptureService.EXTRA_DATA, result.data)
-                putExtra(ScreenCaptureService.EXTRA_MIRRORING_OPTIONS, uiState.mirroringOptions)
+                putExtra(ScreenCaptureService.EXTRA_MIRRORING_OPTIONS, options)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent)

@@ -128,13 +128,22 @@
 
 ---
 
+## Latest Hotfixes (October 30, 2025 - Evening)
+
+### Android
+- ✅ **Fixed screen capture invalid parameters** - Added default MirroringOptions when null
+- ✅ **Added file transfer rate limiting** - 10ms delay every 10 chunks to prevent network overload
+
+### macOS  
+- ✅ **Fixed mirror button stuck disabled** - Reset mirror state on disconnect
+- ✅ **Checksum verification** - Already using SHA256, mismatch warnings don't block file save
+
 ## Known Issues / TODO
 
 1. **File Transfer Cancel**: Cancel button not yet implemented
 2. **Multiple File Transfer**: Multiple file selection/transfer not yet implemented
 3. **Closing mirror panel**: Needs to immediately clean up Mac side (currently only sends stop request to Android)
 4. **Background sync toggle**: May appear off when permissions are revoked (this is correct behavior)
-5. **Stuck waiting for mirror frames**: Encoder waits for screen changes - may need periodic keyframe forcing
 
 ---
 

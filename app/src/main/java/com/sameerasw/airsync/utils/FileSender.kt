@@ -36,7 +36,7 @@ object FileSender {
                 )
                 WebSocketUtil.sendMessage(initJson)
 
-                // Chunks
+                // Chunks with rate limiting to prevent network overload
                 var offset = 0
                 var index = 0
                 while (offset < bytes.size) {
@@ -48,6 +48,11 @@ object FileSender {
 
                     index += 1
                     offset = end
+                    
+                    // Small delay every 10 chunks to prevent overwhelming the network
+                    if (index % 10 == 0) {
+                        kotlinx.coroutines.delay(10)
+                    }
                 }
 
                 // Complete
