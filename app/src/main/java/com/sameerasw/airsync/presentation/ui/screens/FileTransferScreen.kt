@@ -8,7 +8,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,12 +65,22 @@ fun FileTransferScreen(
                 
                 uris.forEach { uri ->
                     try {
+                        val fileName = FileTransferUtil.getFileName(context, uri)
+                        val fileSize = FileTransferUtil.getFileSize(context, uri)
+                        val id = uri.toString()
+                        
+                        // Add to transfer list
+                        transferItems = transferItems + TransferItem(
+                            id = id,
+                            name = fileName,
+                            size = fileSize,
+                            progress = 0f,
+                            status = TransferStatus.PENDING
+                        )
+                        
+                        // Send file
                         FileTransferUtil.sendFile(context, uri) { progress, status ->
                             // Update transfer item progress
-                            val fileName = FileTransferUtil.getFileName(context, uri)
-                            val fileSize = FileTransferUtil.getFileSize(context, uri)
-                            val id = uri.toString()
-                            
                             transferItems = transferItems.map { item ->
                                 if (item.id == id) {
                                     item.copy(progress = progress, status = status)
@@ -76,31 +92,8 @@ fun FileTransferScreen(
                     } catch (e: Exception) {
                         errorMessage = "Failed to send file: ${e.message}"
                         showError = true
+                        android.util.Log.e("FileTransferScreen", "Error sending file", e)
                     }
-                }
-            }
-        }
-    }
-    
-    // Folder picker launcher
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        uri?.let {
-            scope.launch {
-                if (!WebSocketUtil.isConnected()) {
-                    errorMessage = "Not connected to Mac. Please connect first."
-                    showError = true
-                    return@launch
-                }
-                
-                try {
-                    FileTransferUtil.sendFolder(context, uri) { progress, status ->
-                        // Update folder transfer progress
-                    }
-                } catch (e: Exception) {
-                    errorMessage = "Failed to send folder: ${e.message}"
-                    showError = true
                 }
             }
         }
@@ -174,29 +167,14 @@ fun FileTransferScreen(
                 fontWeight = FontWeight.Bold
             )
             
-            Row(
+            Button(
+                onClick = { filePickerLauncher.launch("*/*") },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                enabled = isConnected
             ) {
-                Button(
-                    onClick = { filePickerLauncher.launch("*/*") },
-                    modifier = Modifier.weight(1f),
-                    enabled = isConnected
-                ) {
-                    Icon(Icons.Default.AttachFile, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Select Files")
-                }
-                
-                OutlinedButton(
-                    onClick = { folderPickerLauncher.launch(null) },
-                    modifier = Modifier.weight(1f),
-                    enabled = isConnected
-                ) {
-                    Icon(Icons.Default.Folder, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Select Folder")
-                }
+                Icon(Icons.Default.AttachFile, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Select Files")
             }
             
             if (!isConnected) {

@@ -5,11 +5,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
-import androidx.documentfile.provider.DocumentFile
 import com.sameerasw.airsync.presentation.ui.screens.TransferStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 object FileTransferUtil {
@@ -29,18 +27,34 @@ object FileTransferUtil {
             
             Log.d(TAG, "Sending file: $fileName, size: $fileSize bytes")
             
+            // Generate transfer ID
+            val transferId = java.util.UUID.randomUUID().toString()
+            
             // Read file content
             val inputStream = context.contentResolver.openInputStream(uri)
                 ?: throw Exception("Cannot open file")
             
-            onProgress(0f, TransferStatus.TRANSFERRING)
-            
             val buffer = ByteArray(CHUNK_SIZE)
             var bytesRead: Int
             var totalBytesRead = 0L
-            val chunks = mutableListOf<String>()
+            var chunkIndex = 0
             val digest = MessageDigest.getInstance("SHA-256")
             
+            // Calculate total chunks
+            val totalChunks = ((fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE).toInt()
+            
+            // Send init message
+            val checksum = calculateChecksum(context, uri)
+            val initJson = """{"type":"fileTransferInit","data":{"transferId":"$transferId","fileName":"${escapeJson(fileName)}","fileSize":$fileSize,"totalChunks":$totalChunks,"checksum":"$checksum"}}"""
+            
+            if (!WebSocketUtil.sendMessage(initJson)) {
+                throw Exception("Failed to send file init")
+            }
+            
+            Log.d(TAG, "Sent file init: $fileName ($totalChunks chunks)")
+            onProgress(0f, TransferStatus.TRANSFERRING)
+            
+            // Send chunks
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                 val chunk = if (bytesRead < CHUNK_SIZE) {
                     buffer.copyOf(bytesRead)
@@ -48,39 +62,34 @@ object FileTransferUtil {
                     buffer
                 }
                 
-                // Update checksum
-                digest.update(chunk)
-                
                 val base64Chunk = Base64.encodeToString(chunk, Base64.NO_WRAP)
-                chunks.add(base64Chunk)
+                
+                // Send chunk
+                val chunkJson = """{"type":"fileChunk","data":{"transferId":"$transferId","chunkIndex":$chunkIndex,"data":"$base64Chunk"}}"""
+                
+                if (!WebSocketUtil.sendMessage(chunkJson)) {
+                    throw Exception("Failed to send chunk $chunkIndex")
+                }
                 
                 totalBytesRead += bytesRead
+                chunkIndex++
                 val progress = totalBytesRead.toFloat() / fileSize
                 onProgress(progress, TransferStatus.TRANSFERRING)
+                
+                Log.d(TAG, "Sent chunk $chunkIndex/$totalChunks")
             }
             
             inputStream.close()
             
-            // Calculate final checksum
-            val checksum = digest.digest().joinToString("") { "%02x".format(it) }
-            Log.d(TAG, "File checksum: $checksum")
+            // Send complete message
+            val completeJson = """{"type":"fileTransferComplete","data":{"transferId":"$transferId"}}"""
             
-            // Send file metadata and chunks via WebSocket
-            val fileTransferJson = JsonUtil.createFileTransferJson(
-                fileName = fileName,
-                fileSize = fileSize,
-                chunks = chunks,
-                checksum = checksum
-            )
-            
-            val success = WebSocketUtil.sendMessage(fileTransferJson)
-            
-            if (success) {
-                Log.d(TAG, "File sent successfully: $fileName")
-                onProgress(1f, TransferStatus.COMPLETED)
-            } else {
-                throw Exception("Failed to send file via WebSocket")
+            if (!WebSocketUtil.sendMessage(completeJson)) {
+                throw Exception("Failed to send file complete")
             }
+            
+            Log.d(TAG, "File sent successfully: $fileName")
+            onProgress(1f, TransferStatus.COMPLETED)
             
         } catch (e: Exception) {
             Log.e(TAG, "Error sending file: ${e.message}", e)
@@ -89,49 +98,31 @@ object FileTransferUtil {
         }
     }
     
-    suspend fun sendFolder(
-        context: Context,
-        uri: Uri,
-        onProgress: (Float, TransferStatus) -> Unit
-    ) = withContext(Dispatchers.IO) {
-        try {
-            onProgress(0f, TransferStatus.PENDING)
-            
-            // Get folder name
-            val folderName = getFileName(context, uri)
-            
-            Log.d(TAG, "Sending folder: $folderName")
-            
-            // List all files in the folder
-            val documentFile = DocumentFile.fromTreeUri(context, uri)
-            val files = documentFile?.listFiles() ?: emptyArray()
-            
-            if (files.isEmpty()) {
-                throw Exception("Folder is empty")
-            }
-            
-            onProgress(0f, TransferStatus.TRANSFERRING)
-            
-            // Send each file
-            files.forEachIndexed { index: Int, file: DocumentFile ->
-                if (file.isFile) {
-                    sendFile(context, file.uri) { _, _ -> }
-                }
-                
-                val progress = (index + 1).toFloat() / files.count()
-                onProgress(progress, TransferStatus.TRANSFERRING)
-            }
-            
-            onProgress(1f, TransferStatus.COMPLETED)
-            Log.d(TAG, "Folder sent successfully: $folderName")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending folder: ${e.message}", e)
-            onProgress(0f, TransferStatus.FAILED)
-            throw e
+    private fun calculateChecksum(context: Context, uri: Uri): String {
+        val inputStream = context.contentResolver.openInputStream(uri)
+            ?: throw Exception("Cannot open file for checksum")
+        
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(8192)
+        var bytesRead: Int
+        
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            digest.update(buffer, 0, bytesRead)
         }
+        
+        inputStream.close()
+        
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
     
+    private fun escapeJson(str: String): String {
+        return str.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+    }
+    
+
     fun getFileName(context: Context, uri: Uri): String {
         var name = "unknown"
         val cursor = context.contentResolver.query(uri, null, null, null, null)
