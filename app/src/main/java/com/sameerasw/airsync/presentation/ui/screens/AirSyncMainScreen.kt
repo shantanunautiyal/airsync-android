@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
@@ -44,12 +47,13 @@ import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.TestNotificationUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.HapticUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
-import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardSyncCard
+import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
@@ -57,10 +61,11 @@ import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDevic
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
-import com.sameerasw.airsync.presentation.ui.components.cards.TailscaleSupportCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import org.json.JSONObject
+import kotlinx.coroutines.Job
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -91,16 +96,158 @@ fun AirSyncMainScreen(
     val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val connectScrollState = rememberScrollState()
     val settingsScrollState = rememberScrollState()
+    var hasProcessedQrDialog by remember { mutableStateOf(false) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val navCallbackState = rememberUpdatedState(onNavigateToApps)
+    LaunchedEffect(navCallbackState.value) {
+    }
     var fabVisible by remember { mutableStateOf(true) }
     var fabExpanded by remember { mutableStateOf(true) }
+    var loadingHapticsJob by remember { mutableStateOf<Job?>(null) }
 
-    // Track if we've already processed the QR code dialog to prevent re-showing
-    var hasProcessedQrDialog by remember { mutableStateOf(false) }
+    // For export/import flow
+    var pendingExportJson by remember { mutableStateOf<String?>(null) }
 
-    // Pager state for swipeable tabs (0 = Connect, 1 = Settings)
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    // CreateDocument launcher for export (MIME application/json)
+    val createDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) {
+            Toast.makeText(context, "Export cancelled", Toast.LENGTH_SHORT).show()
+            viewModel.setLoading(false)
+            return@rememberLauncherForActivityResult
+        }
+
+        // Write pendingExportJson to uri
+        scope.launch(Dispatchers.IO) {
+            try {
+                val json = pendingExportJson
+                if (json == null) {
+                    // Nothing to write
+                    viewModel.setLoading(false)
+                    return@launch
+                }
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(json.toByteArray(Charsets.UTF_8))
+                }
+                scope.launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
+                    viewModel.setLoading(false)
+                    pendingExportJson = null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                scope.launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    viewModel.setLoading(false)
+                    pendingExportJson = null
+                }
+            }
+        }
+    }
+
+    // OpenDocument launcher for import (allow picking JSON)
+    val openDocLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) {
+            Toast.makeText(context, "Import cancelled", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+
+        viewModel.setLoading(true)
+        scope.launch(Dispatchers.IO) {
+            try {
+                val input = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                if (input == null) {
+                    scope.launch(Dispatchers.Main) {
+                        Toast.makeText(context, "Failed to read file", Toast.LENGTH_LONG).show()
+                        viewModel.setLoading(false)
+                    }
+                    return@launch
+                }
+
+                val success = viewModel.importDataFromJson(context, input)
+                scope.launch(Dispatchers.Main) {
+                    if (success) {
+                        Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
+                        viewModel.initializeState(context)
+                    } else {
+                        Toast.makeText(context, "Import failed or invalid file", Toast.LENGTH_LONG).show()
+                    }
+                    viewModel.setLoading(false)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                scope.launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Import error: ${e.message}", Toast.LENGTH_LONG).show()
+                    viewModel.setLoading(false)
+                }
+            }
+        }
+    }
+
+    fun connect() {
+        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
+        viewModel.setUserManuallyDisconnected(false)
+
+        WebSocketUtil.connect(
+            context = context,
+            ipAddress = uiState.ipAddress,
+            port = uiState.port.toIntOrNull() ?: 6996,
+            symmetricKey = uiState.symmetricKey,
+            manualAttempt = true,
+            onHandshakeTimeout = {
+                scope.launch(Dispatchers.Main) {
+                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
+                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+                    WebSocketUtil.disconnect(context)
+                    viewModel.showAuthFailure(
+                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
+                    )
+                }
+            },
+            onConnectionStatus = { connected ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
+                    if (connected) {
+                        viewModel.setResponse("Connected successfully!")
+                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
+                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
+                    } else {
+                        viewModel.setResponse("Failed to connect")
+                    }
+                }
+            },
+            onMessage = { response ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setResponse("Received: $response")
+                    try {
+                        val json = JSONObject(response)
+                        if (json.optString("type") == "clipboardUpdate") {
+                            val data = json.optJSONObject("data")
+                            val text = data?.optString("text")
+                            if (!text.isNullOrEmpty()) {
+                                ClipboardSyncManager.handleClipboardUpdate(context, text)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        )
+    }
+
+    fun disconnect() {
+        scope.launch {
+            viewModel.setUserManuallyDisconnectedAwait(true)
+            WebSocketUtil.disconnect(context)
+            viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+            viewModel.setResponse("Disconnected")
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.initializeState(context, initialIp, initialPort, showConnectionDialog && !hasProcessedQrDialog, pcName, isPlus, symmetricKey)
@@ -158,61 +305,14 @@ fun AirSyncMainScreen(
         }
     }
 
-    // Connection management functions
-    fun connect() {
-        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
-
-        viewModel.setUserManuallyDisconnected(false)
-
-        WebSocketUtil.connect(
-            context = context,
-            ipAddress = uiState.ipAddress,
-            port = uiState.port.toIntOrNull() ?: 6996,
-            symmetricKey = uiState.symmetricKey,
-            manualAttempt = true,
-            onHandshakeTimeout = {
-                scope.launch(Dispatchers.Main) {
-                    // Strong haptic feedback
-                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
-                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
-                    WebSocketUtil.disconnect(context)
-                    viewModel.showAuthFailure(
-                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
-                    )
-                }
-            },
-            onConnectionStatus = { connected ->
-                scope.launch(Dispatchers.Main) {
-                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
-                    if (connected) {
-                        viewModel.setResponse("Connected successfully!")
-                        // Get plus status from current temporary device or use QR code value
-                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
-                    } else {
-                        viewModel.setResponse("Failed to connect")
-                    }
-                }
-            },
-            onMessage = { response ->
-                scope.launch(Dispatchers.Main) {
-                    viewModel.setResponse("Received: $response")
-                    // Handle clipboard updates from desktop
-                    try {
-                        val json = JSONObject(response)
-                        if (json.optString("type") == "clipboardUpdate") {
-                            val data = json.optJSONObject("data")
-                            val text = data?.optString("text")
-                            if (!text.isNullOrEmpty()) {
-                                ClipboardSyncManager.handleClipboardUpdate(context, text)
-                            }
-                        }
-                    } catch (_: Exception) {
-                        // Not a clipboard update, ignore
-                    }
-                }
-            }
-        )
+    // Start/stop loading haptics when connecting
+    LaunchedEffect(uiState.isConnecting) {
+        if (uiState.isConnecting) {
+            loadingHapticsJob = HapticUtil.startLoadingHaptics(haptics, lifecycle)
+        } else {
+            loadingHapticsJob?.cancel()
+            loadingHapticsJob = null
+        }
     }
 
     // Auth failure dialog
@@ -233,16 +333,6 @@ fun AirSyncMainScreen(
         )
     }
 
-    fun disconnect() {
-        // Set manual disconnect flag BEFORE disconnecting to prevent auto-reconnect trigger
-        // Use an awaited write to avoid a race where auto-reconnect reads the old value.
-        scope.launch {
-            viewModel.setUserManuallyDisconnectedAwait(true)
-            WebSocketUtil.disconnect(context)
-            viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
-            viewModel.setResponse("Disconnected")
-        }
-    }
 
     fun launchScanner(context: Context) {
         val lensIntent = Intent("com.google.vr.apps.ornament.app.lens.LensLauncherActivity.MAIN")
@@ -294,6 +384,7 @@ fun AirSyncMainScreen(
             AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
                 ExtendedFloatingActionButton(
                     onClick = {
+                        HapticUtil.performClick(haptics)
                         if (uiState.isConnected) {
                             disconnect()
                         } else {
@@ -338,14 +429,24 @@ fun AirSyncMainScreen(
                         },
                         alwaysShowLabel = true,
                         selected = pagerState.currentPage == index,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } }
+                        onClick = {
+                            HapticUtil.performLightTick(haptics)
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        }
                     )
                 }
             }
         }
     ) { innerPadding ->
+        // Track page changes for haptic feedback on swipe
+        LaunchedEffect(pagerState.currentPage) {
+            snapshotFlow { pagerState.currentPage }.collect { page ->
+                HapticUtil.performLightTick(haptics)
+            }
+        }
+
         HorizontalPager(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             state = pagerState
         ) { page ->
             when (page) {
@@ -458,7 +559,7 @@ fun AirSyncMainScreen(
                     )
 
                     // Clipboard Sync Card
-                    ClipboardSyncCard(
+                    SyncFeaturesCard(
                         isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
                         onToggleClipboardSync = { enabled ->
                             viewModel.setClipboardSyncEnabled(enabled)
@@ -470,12 +571,12 @@ fun AirSyncMainScreen(
                         isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
                         onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
                         isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) }
+                        onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
+                        isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
+                        onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
                     )
 
-
-                        // Tailscale Support Card
-                        TailscaleSupportCard(context)
+                        ExpandNetworkingCard(context)
 
 
                         DeviceInfoCard(
@@ -518,13 +619,37 @@ fun AirSyncMainScreen(
                                 val message = DeviceInfoUtil.generateDeviceStatusJson(context)
                                 sendMessage(message)
                             },
-                            uiState = uiState
+                            // Export/Import actions
+                            onExportData = {
+                                viewModel.setLoading(true)
+                                scope.launch(Dispatchers.IO) {
+                                    val json = viewModel.exportAllDataToJson(context)
+                                    if (json == null) {
+                                        scope.launch(Dispatchers.Main) {
+                                            Toast.makeText(context, "Export failed", Toast.LENGTH_LONG).show()
+                                            viewModel.setLoading(false)
+                                        }
+                                    } else {
+                                        pendingExportJson = json
+                                        scope.launch(Dispatchers.Main) {
+                                            createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
+                                        }
+                                    }
+                                }
+                            },
+                            onImportData = {
+                                // Launch picker to select a file to import
+                                openDocLauncher.launch(arrayOf("application/json"))
+                            }
                         )
                     }
 
                     // Manual Icon Sync Button
                     OutlinedButton(
-                        onClick = { viewModel.manualSyncAppIcons(context) },
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            viewModel.manualSyncAppIcons(context)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = if (uiState.isDeveloperModeVisible) 0.dp else 20.dp),
@@ -576,7 +701,10 @@ fun AirSyncMainScreen(
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     else MaterialTheme.colorScheme.onErrorContainer
                                 )
-                                TextButton(onClick = { viewModel.clearIconSyncMessage() }) {
+                                TextButton(onClick = {
+                                    HapticUtil.performClick(haptics)
+                                    viewModel.clearIconSyncMessage()
+                                }) {
                                     Text("Dismiss")
                                 }
                             }

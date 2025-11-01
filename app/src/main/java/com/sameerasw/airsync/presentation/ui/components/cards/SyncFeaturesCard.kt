@@ -15,11 +15,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
-fun ClipboardSyncCard(
+fun SyncFeaturesCard(
     isClipboardSyncEnabled: Boolean,
     onToggleClipboardSync: (Boolean) -> Unit,
     // Continue Browsing props
@@ -34,7 +36,12 @@ fun ClipboardSyncCard(
     // New: Keep previous link props
     isKeepPreviousLinkEnabled: Boolean,
     onToggleKeepPreviousLink: (Boolean) -> Unit,
+    // New: Smartspacer props
+    isSmartspacerShowWhenDisconnected: Boolean,
+    onToggleSmartspacerShowWhenDisconnected: (Boolean) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(
@@ -60,7 +67,10 @@ fun ClipboardSyncCard(
                 }
                 Switch(
                     checked = isClipboardSyncEnabled,
-                    onCheckedChange = onToggleClipboardSync
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleClipboardSync(enabled)
+                    }
                 )
             }
             // Continue Browsing toggle displayed under clipboard sync
@@ -96,7 +106,10 @@ fun ClipboardSyncCard(
                 Spacer(modifier = Modifier.padding(end = 8.dp))
                 Switch(
                     checked = isContinueBrowsingEnabled,
-                    onCheckedChange = onToggleContinueBrowsing,
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleContinueBrowsing(enabled)
+                    },
                     enabled = isContinueBrowsingToggleEnabled
                 )
             }
@@ -119,7 +132,10 @@ fun ClipboardSyncCard(
                 }
                 Switch(
                     checked = isKeepPreviousLinkEnabled,
-                    onCheckedChange = onToggleKeepPreviousLink,
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleKeepPreviousLink(enabled)
+                    },
                     enabled = isContinueBrowsingToggleEnabled
                 )
             }
@@ -135,14 +151,42 @@ fun ClipboardSyncCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Send now playing", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Share media playback details (title, artist, artwork) with desktop",
+                        "Share media playback details with desktop",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
                     checked = isSendNowPlayingEnabled,
-                    onCheckedChange = onToggleSendNowPlaying
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleSendNowPlaying(enabled)
+                    }
+                )
+            }
+
+            // Smartspacer toggle displayed under Send now playing
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Smartspacer", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Show Smartspacer when disconnected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isSmartspacerShowWhenDisconnected,
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleSmartspacerShowWhenDisconnected(enabled)
+                    }
                 )
             }
 

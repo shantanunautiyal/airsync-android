@@ -18,6 +18,7 @@ import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.service.WakeupService
+import com.sameerasw.airsync.smartspacer.AirSyncDeviceTarget
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -64,6 +65,14 @@ class AirSyncViewModel(
                 response = if (isConnected) "Connected successfully!" else "Disconnected"
             )
 
+            // Notify Smartspacer of connection status change
+            appContext?.let { context ->
+                try {
+                    AirSyncDeviceTarget.notifyChange(context)
+                } catch (_: Exception) {
+                    // Smartspacer might not be installed, ignore
+                }
+            }
         }
     }
 
@@ -163,6 +172,7 @@ class AirSyncViewModel(
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
+            val isSmartspacerShowWhenDisconnected = repository.getSmartspacerShowWhenDisconnected().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -351,6 +361,14 @@ class AirSyncViewModel(
             // Refresh network devices list
             loadNetworkDevices()
 
+            // Notify Smartspacer of device update
+            appContext?.let { context ->
+                try {
+                    AirSyncDeviceTarget.notifyChange(context)
+                } catch (_: Exception) {
+                    // Smartspacer might not be installed, ignore
+                }
+            }
         }
     }
 
@@ -591,6 +609,40 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isKeepPreviousLinkEnabled = enabled)
         viewModelScope.launch {
             repository.setKeepPreviousLinkEnabled(enabled)
+        }
+    }
+
+    fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isSmartspacerShowWhenDisconnected = enabled)
+        viewModelScope.launch {
+            repository.setSmartspacerShowWhenDisconnected(enabled)
+        }
+        // Notify Smartspacer to update immediately
+        appContext?.let { context ->
+            try {
+                AirSyncDeviceTarget.notifyChange(context)
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Expose DataStore export/import helpers
+    suspend fun exportAllDataToJson(context: Context): String? {
+        return try {
+            val manager = DataStoreManager(context)
+            manager.exportAllDataToJson()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun importDataFromJson(context: Context, json: String): Boolean {
+        return try {
+            val manager = DataStoreManager(context)
+            manager.importAllDataFromJson(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 

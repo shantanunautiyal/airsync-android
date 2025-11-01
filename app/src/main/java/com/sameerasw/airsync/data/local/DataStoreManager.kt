@@ -14,6 +14,9 @@ import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import org.json.JSONObject
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "airsync_settings")
 
@@ -54,7 +57,9 @@ class DataStoreManager(private val context: Context) {
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
         // New: Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
-        private val TAILSCALE_SUPPORT_ENABLED = booleanPreferencesKey("tailscale_support_enabled")
+        // New: Always show in Smartspacer toggle
+        private val SMARTSPACER_SHOW_WHEN_DISCONNECTED = booleanPreferencesKey("smartspacer_show_when_disconnected")
+        private val EXPAND_NETWORKING_ENABLED = booleanPreferencesKey("expand_networking_enabled")
 
         // Network-aware device connections
         private val NETWORK_DEVICES_PREFIX = "network_device_"
@@ -197,15 +202,28 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun setTailscaleSupportEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[TAILSCALE_SUPPORT_ENABLED] = enabled
+    // New: Always show in Smartspacer toggle
+    suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] = enabled
         }
     }
 
-    fun getTailscaleSupportEnabled(): Flow<Boolean> {
+    fun getSmartspacerShowWhenDisconnected(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] ?: false
+        }
+    }
+
+    suspend fun setExpandNetworkingEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[EXPAND_NETWORKING_ENABLED] = enabled
+        }
+    }
+
+    fun getExpandNetworkingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { prefs ->
-            prefs[TAILSCALE_SUPPORT_ENABLED] ?: false
+            prefs[EXPAND_NETWORKING_ENABLED] ?: false
         }
     }
 
@@ -541,6 +559,148 @@ class DataStoreManager(private val context: Context) {
     suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long) {
         context.dataStore.edit { preferences ->
             preferences[stringPreferencesKey("${NETWORK_DEVICES_PREFIX}${deviceName}_last_connected")] = timestamp.toString()
+        }
+    }
+
+    /**
+     * Export all DataStore preferences to a JSON string.
+     * Excludes very large strings and anything that looks like a base64 image (data:image/...base64,...)
+     */
+    suspend fun exportAllDataToJson(): String {
+        val prefs = context.dataStore.data.first()
+        val exportObj = JSONObject()
+        val dataObj = JSONObject()
+        val mutedArray = org.json.JSONArray()
+
+        prefs.asMap().forEach { (key, value) ->
+            try {
+                // Skip nulls
+                if (value == null) return@forEach
+
+                // If string looks like an embedded image or is very large, skip
+                if (value is String) {
+                    val lower = value.lowercase()
+                    if (lower.contains("data:image") || lower.contains("base64,") || value.length > 10000) {
+                        // mark skipped
+                        return@forEach
+                    }
+                }
+
+                // Collect muted apps: keys like app_<package>_enabled with value false
+                if (key.name.startsWith("app_") && key.name.endsWith("_enabled")) {
+                    val pkg = key.name.removePrefix("app_").removeSuffix("_enabled")
+                    val enabled = (value as? Boolean) ?: true
+                    if (!enabled) {
+                        mutedArray.put(pkg)
+                    }
+                }
+
+                val entry = JSONObject()
+                when (value) {
+                    is String -> {
+                        entry.put("type", "string")
+                        entry.put("value", value)
+                    }
+                    is Boolean -> {
+                        entry.put("type", "boolean")
+                        entry.put("value", value)
+                    }
+                    is Int -> {
+                        entry.put("type", "int")
+                        entry.put("value", value)
+                    }
+                    is Long -> {
+                        entry.put("type", "long")
+                        entry.put("value", value)
+                    }
+                    else -> {
+                        // Fallback to string representation
+                        entry.put("type", "string")
+                        entry.put("value", value.toString())
+                    }
+                }
+                dataObj.put(key.name, entry)
+            } catch (_: Exception) {
+                // ignore problematic entries
+            }
+        }
+
+        exportObj.put("version", 1)
+        exportObj.put("preferences", dataObj)
+        // Include list of apps explicitly disabled for notification syncing so import can restore this
+        exportObj.put("muted_apps", mutedArray)
+        return exportObj.toString()
+    }
+
+    /**
+     * Import preferences from JSON produced by exportAllDataToJson.
+     * Only writes keys present in the JSON; missing keys are left unchanged.
+     */
+    suspend fun importAllDataFromJson(json: String): Boolean {
+        try {
+            val root = JSONObject(json)
+            val prefsObj = root.optJSONObject("preferences") ?: return false
+            val mutedApps = mutableListOf<String>()
+            val mutedJson = root.optJSONArray("muted_apps")
+            if (mutedJson != null) {
+                for (i in 0 until mutedJson.length()) {
+                    try { mutedApps.add(mutedJson.getString(i)) } catch (_: Exception) {}
+                }
+            }
+
+            context.dataStore.edit { preferences ->
+                val keys = prefsObj.keys()
+                while (keys.hasNext()) {
+                    val keyName = keys.next()
+                    try {
+                        val entry = prefsObj.getJSONObject(keyName)
+                        val type = entry.optString("type", "string")
+                        when (type) {
+                            "boolean" -> {
+                                val key = booleanPreferencesKey(keyName)
+                                val v = entry.getBoolean("value")
+                                preferences[key] = v
+                            }
+                            "int" -> {
+                                val key = intPreferencesKey(keyName)
+                                val v = entry.getInt("value")
+                                preferences[key] = v
+                            }
+                            "long" -> {
+                                val key = longPreferencesKey(keyName)
+                                val v = entry.getLong("value")
+                                preferences[key] = v
+                            }
+                            else -> {
+                                val key = stringPreferencesKey(keyName)
+                                val v = entry.optString("value", "")
+                                // Skip if value looks like embedded image or very large
+                                val lower = v.lowercase()
+                                if (lower.contains("data:image") || lower.contains("base64,") || v.length > 10000) {
+                                    // skip this key
+                                } else {
+                                    preferences[key] = v
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // ignore specific key import errors
+                    }
+                }
+
+                // Apply muted apps (explicitly disable per-app notification flags)
+                mutedApps.forEach { pkg ->
+                    try {
+                        val enabledKey = booleanPreferencesKey("app_${pkg}_enabled")
+                        preferences[enabledKey] = false
+                    } catch (_: Exception) {}
+                }
+            }
+
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
         }
     }
 }

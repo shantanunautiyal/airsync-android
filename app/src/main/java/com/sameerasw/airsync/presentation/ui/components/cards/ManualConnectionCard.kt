@@ -12,10 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun ManualConnectionCard(
@@ -29,6 +31,7 @@ fun ManualConnectionCard(
     onSymmetricKeyChange: (String) -> Unit,
     onConnect: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
     var expanded by remember { mutableStateOf(false) }
     val cardShape =if (lastConnected) {
         RoundedCornerShape(minCornerRadius)
@@ -49,7 +52,10 @@ fun ManualConnectionCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { expanded = !expanded }
+                modifier = Modifier.clickable {
+                    HapticUtil.performLightTick(haptics)
+                    expanded = !expanded
+                }
             ) {
                 Text("Manual Connection", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
@@ -94,11 +100,17 @@ fun ManualConnectionCard(
                         Spacer(Modifier.weight(1f))
                         Switch(
                             checked = uiState.manualIsPlus,
-                            onCheckedChange = onIsPlusChange
+                            onCheckedChange = { enabled ->
+                                if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                                onIsPlusChange(enabled)
+                            }
                         )
                     }
                     Button(
-                        onClick = onConnect,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onConnect()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(
                             topStart = minCornerRadius,

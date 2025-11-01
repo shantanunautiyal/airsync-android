@@ -22,12 +22,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionExplanationDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionType
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.QuickSettingsUtil
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun PermissionStatusCard(
@@ -37,6 +39,7 @@ fun PermissionStatusCard(
     onRequestNotificationPermission: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val criticalPermissions = PermissionUtil.getCriticalMissingPermissions(context)
     val optionalPermissions = PermissionUtil.getOptionalMissingPermissions(context)
 
@@ -69,7 +72,10 @@ fun PermissionStatusCard(
                         else MaterialTheme.colorScheme.onSecondaryContainer
                     )
 
-                    OutlinedButton(onClick = onRefreshPermissions) {
+                    OutlinedButton(onClick = {
+                        HapticUtil.performClick(haptics)
+                        onRefreshPermissions()
+                    }) {
                         Text("Refresh")
                     }
                 }
@@ -181,7 +187,10 @@ fun PermissionStatusCard(
                     }
 
                     OutlinedButton(
-                        onClick = { QuickSettingsUtil.requestAddQuickSettingsTile(context) },
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            QuickSettingsUtil.requestAddQuickSettingsTile(context)
+                        },
                         modifier = Modifier.padding(start = 8.dp)
                     ) {
                         Text("Add Tile")
@@ -223,6 +232,8 @@ private fun PermissionButton(
     onExplainClick: () -> Unit,
     isCritical: Boolean
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -250,14 +261,20 @@ private fun PermissionButton(
 
         if (isCritical) {
             Button(
-                onClick = onExplainClick,
+                onClick = {
+                    HapticUtil.performClick(haptics)
+                    onExplainClick()
+                },
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text("Learn More")
             }
         } else {
             OutlinedButton(
-                onClick = onExplainClick,
+                onClick = {
+                    HapticUtil.performClick(haptics)
+                    onExplainClick()
+                },
                 modifier = Modifier.padding(start = 8.dp)
             ) {
                 Text("Learn More")

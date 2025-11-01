@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -18,9 +17,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.sameerasw.airsync.domain.model.UiState
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun DeveloperModeCard(
@@ -30,8 +30,11 @@ fun DeveloperModeCard(
     onSendDeviceInfo: () -> Unit,
     onSendNotification: () -> Unit,
     onSendDeviceStatus: () -> Unit,
-    uiState: UiState
+    onExportData: () -> Unit,
+    onImportData: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Card(modifier = Modifier.fillMaxWidth().padding(top=20.dp),
         shape = RoundedCornerShape(
             topStart = ExtraCornerRadius,
@@ -49,7 +52,10 @@ fun DeveloperModeCard(
                 Text("Developer Mode", style = MaterialTheme.typography.titleMedium)
                 Switch(
                     checked = isDeveloperMode,
-                    onCheckedChange = onToggleDeveloperMode
+                    onCheckedChange = { enabled ->
+                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
+                        onToggleDeveloperMode(enabled)
+                    }
                 )
             }
 
@@ -65,7 +71,10 @@ fun DeveloperModeCard(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = onSendDeviceInfo,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onSendDeviceInfo()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
@@ -73,7 +82,10 @@ fun DeveloperModeCard(
                     }
 
                     Button(
-                        onClick = onSendNotification,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onSendNotification()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
@@ -81,12 +93,41 @@ fun DeveloperModeCard(
                     }
 
                     Button(
-                        onClick = onSendDeviceStatus,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onSendDeviceStatus()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
                         Text("Send Device Status")
                     }
+
+                    // New: export/import split buttons
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                onExportData()
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isLoading
+                        ) {
+                            Text("Export Data")
+                        }
+
+                        Button(
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                onImportData()
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isLoading
+                        ) {
+                            Text("Import Data")
+                        }
+                    }
+
                 }
 
                 // Removed preview/response display to avoid crashes from large/encoded payloads

@@ -15,8 +15,8 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         targetSdk = 36
-        versionCode = 9
-        versionName = "2.1.2"
+        versionCode = 11
+        versionName = "2.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // Smartspacer SDK
+    implementation("com.kieronquinn.smartspacer:sdk-plugin:1.1")
 
     // Material Components (XML themes: Theme.Material3.*)
     implementation("com.google.android.material:material:1.12.0")

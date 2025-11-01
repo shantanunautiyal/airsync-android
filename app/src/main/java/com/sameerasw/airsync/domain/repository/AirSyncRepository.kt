@@ -64,6 +64,10 @@ interface AirSyncRepository {
     suspend fun setKeepPreviousLinkEnabled(enabled: Boolean)
     fun getKeepPreviousLinkEnabled(): Flow<Boolean>
 
+    // Smartspacer settings
+    suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean)
+    fun getSmartspacerShowWhenDisconnected(): Flow<Boolean>
+
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>
