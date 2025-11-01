@@ -627,36 +627,8 @@ fun AirSyncMainScreen(
 
                         )
 
-                        AnimatedVisibility(visible = uiState.isConnected) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                                if (isMirroring) {
-                                    Button(
-                                        onClick = {
-                                            val intent = Intent(context, ScreenCaptureService::class.java).apply {
-                                                action = ScreenCaptureService.ACTION_STOP
-                                            }
-                                            context.startService(intent)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.error
-                                        )
-                                    ) {
-                                        Text("⏹ Stop Mirroring")
-                                    }
-                                } else {
-                                    OutlinedButton(
-                                        onClick = {
-                                            // Start mirroring - launch permission dialog
-                                            val mediaProjectionManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                                            val screenCaptureIntent = mediaProjectionManager.createScreenCaptureIntent()
-                                            screenCaptureLauncher.launch(screenCaptureIntent)
-                                        }
-                                    ) {
-                                        Text("📱 Start Mirroring")
-                                    }
-                                }
-                            }
-                        }
+                        // Mirroring is now controlled from Mac side only
+                        // Android will respond to mirror requests from Mac
 
                         AnimatedVisibility(
                             visible = !uiState.isConnected,

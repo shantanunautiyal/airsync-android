@@ -53,6 +53,7 @@ object WebSocketMessageHandler {
                 "inputEvent" -> handleInputEvent(context, data)
                 "navAction" -> handleNavAction(context, data)
                 "stopMirroring" -> handleStopMirroring(context)
+                "setScreenState" -> handleSetScreenState(context, data)
                 // SMS and Messaging
                 "requestSmsThreads" -> handleRequestSmsThreads(context, data)
                 "requestSmsMessages" -> handleRequestSmsMessages(context, data)
@@ -67,6 +68,10 @@ object WebSocketMessageHandler {
                 "requestHealthSummary" -> handleRequestHealthSummary(context, data)
                 "requestHealthData" -> handleRequestHealthData(context, data)
                 "mirrorRequest" -> {
+                    // Extract mirror mode and package name
+                    val mode = data?.optString("mode", "device") ?: "device"
+                    val packageName = data?.optString("package", "") ?: ""
+                    
                     val options = data?.optJSONObject("options")
                     val rawFps = options?.optInt("fps", 30) ?: 30
                     // Clamp FPS to reasonable range (10-60)
@@ -91,10 +96,29 @@ object WebSocketMessageHandler {
                         bitrateKbps = bitrateKbps
                     )
 
-                    Log.d(TAG, "Mirror request with options: fps=$fps, quality=$quality, maxWidth=$maxWidth, bitrate=${bitrateKbps}kbps")
-                    
-                    // Use helper to prevent duplicate popups
-                    MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                    // Log mirror request details
+                    when (mode) {
+                        "app" -> {
+                            if (packageName.isNotEmpty()) {
+                                Log.d(TAG, "📱 App-specific mirror request: package=$packageName")
+                                Log.d(TAG, "ℹ️ Note: Mirroring current screen (not launching app)")
+                                // Just start mirroring - don't launch the app
+                                // User should already have the app open or will open it manually
+                                MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                            } else {
+                                Log.w(TAG, "⚠️ App mirror requested but no package name provided")
+                                MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                            }
+                        }
+                        "desktop" -> {
+                            Log.d(TAG, "🖥️ Desktop mirror request: fps=$fps, quality=$quality")
+                            MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                        }
+                        else -> {
+                            Log.d(TAG, "📱 Device mirror request: fps=$fps, quality=$quality")
+                            MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                        }
+                    }
                 }
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
@@ -119,8 +143,8 @@ object WebSocketMessageHandler {
             return
         }
 
-        // Mac sends "type" field, not "inputType"
-        val inputType = data.optString("type", data.optString("inputType", ""))
+        // Mac sends "action" field for input events
+        val inputType = data.optString("action", data.optString("type", data.optString("inputType", "")))
         var success = false
         var message = ""
 
@@ -193,6 +217,28 @@ object WebSocketMessageHandler {
                     success = service.performPowerDialog()
                     message = if (success) "Power dialog action performed" else "Power dialog action failed"
                     Log.d(TAG, message)
+                }
+                "text" -> {
+                    val text = data.optString("text", "")
+                    if (text.isNotEmpty()) {
+                        success = service.injectText(text)
+                        message = if (success) "Text injected: $text" else "Text injection failed"
+                        Log.d(TAG, message)
+                    } else {
+                        message = "Empty text provided"
+                        Log.w(TAG, message)
+                    }
+                }
+                "key" -> {
+                    val keyCode = data.optInt("keyCode", -1)
+                    if (keyCode != -1) {
+                        success = service.injectKeyEvent(keyCode)
+                        message = if (success) "Key event injected: $keyCode" else "Key event injection failed"
+                        Log.d(TAG, message)
+                    } else {
+                        message = "Invalid key code"
+                        Log.w(TAG, message)
+                    }
                 }
                 else -> {
                     Log.w(TAG, "Unknown input event type: $inputType")
@@ -1232,6 +1278,31 @@ object WebSocketMessageHandler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping mirroring", e)
+        }
+    }
+
+    private fun handleSetScreenState(context: Context, data: JSONObject?) {
+        try {
+            val screenOff = data?.optBoolean("screenOff", false) ?: false
+            Log.d(TAG, "Received screen state request: screenOff=$screenOff")
+            
+            // Use ScreenCaptureService to show/hide black overlay
+            val service = ScreenCaptureService.instance
+            if (service != null) {
+                if (screenOff) {
+                    // Show black overlay to hide screen content
+                    service.showBlackOverlay()
+                    Log.d(TAG, "✅ Black overlay shown - screen content hidden")
+                } else {
+                    // Hide black overlay to show screen content
+                    service.hideBlackOverlay()
+                    Log.d(TAG, "✅ Black overlay hidden - screen content visible")
+                }
+            } else {
+                Log.w(TAG, "⚠️ ScreenCaptureService not available - cannot control screen overlay")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error handling screen state: ${e.message}", e)
         }
     }
 

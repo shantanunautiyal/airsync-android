@@ -21,6 +21,7 @@ import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.utils.JsonUtil
+import com.sameerasw.airsync.utils.RawFrameEncoder
 import com.sameerasw.airsync.utils.ScreenMirroringManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
@@ -33,9 +34,15 @@ class ScreenCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
     private var screenMirroringManager: ScreenMirroringManager? = null
+    private var rawFrameEncoder: RawFrameEncoder? = null
+    private var useRawFrames = true // Use raw frames by default, H.264 as fallback
 
     private var handlerThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
+    
+    // Black overlay for hiding screen content
+    private var blackOverlayView: android.view.View? = null
+    private var windowManager: android.view.WindowManager? = null
 
     private val mediaProjectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
@@ -88,7 +95,11 @@ class ScreenCaptureService : Service() {
                 if (resultCode == Activity.RESULT_OK && data != null && mirroringOptions != null) {
                     _isStreaming.value = true
                     initializeMediaProjection(resultCode, data, mirroringOptions)
-                    screenMirroringManager?.startMirroring()
+                    if (useRawFrames) {
+                        rawFrameEncoder?.startCapture()
+                    } else {
+                        screenMirroringManager?.startMirroring()
+                    }
                 } else {
                     Log.e(TAG, "Invalid start parameters for screen capture. Stopping service.")
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -114,7 +125,17 @@ class ScreenCaptureService : Service() {
         val mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data)
         mediaProjection?.registerCallback(mediaProjectionCallback, backgroundHandler)
-        screenMirroringManager = ScreenMirroringManager(this, mediaProjection!!, backgroundHandler!!, ::sendMirrorFrame, mirroringOptions)
+        
+        // Check if we should use raw frames or H.264
+        useRawFrames = mirroringOptions.useRawFrames ?: true
+        
+        if (useRawFrames) {
+            Log.d(TAG, "Using raw frame encoder (JPEG)")
+            rawFrameEncoder = RawFrameEncoder(this, mediaProjection!!, backgroundHandler!!, ::sendRawFrame, mirroringOptions)
+        } else {
+            Log.d(TAG, "Using H.264 encoder (fallback)")
+            screenMirroringManager = ScreenMirroringManager(this, mediaProjection!!, backgroundHandler!!, ::sendMirrorFrame, mirroringOptions)
+        }
         
         // Send mirrorStart message to Mac
         sendMirrorStart(mirroringOptions)
@@ -146,7 +167,12 @@ class ScreenCaptureService : Service() {
         if (!_isStreaming.compareAndSet(expect = true, update = false)) return
         Log.d(TAG, "Stopping screen capture.")
 
+        rawFrameEncoder?.stopCapture()
+        rawFrameEncoder = null
+        
         screenMirroringManager?.stopMirroring()
+        screenMirroringManager = null
+        
         mediaProjection?.unregisterCallback(mediaProjectionCallback)
         mediaProjection?.stop()
         mediaProjection = null
@@ -184,6 +210,14 @@ class ScreenCaptureService : Service() {
             WebSocketUtil.sendMessage(json)
         }
     }
+    
+    private fun sendRawFrame(frame: ByteArray, metadata: RawFrameEncoder.FrameMetadata) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val base64Frame = Base64.encodeToString(frame, Base64.NO_WRAP)
+            val json = """{"type":"mirrorFrame","data":{"frame":"$base64Frame","format":"${metadata.format}","timestamp":${metadata.timestamp},"isConfig":false}}"""
+            WebSocketUtil.sendMessage(json)
+        }
+    }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
@@ -214,7 +248,86 @@ class ScreenCaptureService : Service() {
             .build()
     }
 
+    fun showBlackOverlay() {
+        try {
+            if (blackOverlayView != null) {
+                Log.d(TAG, "Black overlay already shown")
+                return
+            }
+            
+            // Check if we have overlay permission
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!android.provider.Settings.canDrawOverlays(this)) {
+                    Log.e(TAG, "❌ No SYSTEM_ALERT_WINDOW permission - cannot show overlay")
+                    Log.e(TAG, "💡 Enable 'Display over other apps' in Settings → Apps → AirSync → Advanced")
+                    return
+                }
+            }
+            
+            windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+            
+            // Create black overlay view (screen curtain)
+            blackOverlayView = android.view.View(this).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                // Make it completely opaque
+                alpha = 1.0f
+            }
+            
+            // Set up window parameters for full-screen overlay (screen curtain)
+            val params = android.view.WindowManager.LayoutParams(
+                android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+                },
+                // Screen curtain flags: not focusable, not touchable, covers everything
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                android.graphics.PixelFormat.OPAQUE
+            )
+            
+            // Position at top-left, covering entire screen
+            params.x = 0
+            params.y = 0
+            params.gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            
+            // Highest priority to ensure it's on top
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                params.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+            
+            // Add overlay to window
+            windowManager?.addView(blackOverlayView, params)
+            Log.d(TAG, "✅ Screen curtain (black overlay) shown successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error showing screen curtain: ${e.message}", e)
+            e.printStackTrace()
+        }
+    }
+    
+    fun hideBlackOverlay() {
+        try {
+            blackOverlayView?.let { view ->
+                windowManager?.removeView(view)
+                blackOverlayView = null
+                Log.d(TAG, "✅ Black overlay hidden successfully")
+            } ?: run {
+                Log.d(TAG, "ℹ️ Black overlay already hidden")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error hiding black overlay: ${e.message}", e)
+        }
+    }
+
     override fun onDestroy() {
+        hideBlackOverlay() // Clean up overlay on service destroy
         stopMirroring()
         handlerThread?.quitSafely()
         instance = null

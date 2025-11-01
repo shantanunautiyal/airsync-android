@@ -24,6 +24,9 @@
 
     <!-- Screen capture permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    
+    <!-- Screen overlay permission (for black screen curtain) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- SMS and Messaging permissions -->
     <uses-permission android:name="android.permission.READ_SMS" />

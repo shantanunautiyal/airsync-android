@@ -177,4 +177,83 @@ class InputAccessibilityService : AccessibilityService() {
             false
         }
     }
+
+    
+    /**
+     * Inject text input using accessibility service
+     */
+    fun injectText(text: String): Boolean {
+        return try {
+            val rootNode = this.rootInActiveWindow
+            if (rootNode == null) {
+                Log.e(TAG, "Root node is null, cannot inject text")
+                return false
+            }
+            
+            val focusedNode = rootNode.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+            if (focusedNode == null) {
+                Log.w(TAG, "No focused input field found")
+                rootNode.recycle()
+                return false
+            }
+            
+            // Get current text and append new text
+            val currentText = focusedNode.text?.toString() ?: ""
+            val newText = currentText + text
+            
+            val arguments = android.os.Bundle()
+            arguments.putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
+            val result = focusedNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+            
+            focusedNode.recycle()
+            rootNode.recycle()
+            
+            Log.d(TAG, "Text injection ${if (result) "succeeded" else "failed"}: $text")
+            return result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error injecting text", e)
+            false
+        }
+    }
+    
+    /**
+     * Inject key event using accessibility service
+     */
+    fun injectKeyEvent(keyCode: Int): Boolean {
+        return try {
+            when (keyCode) {
+                67 -> { // KEYCODE_DEL - Backspace
+                    val rootNode = this.rootInActiveWindow
+                    val focusedNode = rootNode?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+                    val result = if (focusedNode != null) {
+                        val currentText = focusedNode.text?.toString() ?: ""
+                        if (currentText.isNotEmpty()) {
+                            val newText = currentText.dropLast(1)
+                            val arguments = android.os.Bundle()
+                            arguments.putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
+                            focusedNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                    focusedNode?.recycle()
+                    rootNode?.recycle()
+                    Log.d(TAG, "Backspace key ${if (result) "succeeded" else "failed"}")
+                    result
+                }
+                66 -> injectText("\n") // KEYCODE_ENTER
+                62 -> injectText(" ")  // KEYCODE_SPACE
+                61 -> injectText("\t") // KEYCODE_TAB
+                else -> {
+                    Log.w(TAG, "Unsupported key code: $keyCode")
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error injecting key event", e)
+            false
+        }
+    }
 }

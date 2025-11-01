@@ -43,12 +43,18 @@ class ScreenMirroringManager(
     
     private val codecMutex = Mutex()
     private var isStoppingCodec = false
+    
+    // Performance tracking
+    private var framesSent = 0
+    private var lastLogTime = System.currentTimeMillis()
+    private var totalBytes = 0L
 
     private companion object {
         private const val TAG = "ScreenMirroringManager"
         private const val MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_AVC // H.264
         private val START_CODE = byteArrayOf(0, 0, 0, 1) // Annex B Start Code
-        private const val TIMEOUT_US = 10000L // Reduced from 50000 to 10ms for lower latency
+        private const val TIMEOUT_US = 5000L // Reduced to 5ms for ultra-low latency
+        private const val LOG_INTERVAL_MS = 10000L // Log stats every 10 seconds
     }
 
     private fun computeEncoderSize(
@@ -375,11 +381,25 @@ class ScreenMirroringManager(
                             val finalBufferInfo = MediaCodec.BufferInfo()
                             finalBufferInfo.set(0, frameDataToSend.size, bufferInfo.presentationTimeUs, bufferInfo.flags)
                             sendFrame(frameDataToSend, finalBufferInfo)
+                            
+                            // Track performance
+                            framesSent++
+                            totalBytes += frameDataToSend.size
+                            val now = System.currentTimeMillis()
+                            if (now - lastLogTime >= LOG_INTERVAL_MS) {
+                                val elapsed = (now - lastLogTime) / 1000.0
+                                val fps = framesSent / elapsed
+                                val kbps = (totalBytes * 8 / 1024) / elapsed
+                                Log.d(TAG, "📊 Performance: ${String.format("%.1f", fps)} FPS, ${String.format("%.0f", kbps)} kbps")
+                                framesSent = 0
+                                totalBytes = 0
+                                lastLogTime = now
+                            }
                         }
                         codec.releaseOutputBuffer(outputBufferIndex, false)
                     }
                     outputBufferIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                        // Don't log every timeout to reduce overhead
+                        // No data available, continue
                     }
                     else -> Log.w(TAG, "Unexpected output buffer index: $outputBufferIndex")
                 }
