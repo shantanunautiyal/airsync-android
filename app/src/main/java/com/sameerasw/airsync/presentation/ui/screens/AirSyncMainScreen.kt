@@ -1,9 +1,8 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.provider.MediaStore
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,8 +63,10 @@ import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
+import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import org.json.JSONObject
 import kotlinx.coroutines.Job
+import java.net.URLDecoder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -110,6 +111,56 @@ fun AirSyncMainScreen(
 
     // For export/import flow
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
+    
+    fun connect() {
+        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
+        viewModel.setUserManuallyDisconnected(false)
+
+        WebSocketUtil.connect(
+            context = context,
+            ipAddress = uiState.ipAddress,
+            port = uiState.port.toIntOrNull() ?: 6996,
+            symmetricKey = uiState.symmetricKey,
+            manualAttempt = true,
+            onHandshakeTimeout = {
+                scope.launch(Dispatchers.Main) {
+                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
+                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+                    WebSocketUtil.disconnect(context)
+                    viewModel.showAuthFailure(
+                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
+                    )
+                }
+            },
+            onConnectionStatus = { connected ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
+                    if (connected) {
+                        viewModel.setResponse("Connected successfully!")
+                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
+                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
+                    } else {
+                        viewModel.setResponse("Failed to connect")
+                    }
+                }
+            },
+            onMessage = { response ->
+                scope.launch(Dispatchers.Main) {
+                    viewModel.setResponse("Received: $response")
+                    try {
+                        val json = JSONObject(response)
+                        if (json.optString("type") == "clipboardUpdate") {
+                            val data = json.optJSONObject("data")
+                            val text = data?.optString("text")
+                            if (!text.isNullOrEmpty()) {
+                                ClipboardSyncManager.handleClipboardUpdate(context, text)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        )
+    }
 
     // CreateDocument launcher for export (MIME application/json)
     val createDocLauncher = rememberLauncherForActivityResult(
@@ -190,55 +241,63 @@ fun AirSyncMainScreen(
         }
     }
 
-    fun connect() {
-        viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
-        viewModel.setUserManuallyDisconnected(false)
+    // QR Scanner launcher
+    val qrScannerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val qrCode = result.data?.getStringExtra("QR_CODE")
+            if (!qrCode.isNullOrEmpty()) {
+                // Parse the QR code (expected format: airsync://ip:port?name=...&plus=...&key=...)
+                try {
+                    val uri = Uri.parse(qrCode)
+                    val ip = uri.host ?: ""
+                    val port = uri.port.takeIf { it != -1 }?.toString() ?: ""
 
-        WebSocketUtil.connect(
-            context = context,
-            ipAddress = uiState.ipAddress,
-            port = uiState.port.toIntOrNull() ?: 6996,
-            symmetricKey = uiState.symmetricKey,
-            manualAttempt = true,
-            onHandshakeTimeout = {
-                scope.launch(Dispatchers.Main) {
-                    try { haptics.performHapticFeedback(HapticFeedbackType.LongPress) } catch (_: Exception) {}
-                    viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
-                    WebSocketUtil.disconnect(context)
-                    viewModel.showAuthFailure(
-                        "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
-                    )
-                }
-            },
-            onConnectionStatus = { connected ->
-                scope.launch(Dispatchers.Main) {
-                    viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
-                    if (connected) {
-                        viewModel.setResponse("Connected successfully!")
-                        val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                        viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
-                    } else {
-                        viewModel.setResponse("Failed to connect")
-                    }
-                }
-            },
-            onMessage = { response ->
-                scope.launch(Dispatchers.Main) {
-                    viewModel.setResponse("Received: $response")
-                    try {
-                        val json = JSONObject(response)
-                        if (json.optString("type") == "clipboardUpdate") {
-                            val data = json.optJSONObject("data")
-                            val text = data?.optString("text")
-                            if (!text.isNullOrEmpty()) {
-                                ClipboardSyncManager.handleClipboardUpdate(context, text)
-                            }
+                    // Parse query parameters
+                    var pcName: String? = null
+                    var isPlus = false
+                    var symmetricKey: String? = null
+
+                    val queryPart = uri.toString().substringAfter('?', "")
+                    if (queryPart.isNotEmpty()) {
+                        val params = queryPart.split('?')
+                        val paramMap = params.associate { param ->
+                            val parts = param.split('=', limit = 2)
+                            val key = parts.getOrNull(0) ?: ""
+                            val value = parts.getOrNull(1) ?: ""
+                            key to value
                         }
-                    } catch (_: Exception) {}
+                        pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
+                        isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
+                        symmetricKey = paramMap["key"]
+                    }
+
+                    if (ip.isNotEmpty() && port.isNotEmpty()) {
+                        // Update UI state with scanned values
+                        viewModel.updateIpAddress(ip)
+                        viewModel.updatePort(port)
+                        viewModel.updateManualPcName(pcName ?: "")
+                        viewModel.updateManualIsPlus(isPlus)
+                        if (!symmetricKey.isNullOrEmpty()) {
+                            viewModel.updateSymmetricKey(symmetricKey)
+                        }
+
+                        // Trigger connection
+                        scope.launch {
+                            delay(300)  // Brief delay to ensure UI updates
+                            connect()
+                        }
+                    } else {
+                        Toast.makeText(context, "Invalid QR code format", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to parse QR code: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-        )
+        }
     }
+
 
     fun disconnect() {
         scope.launch {
@@ -335,20 +394,9 @@ fun AirSyncMainScreen(
 
 
     fun launchScanner(context: Context) {
-        val lensIntent = Intent("com.google.vr.apps.ornament.app.lens.LensLauncherActivity.MAIN")
-        lensIntent.setPackage("com.google.ar.lens")
-
-        try {
-            context.startActivity(lensIntent)
-        } catch (_: ActivityNotFoundException) {
-            // Fallback to default camera app
-            val cameraIntent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
-            try {
-                context.startActivity(cameraIntent)
-            } catch (_: ActivityNotFoundException) {
-                Toast.makeText(context, "No camera app found", Toast.LENGTH_SHORT).show()
-            }
-        }
+        // Launch our custom QR Scanner Activity
+        val scannerIntent = Intent(context, QRScannerActivity::class.java)
+        qrScannerLauncher.launch(scannerIntent)
     }
 
 
@@ -501,7 +549,8 @@ fun AirSyncMainScreen(
                                 onPcNameChange = { viewModel.updateManualPcName(it) },
                                 onIsPlusChange = { viewModel.updateManualIsPlus(it) },
                                 onSymmetricKeyChange = { viewModel.updateSymmetricKey(it) },
-                                onConnect = { viewModel.prepareForManualConnection() }
+                                onConnect = { viewModel.prepareForManualConnection() },
+                                onQrScanClick = { launchScanner(context) }
                             )
                         }
                     }

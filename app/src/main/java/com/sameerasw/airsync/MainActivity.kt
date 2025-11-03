@@ -3,6 +3,7 @@ package com.sameerasw.airsync
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,10 +28,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.core.net.toUri
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.sameerasw.airsync.data.local.DataStoreManager
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.Flow
+import android.content.Intent
+import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
+import com.sameerasw.airsync.utils.WebSocketUtil
 
 class MainActivity : ComponentActivity() {
 
@@ -40,9 +40,35 @@ class MainActivity : ComponentActivity() {
     ) { isGranted ->
     }
 
+    private val qrScannerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val qrCode = result.data?.getStringExtra("QR_CODE")
+            if (qrCode != null) {
+                // Parse and connect with the QR code data
+                handleQRCodeResult(qrCode)
+            }
+        } else {
+            // User cancelled or invalid QR, do nothing - app remains open
+        }
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Check if this is a QS tile long-press intent and device is not connected
+        if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
+            if (!WebSocketUtil.isConnected()) {
+                // Not connected, open QR scanner instead
+                val qrScannerIntent = Intent(this, QRScannerActivity::class.java)
+                qrScannerLauncher.launch(qrScannerIntent)
+                return
+            }
+        }
+
+        // ...existing code...
         // Enable full edge-to-edge drawing for both status and navigation bars
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
@@ -178,6 +204,71 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (!PermissionUtil.isPostNotificationPermissionGranted(this)) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    private fun handleQRCodeResult(qrCode: String) {
+        try {
+            val uri = android.net.Uri.parse(qrCode)
+
+            // Validate QR code format: must be airsync scheme with host and port
+            if (uri.scheme != "airsync") {
+                Log.w("MainActivity", "Invalid QR code scheme: ${uri.scheme}")
+                android.widget.Toast.makeText(
+                    this,
+                    "Invalid QR code format",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                finish()
+                return
+            }
+
+            val host = uri.host
+            val port = uri.port
+
+            if (host.isNullOrEmpty() || port == -1) {
+                Log.w("MainActivity", "Invalid QR code: missing host or port")
+                android.widget.Toast.makeText(
+                    this,
+                    "Invalid QR code format",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                finish()
+                return
+            }
+
+            // Valid QR code, proceed with connection
+            val mainIntent = Intent(this, MainActivity::class.java).apply {
+                data = uri
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(mainIntent)
+            finish()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error handling QR code result: ${e.message}", e)
+            android.widget.Toast.makeText(
+                this,
+                "Invalid QR code format",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            finish()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+
+        // Check if this is a QS tile long-press intent
+        if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
+            // Check if device is connected
+            if (!WebSocketUtil.isConnected()) {
+                // Not connected, open QR scanner
+                val qrScannerIntent = Intent(this, QRScannerActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                startActivity(qrScannerIntent)
+                finish()
             }
         }
     }

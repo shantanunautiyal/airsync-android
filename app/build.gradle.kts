@@ -15,8 +15,8 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         targetSdk = 36
-        versionCode = 11
-        versionName = "2.1.4"
+        versionCode = 12
+        versionName = "2.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -88,6 +88,16 @@ dependencies {
 
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)
+
+    // CameraX for QR scanning
+    implementation("androidx.camera:camera-core:1.4.0")
+    implementation("androidx.camera:camera-camera2:1.4.0")
+    implementation("androidx.camera:camera-lifecycle:1.4.0")
+    implementation("androidx.camera:camera-view:1.4.0")
+    implementation("androidx.camera:camera-mlkit-vision:1.4.0")
+
+    // ML Kit barcode scanner (QR code only)
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
