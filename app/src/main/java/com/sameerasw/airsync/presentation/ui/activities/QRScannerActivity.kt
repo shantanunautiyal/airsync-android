@@ -22,16 +22,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.Canvas
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
+import com.sameerasw.airsync.utils.HapticUtil
 import java.util.concurrent.Executors
 
 class QRScannerActivity : ComponentActivity() {
@@ -73,102 +76,116 @@ class QRScannerActivity : ComponentActivity() {
                     onClosed = {
                         setResult(RESULT_CANCELED)
                         finish()
-                    }
+                    },
+                    activity = this
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
 private fun QRScannerScreen(
     onQrScanned: (String) -> Unit,
-    onClosed: () -> Unit
+    onClosed: () -> Unit,
+    activity: ComponentActivity? = null
 ) {
     var scanned by remember { mutableStateOf(false) }
     var lastScannedCode by remember { mutableStateOf("") }
     var scanMessage by remember { mutableStateOf("") }
+    var isActivelyScanning by remember { mutableStateOf(false) }
+    var loadingHapticsJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val haptics = LocalHapticFeedback.current
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
-            TopAppBar(
-                title = { Text("Scan QR Code") },
-                navigationIcon = {
-                    IconButton(onClick = onClosed) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            )
+    // Make camera draw behind system bars
+    LaunchedEffect(Unit) {
+        if (activity != null) {
+            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
         }
-    ) { innerPadding ->
+    }
+
+    // Continuous subtle haptic feedback while actively scanning
+    LaunchedEffect(isActivelyScanning) {
+        if (isActivelyScanning) {
+            loadingHapticsJob = HapticUtil.startLoadingHaptics(haptics)
+        } else {
+            loadingHapticsJob?.cancel()
+            loadingHapticsJob = null
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        QrCodeScannerView(
+            modifier = Modifier.fillMaxSize(),
+            onQrScanned = { qrData ->
+                if (!scanned && qrData != lastScannedCode) {
+                    lastScannedCode = qrData
+                    scanned = true
+                    scanMessage = "QR Code detected!"
+                    Log.d("QrScanner", "QR detected in screen: $qrData")
+
+                    // Trigger 3-step haptic feedback on successful scan
+                    HapticUtil.performSuccess(haptics)
+
+                    isActivelyScanning = false
+                    loadingHapticsJob?.cancel()
+                    // Small delay to ensure UI update before finishing
+                    onQrScanned(qrData)
+                }
+            },
+            onActiveScanningChanged = { isScanning ->
+                isActivelyScanning = isScanning
+            }
+        )
+
+        // Scanning indicator
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color.Black)
+                .align(Alignment.Center),
+            contentAlignment = Alignment.Center
         ) {
-            QrCodeScannerView(
-                modifier = Modifier.fillMaxSize(),
-                onQrScanned = { qrData ->
-                    if (!scanned && qrData != lastScannedCode) {
-                        lastScannedCode = qrData
-                        scanned = true
-                        scanMessage = "QR Code detected!"
-                        Log.d("QrScanner", "QR detected in screen: $qrData")
-                        // Small delay to ensure UI update before finishing
-                        onQrScanned(qrData)
-                    }
-                }
+            LoadingIndicator(modifier = Modifier.scale(2f))
+        }
+
+        // Back button overlay on top-left
+        IconButton(
+            onClick = onClosed,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .systemBarsPadding()
+                .background(MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.large)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface,
             )
+        }
 
-            // Scanning frame overlay
-            Canvas(
-                modifier = Modifier
-                    .size(300.dp)
-                    .align(Alignment.Center)
-            ) {
-                drawRect(
-                    color = Color(0x99FFFFFF),
-                    topLeft = androidx.compose.ui.geometry.Offset(
-                        (size.width - 200.dp.toPx()) / 2,
-                        (size.height - 200.dp.toPx()) / 2
-                    ),
-                    size = androidx.compose.ui.geometry.Size(200.dp.toPx(), 200.dp.toPx()),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
-                )
-            }
-
-            // Status messages
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (scanMessage.isNotEmpty()) {
-                    Text(
-                        scanMessage,
-                        color = Color.Green,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-                Text(
-                    "Position QR code in frame\nKeep phone steady",
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+        // Status messages with background
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .systemBarsPadding()
+                .background(MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.large)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Scan the QR code to connect",
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
@@ -177,7 +194,8 @@ private fun QRScannerScreen(
 @Composable
 fun QrCodeScannerView(
     modifier: Modifier = Modifier,
-    onQrScanned: (String) -> Unit
+    onQrScanned: (String) -> Unit,
+    onActiveScanningChanged: (Boolean) -> Unit = {}
 ) {
     var lastScanned by remember { mutableStateOf("") }
 
@@ -219,6 +237,7 @@ fun QrCodeScannerView(
                         processQrImage(scanner, imageProxy) { result ->
                             if (result != lastScanned && result.isNotEmpty()) {
                                 lastScanned = result
+                                onActiveScanningChanged(true)
                                 Log.d("QrScanner", "QR scanned, calling callback with: $result")
                                 onQrScanned(result)
                             }

@@ -48,6 +48,21 @@ object HapticUtil {
     }
 
     /**
+     * Perform a success haptic - 3 quick taps for successful operations
+     */
+    fun performSuccess(haptics: HapticFeedback?) {
+        try {
+            CoroutineScope(Dispatchers.Main).launch {
+                haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+                delay(100)
+                haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+                delay(50)
+                haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
      * Start repeating haptic ticks for loading states
      * Returns a Job that can be cancelled to stop the haptics
      *
