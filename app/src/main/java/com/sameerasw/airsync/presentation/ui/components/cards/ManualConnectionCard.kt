@@ -29,7 +29,8 @@ fun ManualConnectionCard(
     onPcNameChange: (String) -> Unit,
     onIsPlusChange: (Boolean) -> Unit,
     onSymmetricKeyChange: (String) -> Unit,
-    onConnect: () -> Unit
+    onConnect: () -> Unit,
+    onQrScanClick: (() -> Unit)? = null
 ) {
     val haptics = LocalHapticFeedback.current
     var expanded by remember { mutableStateOf(false) }
@@ -69,6 +70,26 @@ fun ManualConnectionCard(
 
             AnimatedVisibility(visible = expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 16.dp)) {
+                    // QR Scanner button
+                    if (onQrScanClick != null) {
+                        Button(
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                onQrScanClick()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(minCornerRadius)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.rounded_qr_code_scanner_24),
+                                contentDescription = "Scan QR Code",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .padding(end = 8.dp)
+                            )
+                            Text("Scan QR Code")
+                        }
+                    }
                     OutlinedTextField(
                         value = uiState.ipAddress,
                         onValueChange = onIpChange,

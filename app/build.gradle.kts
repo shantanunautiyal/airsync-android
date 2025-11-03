@@ -89,6 +89,16 @@ dependencies {
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)
 
+    // CameraX for QR scanning
+    implementation("androidx.camera:camera-core:1.4.0")
+    implementation("androidx.camera:camera-camera2:1.4.0")
+    implementation("androidx.camera:camera-lifecycle:1.4.0")
+    implementation("androidx.camera:camera-view:1.4.0")
+    implementation("androidx.camera:camera-mlkit-vision:1.4.0")
+
+    // ML Kit barcode scanner (QR code only)
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
