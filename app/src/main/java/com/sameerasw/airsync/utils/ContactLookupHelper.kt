@@ -3,8 +3,8 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.net.Uri
 import android.provider.ContactsContract
+import android.util.Log
 import com.google.i18n.phonenumbers.PhoneNumberUtil
-import com.google.i18n.phonenumbers.Phonenumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
@@ -76,34 +76,58 @@ class ContactLookupHelper(private val context: Context) {
      * Find contact display name for a given phone number.
      * Caches results to avoid repeated expensive lookups.
      * Uses negative caching to avoid repeated lookups for non-existent contacts.
+     * Returns null for unknown/unfound numbers.
      */
     suspend fun findContactName(number: String): String? = withContext(Dispatchers.IO) {
         if (number.isBlank()) return@withContext null
 
-        val normalizedNumber = normalizeNumber(number)
+        val normalizedNumber = try {
+            normalizeNumber(number)
+        } catch (e: Exception) {
+            number  // Use original if normalization fails
+        }
 
         // Check negative cache (contact doesn't exist)
         val negativeTimeMillis = negativeCache[normalizedNumber]
         if (negativeTimeMillis != null && System.currentTimeMillis() - negativeTimeMillis < NEGATIVE_CACHE_TTL) {
+            Log.d("ContactLookupHelper", "✓ Negative cache hit for: $normalizedNumber (no contact found)")
             return@withContext null
         }
 
         // Check positive cache
         val cached = contactCache[normalizedNumber]
         if (cached != null && System.currentTimeMillis() - cached.cachedAtMillis < CONTACT_CACHE_TTL) {
-            return@withContext cached.displayName
+            if (cached.displayName != null && cached.displayName.isNotEmpty()) {
+                Log.d("ContactLookupHelper", "✓ Cache hit for: $normalizedNumber -> ${cached.displayName}")
+                return@withContext cached.displayName
+            } else {
+                Log.d("ContactLookupHelper", "✓ Cache hit (no name) for: $normalizedNumber")
+                return@withContext null
+            }
         }
 
-        // Perform actual lookup
-        val displayName = performPhoneLookup(normalizedNumber) ?: performPhoneLookup(number)
+        // Perform actual lookup - try both normalized and original numbers
+        var displayName = performPhoneLookup(normalizedNumber)
+        if (displayName.isNullOrEmpty()) {
+            displayName = performPhoneLookup(number)
+        }
 
-        return@withContext if (displayName != null) {
-            // Cache the result
-            contactCache[normalizedNumber] = CachedContact(displayName, System.currentTimeMillis())
-            negativeCache.remove(normalizedNumber) // Remove from negative cache if found
-            displayName
+        return@withContext if (!displayName.isNullOrEmpty()) {
+            // Verify the name is not just the number itself
+            if (displayName == normalizedNumber || displayName == number) {
+                Log.d("ContactLookupHelper", "⚠ Lookup returned number as name, treating as unknown: $number")
+                negativeCache[normalizedNumber] = System.currentTimeMillis()
+                null
+            } else {
+                // Cache the valid result
+                Log.d("ContactLookupHelper", "✓ Found contact for $normalizedNumber: $displayName")
+                contactCache[normalizedNumber] = CachedContact(displayName, System.currentTimeMillis())
+                negativeCache.remove(normalizedNumber)
+                displayName
+            }
         } else {
             // Add to negative cache
+            Log.d("ContactLookupHelper", "✓ No contact found for: $normalizedNumber")
             negativeCache[normalizedNumber] = System.currentTimeMillis()
             null
         }

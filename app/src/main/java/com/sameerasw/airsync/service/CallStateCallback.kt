@@ -135,7 +135,17 @@ class CallStateListener(private val context: Context) {
             // Lookup contact name
             val contactName = if (displayNumber != "Unknown") {
                 try {
-                    contactLookupHelper.findContactName(displayNumber)
+                    val name = contactLookupHelper.findContactName(displayNumber)
+                    // Validate: never use the phone number as a contact name
+                    if (!name.isNullOrEmpty() && name != displayNumber) {
+                        Log.d(TAG, "✓ Contact found: $name for number: $displayNumber")
+                        name
+                    } else {
+                        if (!name.isNullOrEmpty()) {
+                            Log.d(TAG, "⚠ Contact name equals phone number, treating as unknown: $displayNumber")
+                        }
+                        null
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error looking up contact for $displayNumber", e)
                     null
@@ -144,13 +154,22 @@ class CallStateListener(private val context: Context) {
                 null
             }
             
-            Log.d(TAG, "Contact lookup complete - name: $contactName")
+            Log.d(TAG, "Contact lookup complete - name: ${contactName ?: "Unknown"}")
 
-            // Normalize phone number
+            // Normalize phone number - validate that result is actually normalized
             val normalizedNumber = if (displayNumber != "Unknown") {
                 try {
-                    contactLookupHelper.normalizeNumber(displayNumber)
+                    val normalized = contactLookupHelper.normalizeNumber(displayNumber)
+                    // Validate: normalized number should start with + for E.164 format
+                    if (normalized.startsWith("+")) {
+                        Log.d(TAG, "✓ Number normalized: $displayNumber -> $normalized")
+                        normalized
+                    } else {
+                        Log.w(TAG, "⚠ Normalization failed or returned invalid format: $normalized, using original: $displayNumber")
+                        displayNumber
+                    }
                 } catch (e: Exception) {
+                    Log.e(TAG, "Error normalizing number $displayNumber: ${e.message}")
                     displayNumber
                 }
             } else {
@@ -170,7 +189,7 @@ class CallStateListener(private val context: Context) {
                 }
             }
 
-            // Create call event with all details
+            // Create call event with all details - strict validation, no fallback values
             val callEvent = CallEvent(
                 eventId = UUID.randomUUID().toString(),
                 deviceId = "",
@@ -178,13 +197,20 @@ class CallStateListener(private val context: Context) {
                 direction = direction,
                 state = state,
                 number = displayNumber,
-                normalizedNumber = normalizedNumber,
-                contactName = contactName,
-                contactPhoto = contactPhoto,
+                normalizedNumber = normalizedNumber?.takeIf { it.isNotEmpty() },  // Only if non-empty
+                contactName = contactName?.takeIf { it.isNotEmpty() },  // Only if non-empty
+                contactPhoto = contactPhoto?.takeIf { it.isNotEmpty() },  // Only if non-empty
                 simSlot = null,
                 callLogId = null,
                 durationSec = null
             )
+
+            // Log the event details for debugging
+            Log.d(TAG, "CallEvent details:")
+            Log.d(TAG, "  - number: ${callEvent.number}")
+            Log.d(TAG, "  - normalizedNumber: ${callEvent.normalizedNumber ?: "null"}")
+            Log.d(TAG, "  - contactName: ${callEvent.contactName ?: "null"}")
+            Log.d(TAG, "  - contactPhoto: ${if (callEvent.contactPhoto != null) "${callEvent.contactPhoto.length} bytes" else "null"}")
 
             // Send to Mac via WebSocket
             val gson = Gson()
