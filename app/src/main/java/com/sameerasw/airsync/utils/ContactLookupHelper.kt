@@ -26,15 +26,49 @@ class ContactLookupHelper(private val context: Context) {
 
     /**
      * Normalize a phone number to E.164 format for consistent lookups.
+     * Intelligently detects country code from number or uses device locale.
      * Falls back to the original number if normalization fails.
      */
-    fun normalizeNumber(number: String, defaultRegion: String = "US"): String {
+    fun normalizeNumber(number: String, defaultRegion: String? = null): String {
         return try {
-            val parsed = phoneNumberUtil.parse(number, defaultRegion)
+            val region = defaultRegion ?: detectCountryCode(number) ?: getDeviceCountryCode()
+            val parsed = phoneNumberUtil.parse(number, region)
             phoneNumberUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
         } catch (e: Exception) {
             // If parsing fails, return the original number
             number
+        }
+    }
+
+    /**
+     * Detect country code from phone number format
+     * Returns null if cannot detect (will fallback to device locale)
+     */
+    private fun detectCountryCode(number: String): String? {
+        return try {
+            when {
+                // If number starts with +, try to parse without region hint
+                number.startsWith("+") -> {
+                    val parsed = phoneNumberUtil.parse(number, "")
+                    phoneNumberUtil.getRegionCodeForNumber(parsed)
+                }
+                // If number starts with 0, it's likely national format - need device locale
+                number.startsWith("0") -> null
+                else -> null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Get device's country code from locale
+     */
+    private fun getDeviceCountryCode(): String {
+        return try {
+            context.resources.configuration.locale.country.takeIf { it.isNotEmpty() } ?: "US"
+        } catch (e: Exception) {
+            "US"  // Fallback
         }
     }
 
