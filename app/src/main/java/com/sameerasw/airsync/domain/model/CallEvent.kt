@@ -15,6 +15,7 @@ data class CallEvent(
     val number: String,
     val normalizedNumber: String? = null,
     val contactName: String? = null,
+    val contactPhoto: String? = null, // base64-encoded photo (max 256px), only for initial ringing/offhook
     val simSlot: Int? = null,
     val callLogId: Long? = null,
     val durationSec: Long? = null

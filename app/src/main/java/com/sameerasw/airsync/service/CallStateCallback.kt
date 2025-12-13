@@ -5,9 +5,10 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import com.sameerasw.airsync.domain.model.CallDirection
 import com.sameerasw.airsync.domain.model.CallEvent
-import com.sameerasw.airsync.utils.ContactLookupHelper
+import com.sameerasw.airsync.utils.ContactPhotoUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import com.google.gson.Gson
+import com.sameerasw.airsync.utils.ContactLookupHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -156,6 +157,19 @@ class CallStateListener(private val context: Context) {
                 null
             }
 
+            // Get contact photo only for initial ringing or offhook events (not for idle/missed)
+            var contactPhoto: String? = null
+            if ((state == "ringing" || state == "offhook") && displayNumber != "Unknown") {
+                try {
+                    contactPhoto = ContactPhotoUtil.getContactPhotoBase64(context, displayNumber)
+                    if (!contactPhoto.isNullOrEmpty()) {
+                        Log.d(TAG, "✅ Contact photo retrieved: ${contactPhoto.length} bytes")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error retrieving contact photo: ${e.message}")
+                }
+            }
+
             // Create call event with all details
             val callEvent = CallEvent(
                 eventId = UUID.randomUUID().toString(),
@@ -166,6 +180,7 @@ class CallStateListener(private val context: Context) {
                 number = displayNumber,
                 normalizedNumber = normalizedNumber,
                 contactName = contactName,
+                contactPhoto = contactPhoto,
                 simSlot = null,
                 callLogId = null,
                 durationSec = null
@@ -180,11 +195,11 @@ class CallStateListener(private val context: Context) {
             json.put("data", JSONObject(eventJson))
 
             val messageStr = json.toString()
-            Log.d(TAG, "Sending complete call event to Mac: $messageStr")
+            Log.d(TAG, "Sending complete call event to Mac (event_size=${messageStr.length} bytes): state=$state, number=$displayNumber")
 
             val sent = WebSocketUtil.sendMessage(messageStr)
             if (sent) {
-                Log.d(TAG, "✅ Successfully sent call_event: state=$state, direction=$direction, number=$displayNumber, contact=$contactName, normalized=$normalizedNumber")
+                Log.d(TAG, "✅ Successfully sent call_event: state=$state, direction=$direction, number=$displayNumber, contact=$contactName, normalized=$normalizedNumber, photo=${if (contactPhoto != null) "yes" else "no"}")
             } else {
                 Log.w(TAG, "❌ Failed to send call_event - WebSocket not connected. Will retry on next broadcast.")
             }
