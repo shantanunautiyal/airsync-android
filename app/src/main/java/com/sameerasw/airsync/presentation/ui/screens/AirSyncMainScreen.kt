@@ -116,7 +116,7 @@ fun AirSyncMainScreen(
         // Check if critical permissions are missing
         val criticalPermissions = com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
         if (criticalPermissions.isNotEmpty()) {
-            Toast.makeText(context, "Missing critical permissions", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Missing permissions", Toast.LENGTH_SHORT).show()
             return
         }
 

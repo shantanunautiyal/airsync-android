@@ -67,8 +67,8 @@ fun PermissionsScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        "✅ All Permissions Granted",
-                        style = MaterialTheme.typography.headlineSmall,
+                        "＼(>o<)ノ All Permissions Granted",
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
@@ -92,7 +92,7 @@ fun PermissionsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (criticalPermissions.isNotEmpty()) "❌ Missing Critical Permissions" else "⚠️ Optional Permissions",
+                            text = if (criticalPermissions.isNotEmpty()) "Missing Critical Permissions" else "Optional Permissions",
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f),
                             color = if (criticalPermissions.isNotEmpty())

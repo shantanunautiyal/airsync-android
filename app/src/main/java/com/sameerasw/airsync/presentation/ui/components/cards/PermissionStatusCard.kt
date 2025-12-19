@@ -67,7 +67,7 @@ fun PermissionStatusCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (criticalPermissions.isNotEmpty()) "❌ Missing Critical Permissions" else "⚠️ Optional Permissions",
+                        text = if (criticalPermissions.isNotEmpty()) "Missing Critical Permissions" else "Optional Permissions",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f),
                         color = if (criticalPermissions.isNotEmpty())
