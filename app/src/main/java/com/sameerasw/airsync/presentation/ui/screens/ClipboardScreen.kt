@@ -38,115 +38,115 @@ fun ClipboardScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Top Bar
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, top = 12.dp),
-            shape = RoundedCornerShape(ExtraCornerRadius),
-            color = MaterialTheme.colorScheme.surfaceVariant
-        ) {
-            // Clear button - only show when connected and chat not empty
-            if (isConnected && clipboardHistory.isNotEmpty()) {
-                Button(
-                    onClick = onClearHistory,
+
+        // Clear button - only show when connected and chat not empty
+        if (isConnected && clipboardHistory.isNotEmpty()) {
+            Button(
+                onClick = onClearHistory,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Text("Clear History")
+            }
+        }
+
+        // Scrollable Message Area - takes remaining space
+        Box(modifier = Modifier.weight(1f)) {
+            // History List or Empty State
+            if (clipboardHistory.isEmpty()) {
+                // Just show nothing when empty - spacer will center it visually
+                Box(modifier = Modifier.fillMaxWidth())
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    reverseLayout = true
+                ) {
+                    items(clipboardHistory) { entry ->
+                        ClipboardEntryBubble(
+                            entry = entry,
+                            onBubbleTap = {
+                                clipboardManager.setText(AnnotatedString(entry.text))
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Chat Input Box - always visible at bottom when connected
+        if (isConnected) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(topStart = ExtraCornerRadius, topEnd = ExtraCornerRadius),
+                color = MaterialTheme.colorScheme.surfaceContainer
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Clear Chat")
-                }
-            }
-        }
-
-        // Spacer pushes content to bottom
-        Spacer(modifier = Modifier.weight(1f))
-
-        // History List or Empty State
-        if (clipboardHistory.isEmpty()) {
-            // Just show nothing when empty - spacer above will center it visually
-            Box(modifier = Modifier.fillMaxWidth())
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 16.dp),
-                reverseLayout = true
-            ) {
-                items(clipboardHistory) { entry ->
-                    ClipboardEntryBubble(
-                        entry = entry,
-                        onBubbleTap = {
-                            clipboardManager.setText(AnnotatedString(entry.text))
-                        }
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 18.dp, max = 100.dp),
+                        placeholder = {
+                            Text(
+                                text = "Type a message...",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        singleLine = false,
+                        maxLines = 4
                     )
-                }
-            }
-        }
 
-        // Chat Input Box
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(topStart = ExtraCornerRadius, topEnd = ExtraCornerRadius),
-            color = MaterialTheme.colorScheme.surfaceContainer
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 40.dp, max = 100.dp),
-                    placeholder = {
-                        Text(
-                            text = "Type a message...",
-                            style = MaterialTheme.typography.bodySmall
+                    IconButton(
+                        onClick = {
+                            if (inputText.isNotBlank()) {
+                                onSendText(inputText)
+                                inputText = ""
+                            }
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                color = if (inputText.isNotBlank()) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                },
+                                shape = CircleShape
+                            ),
+                        enabled = inputText.isNotBlank()
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = if (inputText.isNotBlank()) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
                         )
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    singleLine = false,
-                    maxLines = 4
-                )
-
-                IconButton(
-                    onClick = {
-                        if (inputText.isNotBlank()) {
-                            onSendText(inputText)
-                            inputText = ""
-                        }
-                    },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .align(Alignment.Bottom),
-                    shape = CircleShape,
-                    enabled = inputText.isNotBlank() && isConnected
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = if (inputText.isNotBlank() && isConnected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant
-                        }
-                    )
+                    }
                 }
             }
         }
