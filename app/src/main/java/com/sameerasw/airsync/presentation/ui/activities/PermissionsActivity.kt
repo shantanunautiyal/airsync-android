@@ -24,27 +24,19 @@ class PermissionsActivity : ComponentActivity() {
     // Permission launchers
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        refreshUI()
-    }
+    ) { refreshUI() }
 
     private val callLogPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        refreshUI()
-    }
+    ) { refreshUI() }
 
     private val contactsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        refreshUI()
-    }
+    ) { refreshUI() }
 
     private val phonePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        refreshUI()
-    }
+    ) { refreshUI() }
 
     private var refreshCounter by mutableStateOf(0)
 
@@ -63,9 +55,7 @@ class PermissionsActivity : ComponentActivity() {
             )
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
+        window.isNavigationBarContrastEnforced = false
 
         setContent {
             AirSyncTheme {

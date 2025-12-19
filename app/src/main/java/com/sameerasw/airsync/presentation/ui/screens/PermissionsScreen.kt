@@ -15,7 +15,6 @@ import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionExplan
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionType
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.PermissionUtil
-import com.sameerasw.airsync.utils.QuickSettingsUtil
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
@@ -201,54 +200,7 @@ fun PermissionsScreen(
                         }
                     }
 
-                    // Quick Settings tile tip
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Tip:",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (criticalPermissions.isNotEmpty())
-                            MaterialTheme.colorScheme.onErrorContainer
-                        else MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Add Quick Settings Tile",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (criticalPermissions.isNotEmpty())
-                                    MaterialTheme.colorScheme.onErrorContainer
-                                else
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = "Add AirSync to Quick Settings for one-tap connect/reconnect.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (criticalPermissions.isNotEmpty())
-                                    MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
-                                else
-                                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                HapticUtil.performClick(haptics)
-                                QuickSettingsUtil.requestAddQuickSettingsTile(context)
-                            },
-                            modifier = Modifier.padding(start = 8.dp)
-                        ) {
-                            Text("Add Tile")
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
@@ -347,4 +299,5 @@ private fun PermissionButton(
         }
     }
 }
+
 

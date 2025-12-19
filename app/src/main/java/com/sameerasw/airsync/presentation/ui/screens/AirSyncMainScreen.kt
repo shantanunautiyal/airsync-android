@@ -61,6 +61,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCa
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
+import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTipCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
@@ -604,6 +605,11 @@ fun AirSyncMainScreen(
                     // Permissions Card
                     PermissionsCard(
                         missingPermissionsCount = uiState.missingPermissions.size
+                    )
+
+                    // Quick Settings Tip Card
+                    QuickSettingsTipCard(
+                        isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(context)
                     )
 
                     // Notification Sync Settings Card

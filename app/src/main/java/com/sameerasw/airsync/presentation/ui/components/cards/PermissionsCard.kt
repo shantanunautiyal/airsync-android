@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.ui.activities.PermissionsActivity
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
@@ -76,10 +79,11 @@ fun PermissionsCard(
                 )
             }
 
-            Text(
-                "→",
-                style = MaterialTheme.typography.titleMedium,
-                color = if (missingPermissionsCount > 0)
+            Icon(
+                painter = painterResource(id = R.drawable.rounded_keyboard_arrow_right_24),
+                contentDescription = "Open permissions",
+                modifier = Modifier.size(24.dp),
+                tint = if (missingPermissionsCount > 0)
                     MaterialTheme.colorScheme.onErrorContainer
                 else
                     MaterialTheme.colorScheme.onSurface
