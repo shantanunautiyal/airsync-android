@@ -54,13 +54,14 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
+import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTipCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
@@ -79,7 +80,6 @@ fun AirSyncMainScreen(
     isPlus: Boolean = false,
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
-    onRequestNotificationPermission: () -> Unit = {},
     showAboutDialog: Boolean = false,
     onDismissAbout: () -> Unit = {}
 ) {
@@ -113,6 +113,13 @@ fun AirSyncMainScreen(
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
     
     fun connect() {
+        // Check if critical permissions are missing
+        val criticalPermissions = com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
+        if (criticalPermissions.isNotEmpty()) {
+            Toast.makeText(context, "Missing permissions", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
         viewModel.setUserManuallyDisconnected(false)
 
@@ -313,6 +320,23 @@ fun AirSyncMainScreen(
 
         // Start network monitoring for dynamic Wi-Fi changes
         viewModel.startNetworkMonitoring(context)
+
+        // Refresh permissions on app launch
+        viewModel.refreshPermissions(context)
+    }
+
+    // Refresh permissions when app resumes from pause
+    DisposableEffect(lifecycle) {
+        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPermissions(context)
+            }
+        }
+        lifecycle.addObserver(lifecycleObserver)
+
+        onDispose {
+            lifecycle.removeObserver(lifecycleObserver)
+        }
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
@@ -510,20 +534,6 @@ fun AirSyncMainScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
 
-                    // Permission Status Card
-                    AnimatedVisibility(
-                        visible = uiState.missingPermissions.isNotEmpty(),
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        PermissionStatusCard(
-                            missingPermissions = uiState.missingPermissions,
-                            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                            onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                            onRequestNotificationPermission = onRequestNotificationPermission
-                        )
-                    }
-
                     // Connection Status Card
                     ConnectionStatusCard(
                         isConnected = uiState.isConnected,
@@ -599,6 +609,16 @@ fun AirSyncMainScreen(
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                    // Permissions Card
+                    PermissionsCard(
+                        missingPermissionsCount = uiState.missingPermissions.size
+                    )
+
+                    // Quick Settings Tip Card
+                    QuickSettingsTipCard(
+                        isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(context)
+                    )
+
                     // Notification Sync Settings Card
                     NotificationSyncCard(
                         isNotificationEnabled = uiState.isNotificationEnabled,
@@ -645,11 +665,18 @@ fun AirSyncMainScreen(
                             onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
                             isLoading = uiState.isLoading,
                             onSendDeviceInfo = {
+                                val adbPorts = try {
+                                    val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
+                                    discoveredServices.map { it.port.toString() }
+                                } catch (e: Exception) {
+                                    emptyList()
+                                }
                                 val message = JsonUtil.createDeviceInfoJson(
                                     deviceInfo.name,
                                     deviceInfo.localIp,
                                     uiState.port.toIntOrNull() ?: 6996,
-                                    versionName ?: "2.0.0"
+                                    versionName ?: "2.0.0",
+                                    adbPorts
                                 )
                                 sendMessage(message)
                             },

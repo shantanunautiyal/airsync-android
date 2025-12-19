@@ -61,9 +61,21 @@ class DataStoreManager(private val context: Context) {
         private val SMARTSPACER_SHOW_WHEN_DISCONNECTED = booleanPreferencesKey("smartspacer_show_when_disconnected")
         private val EXPAND_NETWORKING_ENABLED = booleanPreferencesKey("expand_networking_enabled")
 
-        // Network-aware device connections
-        private val NETWORK_DEVICES_PREFIX = "network_device_"
-        private val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
+        // Call monitoring preferences
+        private val CALL_SYNC_ENABLED = booleanPreferencesKey("call_sync_enabled")
+        private val LAST_CALL_SYNC_TIMESTAMP = longPreferencesKey("last_call_sync_timestamp")
+        private val DEVICE_ID = stringPreferencesKey("device_id")
+
+        private const val NETWORK_DEVICES_PREFIX = "network_device_"
+        private const val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
+
+        private var instance: DataStoreManager? = null
+
+        fun getInstance(context: Context): DataStoreManager {
+            return instance ?: DataStoreManager(context).also {
+                instance = it
+            }
+        }
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -74,7 +86,7 @@ class DataStoreManager(private val context: Context) {
 
     fun getIpAddress(): Flow<String> {
         return context.dataStore.data.map { preferences ->
-            preferences[IP_ADDRESS] ?: "192.168.1.100"
+            preferences[IP_ADDRESS] ?: ""
         }
     }
 
@@ -701,6 +713,43 @@ class DataStoreManager(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             return false
+        }
+    }
+
+    // Call sync methods
+    suspend fun setCallSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CALL_SYNC_ENABLED] = enabled
+        }
+    }
+
+    fun getCallSyncEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[CALL_SYNC_ENABLED] ?: false // Default to disabled
+        }
+    }
+
+    suspend fun setLastCallSyncTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_CALL_SYNC_TIMESTAMP] = timestamp
+        }
+    }
+
+    fun getLastCallSyncTimestamp(): Flow<Long> {
+        return context.dataStore.data.map { preferences ->
+            preferences[LAST_CALL_SYNC_TIMESTAMP] ?: 0L
+        }
+    }
+
+    suspend fun setDeviceId(deviceId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[DEVICE_ID] = deviceId
+        }
+    }
+
+    fun getDeviceId(): Flow<String> {
+        return context.dataStore.data.map { preferences ->
+            preferences[DEVICE_ID] ?: ""
         }
     }
 }

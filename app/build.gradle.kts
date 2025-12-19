@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    kotlin("kapt")
 }
 
 android {
@@ -15,8 +16,8 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         targetSdk = 36
-        versionCode = 12
-        versionName = "2.1.5"
+        versionCode = 13
+        versionName = "2.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -89,12 +90,25 @@ dependencies {
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)
 
+
     // CameraX for QR scanning
     implementation("androidx.camera:camera-core:1.4.0")
     implementation("androidx.camera:camera-camera2:1.4.0")
     implementation("androidx.camera:camera-lifecycle:1.4.0")
     implementation("androidx.camera:camera-view:1.4.0")
     implementation("androidx.camera:camera-mlkit-vision:1.4.0")
+
+    // Room database for call history
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
+
+    // Phone number normalization
+    implementation(libs.libphonenumber)
+
+    // Coroutines for async operations
+    implementation(libs.kotlinx.coroutines.android)
+
 
     // ML Kit barcode scanner (QR code only)
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
