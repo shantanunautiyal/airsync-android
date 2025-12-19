@@ -1,0 +1,90 @@
+package com.sameerasw.airsync.presentation.ui.components.cards
+
+import android.content.Intent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.dp
+import com.sameerasw.airsync.presentation.ui.activities.PermissionsActivity
+import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
+import com.sameerasw.airsync.utils.HapticUtil
+
+@Composable
+fun PermissionsCard(
+    missingPermissionsCount: Int = 0
+) {
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp)
+            .clickable {
+                HapticUtil.performClick(haptics)
+                val intent = Intent(context, PermissionsActivity::class.java)
+                context.startActivity(intent)
+            },
+        shape = RoundedCornerShape(
+            topStart = ExtraCornerRadius,
+            topEnd = ExtraCornerRadius,
+            bottomStart = 8.dp,
+            bottomEnd = 8.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (missingPermissionsCount > 0)
+                MaterialTheme.colorScheme.errorContainer
+            else
+                MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Permissions",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (missingPermissionsCount > 0)
+                        MaterialTheme.colorScheme.onErrorContainer
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    if (missingPermissionsCount > 0)
+                        "$missingPermissionsCount permission${if (missingPermissionsCount == 1) "" else "s"} missing"
+                    else
+                        "All permissions granted",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (missingPermissionsCount > 0)
+                        MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+
+            Text(
+                "→",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (missingPermissionsCount > 0)
+                    MaterialTheme.colorScheme.onErrorContainer
+                else
+                    MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+

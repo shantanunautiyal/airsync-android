@@ -54,12 +54,12 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
@@ -79,10 +79,6 @@ fun AirSyncMainScreen(
     isPlus: Boolean = false,
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
-    onRequestNotificationPermission: () -> Unit = {},
-    onRequestCallLogPermission: () -> Unit = {},
-    onRequestContactsPermission: () -> Unit = {},
-    onRequestPhonePermission: () -> Unit = {},
     showAboutDialog: Boolean = false,
     onDismissAbout: () -> Unit = {}
 ) {
@@ -316,6 +312,23 @@ fun AirSyncMainScreen(
 
         // Start network monitoring for dynamic Wi-Fi changes
         viewModel.startNetworkMonitoring(context)
+
+        // Refresh permissions on app launch
+        viewModel.refreshPermissions(context)
+    }
+
+    // Refresh permissions when app resumes from pause
+    DisposableEffect(lifecycle) {
+        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPermissions(context)
+            }
+        }
+        lifecycle.addObserver(lifecycleObserver)
+
+        onDispose {
+            lifecycle.removeObserver(lifecycleObserver)
+        }
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
@@ -513,23 +526,6 @@ fun AirSyncMainScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
 
-                    // Permission Status Card
-                    AnimatedVisibility(
-                        visible = uiState.missingPermissions.isNotEmpty(),
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        PermissionStatusCard(
-                            missingPermissions = uiState.missingPermissions,
-                            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                            onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                            onRequestNotificationPermission = onRequestNotificationPermission,
-                            onRequestCallLogPermission = onRequestCallLogPermission,
-                            onRequestContactsPermission = onRequestContactsPermission,
-                            onRequestPhonePermission = onRequestPhonePermission
-                        )
-                    }
-
                     // Connection Status Card
                     ConnectionStatusCard(
                         isConnected = uiState.isConnected,
@@ -605,6 +601,11 @@ fun AirSyncMainScreen(
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                    // Permissions Card
+                    PermissionsCard(
+                        missingPermissionsCount = uiState.missingPermissions.size
+                    )
+
                     // Notification Sync Settings Card
                     NotificationSyncCard(
                         isNotificationEnabled = uiState.isNotificationEnabled,

@@ -120,6 +120,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Permissions Activity -->
+        <activity
+            android:name=".presentation.ui.activities.PermissionsActivity"
+            android:exported="false"
+            android:label="Permissions"
+            android:theme="@style/Theme.AirSync" />
+
+
         <!-- Mac Media Player Service - creates native Android media player UI -->
         <service
             android:name=".service.MacMediaPlayerService"

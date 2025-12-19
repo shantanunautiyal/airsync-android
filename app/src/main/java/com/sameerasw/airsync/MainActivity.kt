@@ -223,18 +223,6 @@ class MainActivity : ComponentActivity() {
                                 pcName = pcName,
                                 isPlus = isPlus,
                                 symmetricKey = symmetricKey,
-                                onRequestNotificationPermission = {
-                                    requestNotificationPermission()
-                                },
-                                onRequestCallLogPermission = {
-                                    requestCallLogPermission()
-                                },
-                                onRequestContactsPermission = {
-                                    requestContactsPermission()
-                                },
-                                onRequestPhonePermission = {
-                                    requestPhonePermission()
-                                },
                                 showAboutDialog = showAboutDialog,
                                 onDismissAbout = { showAboutDialog = false }
                             )
