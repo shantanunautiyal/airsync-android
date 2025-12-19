@@ -30,7 +30,24 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.sameerasw.airsync.data.local.DataStoreManager
 import android.content.Intent
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
+import com.sameerasw.airsync.utils.AdbMdnsDiscovery
 import com.sameerasw.airsync.utils.WebSocketUtil
+
+object AdbDiscoveryHolder {
+    private var discovery: AdbMdnsDiscovery? = null
+
+    fun initialize(context: android.content.Context) {
+        if (discovery == null) {
+            Log.d("AdbDiscoveryHolder", "Initializing ADB discovery")
+            discovery = AdbMdnsDiscovery(context.applicationContext)
+            discovery?.startDiscovery()
+        }
+    }
+
+    fun getDiscoveredServices(): List<AdbMdnsDiscovery.AdbServiceInfo> {
+        return discovery?.getDiscoveredServices() ?: emptyList()
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -57,6 +74,10 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Start ADB discovery once at app startup and keep it running
+        AdbDiscoveryHolder.initialize(this)
+        Log.d("MainActivity", "Started persistent ADB discovery at app startup")
 
         // Check if this is a QS tile long-press intent and device is not connected
         if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
@@ -271,5 +292,19 @@ class MainActivity : ComponentActivity() {
                 finish()
             }
         }
+    }
+
+    /**
+     * Ensure ADB discovery is running (started at app startup, this just verifies it's active).
+     */
+    fun initializeAdbDiscovery() {
+        AdbDiscoveryHolder.initialize(this)
+    }
+
+    /**
+     * Get discovered ADB services from the running mDNS discovery.
+     */
+    fun getDiscoveredAdbServices(): List<AdbMdnsDiscovery.AdbServiceInfo> {
+        return AdbDiscoveryHolder.getDiscoveredServices()
     }
 }

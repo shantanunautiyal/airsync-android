@@ -25,6 +25,9 @@
     <!-- Camera permission for QR code scanner -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- mDNS discovery for ADB wireless ports -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+
     <!-- Call handling permissions -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />

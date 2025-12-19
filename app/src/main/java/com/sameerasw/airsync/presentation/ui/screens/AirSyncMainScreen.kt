@@ -645,11 +645,18 @@ fun AirSyncMainScreen(
                             onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
                             isLoading = uiState.isLoading,
                             onSendDeviceInfo = {
+                                val adbPorts = try {
+                                    val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
+                                    discoveredServices.map { it.port.toString() }
+                                } catch (e: Exception) {
+                                    emptyList()
+                                }
                                 val message = JsonUtil.createDeviceInfoJson(
                                     deviceInfo.name,
                                     deviceInfo.localIp,
                                     uiState.port.toIntOrNull() ?: 6996,
-                                    versionName ?: "2.0.0"
+                                    versionName ?: "2.0.0",
+                                    adbPorts
                                 )
                                 sendMessage(message)
                             },
