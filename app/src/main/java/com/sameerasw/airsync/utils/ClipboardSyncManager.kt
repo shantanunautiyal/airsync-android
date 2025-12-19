@@ -47,23 +47,9 @@ object ClipboardSyncManager {
                     return@launch
                 }
 
-                // Register clipboard listener on Main thread
-                launch(Dispatchers.Main) {
-                    clipboardListener = ClipboardUtil.registerClipboardListener(context) { clipText ->
-                        Log.d(TAG, "Clipboard changed detected: ${clipText.take(50)}...")
-                        // Avoid infinite loop by checking both sent and received text
-                        if (clipText != lastReceivedText && clipText != lastSentText && clipText.isNotBlank()) {
-                            Log.d(TAG, "Syncing clipboard to desktop...")
-                            syncClipboardToDesktop(clipText)
-                        } else {
-                            Log.d(TAG, "Skipping clipboard sync - matches last sent/received text")
-                        }
-                    }
-
-                    isEnabled = true
-                    Log.d(TAG, "Clipboard sync started successfully")
-                }
-
+                // Clipboard monitoring disabled - only sync via manual share method
+                isEnabled = true
+                Log.d(TAG, "Clipboard sync started (share method only)")
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting clipboard sync: ${e.message}")
             }

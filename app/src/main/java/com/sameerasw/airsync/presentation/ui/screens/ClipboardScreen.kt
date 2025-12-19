@@ -31,8 +31,7 @@ fun ClipboardScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Top Bar
         Surface(
@@ -41,15 +40,16 @@ fun ClipboardScreen(
                 .padding(start = 12.dp, end = 12.dp, top = 12.dp),
             shape = RoundedCornerShape(ExtraCornerRadius),
             color = MaterialTheme.colorScheme.surfaceVariant
-        ) {
-            
-        }
+        ){}
+
+        // Spacer pushes content to bottom
+        Spacer(modifier = Modifier.weight(1f))
 
         // History List or Empty State
         if (clipboardHistory.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -70,10 +70,15 @@ fun ClipboardScreen(
                     )
                 }
             }
+
+
+            // Spacer pushes content to bottom
+            Spacer(modifier = Modifier.weight(1f))
+
         } else {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 16.dp),
