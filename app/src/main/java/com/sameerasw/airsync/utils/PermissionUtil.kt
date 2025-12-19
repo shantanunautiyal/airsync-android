@@ -171,6 +171,21 @@ object PermissionUtil {
             missing.add("Wallpaper Access")
         }
 
+        // Check call log permission (optional)
+        if (!isCallLogPermissionGranted(context)) {
+            missing.add("Call Log Access")
+        }
+
+        // Check contacts permission (optional)
+        if (!isContactsPermissionGranted(context)) {
+            missing.add("Contacts Access")
+        }
+
+        // Check phone state permission (optional)
+        if (!isPhoneStatePermissionGranted(context)) {
+            missing.add("Phone Access")
+        }
+
         return missing
     }
 
@@ -209,6 +224,51 @@ object PermissionUtil {
             optional.add("Wallpaper Access")
         }
 
+        // Call log access is optional for call log sync
+        if (!isCallLogPermissionGranted(context)) {
+            optional.add("Call Log Access")
+        }
+
+        // Contacts access is optional for contacts sync
+        if (!isContactsPermissionGranted(context)) {
+            optional.add("Contacts Access")
+        }
+
+        // Phone state access is optional
+        if (!isPhoneStatePermissionGranted(context)) {
+            optional.add("Phone Access")
+        }
+
         return optional
+    }
+
+    /**
+     * Check if READ_CALL_LOG permission is granted
+     */
+    fun isCallLogPermissionGranted(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_CALL_LOG
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Check if READ_CONTACTS permission is granted
+     */
+    fun isContactsPermissionGranted(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_CONTACTS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Check if READ_PHONE_STATE permission is granted
+     */
+    fun isPhoneStatePermissionGranted(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_PHONE_STATE
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }

@@ -57,6 +57,22 @@ class MainActivity : ComponentActivity() {
     ) { isGranted ->
     }
 
+    // Permission launchers for call-related permissions
+    private val callLogPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+    }
+
+    private val contactsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+    }
+
+    private val phonePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+    }
+
     private val qrScannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -89,7 +105,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // ...existing code...
         // Enable full edge-to-edge drawing for both status and navigation bars
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
@@ -211,6 +226,15 @@ class MainActivity : ComponentActivity() {
                                 onRequestNotificationPermission = {
                                     requestNotificationPermission()
                                 },
+                                onRequestCallLogPermission = {
+                                    requestCallLogPermission()
+                                },
+                                onRequestContactsPermission = {
+                                    requestContactsPermission()
+                                },
+                                onRequestPhonePermission = {
+                                    requestPhonePermission()
+                                },
                                 showAboutDialog = showAboutDialog,
                                 onDismissAbout = { showAboutDialog = false }
                             )
@@ -226,6 +250,24 @@ class MainActivity : ComponentActivity() {
             if (!PermissionUtil.isPostNotificationPermissionGranted(this)) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+    }
+
+    private fun requestCallLogPermission() {
+        if (!PermissionUtil.isCallLogPermissionGranted(this)) {
+            callLogPermissionLauncher.launch(Manifest.permission.READ_CALL_LOG)
+        }
+    }
+
+    private fun requestContactsPermission() {
+        if (!PermissionUtil.isContactsPermissionGranted(this)) {
+            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
+
+    private fun requestPhonePermission() {
+        if (!PermissionUtil.isPhoneStatePermissionGranted(this)) {
+            phonePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
         }
     }
 

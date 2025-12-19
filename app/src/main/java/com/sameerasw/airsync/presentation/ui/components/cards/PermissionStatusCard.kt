@@ -36,7 +36,10 @@ fun PermissionStatusCard(
     missingPermissions: List<String>,
     onGrantPermissions: () -> Unit,
     onRefreshPermissions: () -> Unit,
-    onRequestNotificationPermission: (() -> Unit)? = null
+    onRequestNotificationPermission: (() -> Unit)? = null,
+    onRequestCallLogPermission: (() -> Unit)? = null,
+    onRequestContactsPermission: (() -> Unit)? = null,
+    onRequestPhonePermission: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -144,6 +147,30 @@ fun PermissionStatusCard(
                                     isCritical = false
                                 )
                             }
+                            "Call Log Access" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Enables call log sync",
+                                    onExplainClick = { showDialog = PermissionType.CALL_LOG },
+                                    isCritical = false
+                                )
+                            }
+                            "Contacts Access" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Enables contacts sync",
+                                    onExplainClick = { showDialog = PermissionType.CONTACTS },
+                                    isCritical = false
+                                )
+                            }
+                            "Phone Access" -> {
+                                PermissionButton(
+                                    permissionName = permission,
+                                    description = "Enables phone state access",
+                                    onExplainClick = { showDialog = PermissionType.PHONE },
+                                    isCritical = false
+                                )
+                            }
                         }
                     }
                 }
@@ -218,6 +245,15 @@ fun PermissionStatusCard(
                     }
                     PermissionType.WALLPAPER_ACCESS -> {
                         PermissionUtil.openManageExternalStorageSettings(context)
+                    }
+                    PermissionType.CALL_LOG -> {
+                        onRequestCallLogPermission?.invoke()
+                    }
+                    PermissionType.CONTACTS -> {
+                        onRequestContactsPermission?.invoke()
+                    }
+                    PermissionType.PHONE -> {
+                        onRequestPhonePermission?.invoke()
                     }
                 }
             }

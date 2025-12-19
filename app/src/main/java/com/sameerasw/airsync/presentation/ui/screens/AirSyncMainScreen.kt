@@ -80,6 +80,9 @@ fun AirSyncMainScreen(
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
+    onRequestCallLogPermission: () -> Unit = {},
+    onRequestContactsPermission: () -> Unit = {},
+    onRequestPhonePermission: () -> Unit = {},
     showAboutDialog: Boolean = false,
     onDismissAbout: () -> Unit = {}
 ) {
@@ -520,7 +523,10 @@ fun AirSyncMainScreen(
                             missingPermissions = uiState.missingPermissions,
                             onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
                             onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                            onRequestNotificationPermission = onRequestNotificationPermission
+                            onRequestNotificationPermission = onRequestNotificationPermission,
+                            onRequestCallLogPermission = onRequestCallLogPermission,
+                            onRequestContactsPermission = onRequestContactsPermission,
+                            onRequestPhonePermission = onRequestPhonePermission
                         )
                     }
 

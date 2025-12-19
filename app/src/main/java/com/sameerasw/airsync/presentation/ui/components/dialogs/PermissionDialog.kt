@@ -19,7 +19,10 @@ enum class PermissionType {
     NOTIFICATION_ACCESS,
     POST_NOTIFICATIONS,
     BACKGROUND_USAGE,
-    WALLPAPER_ACCESS
+    WALLPAPER_ACCESS,
+    CALL_LOG,
+    CONTACTS,
+    PHONE
 }
 
 data class PermissionInfo(
@@ -174,6 +177,30 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
             description = "This optional permission allows AirSync to sync your phone's wallpaper to your mac.",
             whyNeeded = "To read your current wallpaper which is not accessible with regular privileges,  AirSync needs external storage permissions. \nBut the app will only use the permission for the given explained use cases and will not alter or read any other files on the storage.",
             buttonText = "Grant Storage Access"
+        )
+
+        PermissionType.CALL_LOG -> PermissionInfo(
+            title = "Call Log Access",
+            icon = "📞",
+            description = "Read call log of the device.",
+            whyNeeded = "Gather and sync call status to your other devices.",
+            buttonText = "Grant Call Log Access"
+        )
+
+        PermissionType.CONTACTS -> PermissionInfo(
+            title = "Contacts Access",
+            icon = "👤",
+            description = "Show caller info on mac",
+            whyNeeded = "Use your contacts registry to find and display details about any calls and the caller.",
+            buttonText = "Grant Contacts Access"
+        )
+
+        PermissionType.PHONE -> PermissionInfo(
+            title = "Phone Access",
+            icon = "📱",
+            description = "Detect call state",
+            whyNeeded = "AirSync will monitor and display ongoing call status on mac. \nAirSync will never access your call audio or store any sensitive data. Android system does not allow accessing call audio to any other application than the dialer.",
+            buttonText = "Grant Phone Access"
         )
     }
 }
