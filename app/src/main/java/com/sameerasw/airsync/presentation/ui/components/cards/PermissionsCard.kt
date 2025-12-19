@@ -68,7 +68,7 @@ fun PermissionsCard(
                 )
                 Text(
                     if (missingPermissionsCount > 0)
-                        "$missingPermissionsCount permission${if (missingPermissionsCount == 1) "" else "s"} missing"
+                        "$missingPermissionsCount missing"
                     else
                         "All permissions granted",
                     style = MaterialTheme.typography.bodySmall,

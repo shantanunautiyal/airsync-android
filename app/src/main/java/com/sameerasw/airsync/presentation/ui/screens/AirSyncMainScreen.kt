@@ -113,6 +113,13 @@ fun AirSyncMainScreen(
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
     
     fun connect() {
+        // Check if critical permissions are missing
+        val criticalPermissions = com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
+        if (criticalPermissions.isNotEmpty()) {
+            Toast.makeText(context, "Missing critical permissions", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
         viewModel.setUserManuallyDisconnected(false)
 
