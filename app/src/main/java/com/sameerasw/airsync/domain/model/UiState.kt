@@ -31,5 +31,7 @@ data class UiState(
     val macDeviceStatus: MacDeviceStatus? = null,
     // Auth failure dialog
     val showAuthFailureDialog: Boolean = false,
-    val authFailureMessage: String = ""
+    val authFailureMessage: String = "",
+    // Clipboard history
+    val clipboardHistory: List<ClipboardEntry> = emptyList()
 )

@@ -21,6 +21,13 @@ object ClipboardSyncManager {
     private var syncJob: Job? = null
     private val syncScope = CoroutineScope(Dispatchers.IO)
 
+    // Callback for clipboard history tracking
+    private var onClipboardSent: ((text: String) -> Unit)? = null
+
+    fun setOnClipboardSentCallback(callback: ((text: String) -> Unit)?) {
+        onClipboardSent = callback
+    }
+
     /**
      * Start clipboard sync
      */
@@ -95,6 +102,8 @@ object ClipboardSyncManager {
                 val success = WebSocketUtil.sendMessage(clipboardJson)
                 if (success) {
                     Log.d(TAG, "Clipboard synced to desktop: ${text.take(50)}...")
+                    // Notify callback about sent clipboard
+                    onClipboardSent?.invoke(text)
                 } else {
                     Log.w(TAG, "Failed to sync clipboard to desktop")
                     // Reset lastSentText if sending failed
@@ -194,6 +203,8 @@ object ClipboardSyncManager {
             val success = WebSocketUtil.sendMessage(clipboardJson)
             if (success) {
                 Log.d(TAG, "Text shared to desktop: ${text.take(50)}...")
+                // Notify callback about sent clipboard
+                onClipboardSent?.invoke(text)
             } else {
                 Log.w(TAG, "Failed to share text to desktop")
             }

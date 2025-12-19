@@ -646,4 +646,25 @@ class AirSyncViewModel(
         }
     }
 
+    // Clipboard history management
+    fun addClipboardEntry(text: String, isFromPc: Boolean) {
+        val entry = com.sameerasw.airsync.domain.model.ClipboardEntry(
+            id = java.util.UUID.randomUUID().toString(),
+            text = text,
+            timestamp = System.currentTimeMillis(),
+            isFromPc = isFromPc
+        )
+        val updatedHistory = (listOf(entry) + _uiState.value.clipboardHistory).take(100) // Keep last 100 entries
+        _uiState.value = _uiState.value.copy(clipboardHistory = updatedHistory)
+    }
+
+    fun clearClipboardHistory() {
+        _uiState.value = _uiState.value.copy(clipboardHistory = emptyList())
+    }
+
+    fun clearDisconnectionClipboardHistory() {
+        // Clear clipboard history when disconnected
+        _uiState.value = _uiState.value.copy(clipboardHistory = emptyList())
+    }
+
 }

@@ -32,12 +32,15 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
@@ -101,7 +104,7 @@ fun AirSyncMainScreen(
     val connectScrollState = rememberScrollState()
     val settingsScrollState = rememberScrollState()
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     val navCallbackState = rememberUpdatedState(onNavigateToApps)
     LaunchedEffect(navCallbackState.value) {
     }
@@ -160,6 +163,9 @@ fun AirSyncMainScreen(
                             val data = json.optJSONObject("data")
                             val text = data?.optString("text")
                             if (!text.isNullOrEmpty()) {
+                                // Add to clipboard history (from PC)
+                                viewModel.addClipboardEntry(text, isFromPc = true)
+                                // Handle the clipboard update
                                 ClipboardSyncManager.handleClipboardUpdate(context, text)
                             }
                         }
@@ -311,6 +317,7 @@ fun AirSyncMainScreen(
             viewModel.setUserManuallyDisconnectedAwait(true)
             WebSocketUtil.disconnect(context)
             viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+            viewModel.clearClipboardHistory()
             viewModel.setResponse("Disconnected")
         }
     }
@@ -382,6 +389,10 @@ fun AirSyncMainScreen(
     // Start/stop clipboard sync based on connection status and settings
     LaunchedEffect(uiState.isConnected, uiState.isClipboardSyncEnabled) {
         if (uiState.isConnected && uiState.isClipboardSyncEnabled) {
+            // Register callback to track clipboard history
+            ClipboardSyncManager.setOnClipboardSentCallback { text ->
+                viewModel.addClipboardEntry(text, isFromPc = false)
+            }
             ClipboardSyncManager.startSync(context)
         } else {
             ClipboardSyncManager.stopSync(context)
@@ -446,6 +457,7 @@ fun AirSyncMainScreen(
 
     DisposableEffect(Unit) {
         onDispose {
+            ClipboardSyncManager.setOnClipboardSentCallback(null)
             ClipboardSyncManager.stopSync(context)
         }
     }
@@ -453,32 +465,58 @@ fun AirSyncMainScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        HapticUtil.performClick(haptics)
-                        if (uiState.isConnected) {
-                            disconnect()
-                        } else {
-                            launchScanner(context)
-                        }
-                    },
-                    icon = {
-                        if (uiState.isConnected) {
-                            Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
-                        } else {
-                            Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
-                        }
-                    },
-                    text = { Text(text = if (uiState.isConnected) "Disconnect" else "Scan to connect") },
-                    expanded = fabExpanded
-                )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Secondary FAB for clearing clipboard history
+                AnimatedVisibility(
+                    visible = fabVisible && uiState.isConnected && pagerState.currentPage == 1,
+                    enter = scaleIn(),
+                    exit = scaleOut()
+                ) {
+                    FloatingActionButton(
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            viewModel.clearClipboardHistory()
+                        },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Clear clipboard history"
+                        )
+                    }
+                }
+                // Primary FAB for connect/disconnect
+                AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            if (uiState.isConnected) {
+                                disconnect()
+                            } else {
+                                launchScanner(context)
+                            }
+                        },
+                        icon = {
+                            if (uiState.isConnected) {
+                                Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
+                            } else {
+                                Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
+                            }
+                        },
+                        text = { Text(text = if (uiState.isConnected) "Disconnect" else "Scan to connect") },
+                        expanded = fabExpanded
+                    )
+                }
             }
         },
         bottomBar = {
-            val items = listOf("Connect", "Settings")
-            val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.Settings)
-            val unselectedIcons = listOf(Icons.Outlined.Phonelink, Icons.Outlined.Settings)
+            val items = listOf("Connect", "Clipboard", "Settings")
+            val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.ContentPaste, Icons.Filled.Settings)
+            val unselectedIcons = listOf(Icons.Outlined.Phonelink, Icons.Rounded.ContentPaste, Icons.Outlined.Settings)
             NavigationBar(
                 windowInsets = NavigationBarDefaults.windowInsets
             ) {
@@ -598,6 +636,16 @@ fun AirSyncMainScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
                     }
+                }
+                1 -> {
+                    // Clipboard tab content
+                    ClipboardScreen(
+                        clipboardHistory = uiState.clipboardHistory,
+                        isConnected = uiState.isConnected,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = innerPadding.calculateBottomPadding())
+                    )
                 }
                 else -> {
                     // Settings tab content
