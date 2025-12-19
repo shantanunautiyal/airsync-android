@@ -465,31 +465,8 @@ fun AirSyncMainScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Secondary FAB for clearing clipboard history
-                AnimatedVisibility(
-                    visible = fabVisible && uiState.isConnected && pagerState.currentPage == 1,
-                    enter = scaleIn(),
-                    exit = scaleOut()
-                ) {
-                    FloatingActionButton(
-                        onClick = {
-                            HapticUtil.performClick(haptics)
-                            viewModel.clearClipboardHistory()
-                        },
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Clear clipboard history"
-                        )
-                    }
-                }
-                // Primary FAB for connect/disconnect
+            // Hide FAB on Clipboard tab
+            if (pagerState.currentPage != 1) {
                 AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
                     ExtendedFloatingActionButton(
                         onClick = {
@@ -642,6 +619,12 @@ fun AirSyncMainScreen(
                     ClipboardScreen(
                         clipboardHistory = uiState.clipboardHistory,
                         isConnected = uiState.isConnected,
+                        onSendText = { text ->
+                            viewModel.addClipboardEntry(text, isFromPc = false)
+                            val clipboardJson = JsonUtil.createClipboardUpdateJson(text)
+                            WebSocketUtil.sendMessage(clipboardJson)
+                        },
+                        onClearHistory = { viewModel.clearClipboardHistory() },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(bottom = innerPadding.calculateBottomPadding())

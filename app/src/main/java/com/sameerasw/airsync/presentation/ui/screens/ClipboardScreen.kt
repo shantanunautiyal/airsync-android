@@ -5,10 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -24,9 +26,12 @@ import java.util.*
 fun ClipboardScreen(
     clipboardHistory: List<ClipboardEntry>,
     isConnected: Boolean,
+    onSendText: (String) -> Unit,
+    onClearHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
+    var inputText by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -40,41 +45,31 @@ fun ClipboardScreen(
                 .padding(start = 12.dp, end = 12.dp, top = 12.dp),
             shape = RoundedCornerShape(ExtraCornerRadius),
             color = MaterialTheme.colorScheme.surfaceVariant
-        ){}
+        ) {
+            // Clear button - only show when connected and chat not empty
+            if (isConnected && clipboardHistory.isNotEmpty()) {
+                Button(
+                    onClick = onClearHistory,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text("Clear Chat")
+                }
+            }
+        }
 
         // Spacer pushes content to bottom
         Spacer(modifier = Modifier.weight(1f))
 
         // History List or Empty State
         if (clipboardHistory.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = if (isConnected) "No clipboard history yet" else "Connect to start syncing clipboard",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
-                        text = if (isConnected) "Clipboard updates will appear here" else "Clipboard history is cleared on disconnect",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                }
-            }
-
-
-            // Spacer pushes content to bottom
-            Spacer(modifier = Modifier.weight(1f))
-
+            // Just show nothing when empty - spacer above will center it visually
+            Box(modifier = Modifier.fillMaxWidth())
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -89,6 +84,67 @@ fun ClipboardScreen(
                         entry = entry,
                         onBubbleTap = {
                             clipboardManager.setText(AnnotatedString(entry.text))
+                        }
+                    )
+                }
+            }
+        }
+
+        // Chat Input Box
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(topStart = ExtraCornerRadius, topEnd = ExtraCornerRadius),
+            color = MaterialTheme.colorScheme.surfaceContainer
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 40.dp, max = 100.dp),
+                    placeholder = {
+                        Text(
+                            text = "Type a message...",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    singleLine = false,
+                    maxLines = 4
+                )
+
+                IconButton(
+                    onClick = {
+                        if (inputText.isNotBlank()) {
+                            onSendText(inputText)
+                            inputText = ""
+                        }
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .align(Alignment.Bottom),
+                    shape = CircleShape,
+                    enabled = inputText.isNotBlank() && isConnected
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (inputText.isNotBlank() && isConnected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
                         }
                     )
                 }
