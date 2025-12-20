@@ -21,8 +21,6 @@ import com.sameerasw.airsync.service.WakeupService
 import com.sameerasw.airsync.smartspacer.AirSyncDeviceTarget
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -104,7 +102,7 @@ class AirSyncViewModel(
         }
         // Observe manual disconnect flag to immediately cancel any running auto-reconnect
         viewModelScope.launch {
-            repository.getUserManuallyDisconnected().collect { manual ->
+            repository.getUserManuallyDisconnected().collect { _ ->
                 // No device status notification to update
             }
         }
@@ -440,7 +438,7 @@ class AirSyncViewModel(
     fun manualSyncAppIcons(context: Context) {
         _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
 
-        SyncManager.manualSyncAppIcons(context) { success, message ->
+        SyncManager.manualSyncAppIcons(context) { _, message ->
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(
                     isIconSyncLoading = false,

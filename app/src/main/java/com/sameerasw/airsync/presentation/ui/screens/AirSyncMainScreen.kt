@@ -2,7 +2,7 @@ package com.sameerasw.airsync.presentation.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +70,7 @@ import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import org.json.JSONObject
 import kotlinx.coroutines.Job
 import java.net.URLDecoder
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -155,20 +156,16 @@ fun AirSyncMainScreen(
             },
             onMessage = { response ->
                 scope.launch(Dispatchers.Main) {
+                    Log.d("AirSyncMainScreen", "Message received: $response")
                     viewModel.setResponse("Received: $response")
                     try {
                         val json = JSONObject(response)
-                        if (json.optString("type") == "clipboardUpdate") {
-                            val data = json.optJSONObject("data")
-                            val text = data?.optString("text")
-                            if (!text.isNullOrEmpty()) {
-                                // Add to clipboard history (from PC)
-                                viewModel.addClipboardEntry(text, isFromPc = true)
-                                // Handle the clipboard update
-                                ClipboardSyncManager.handleClipboardUpdate(context, text)
-                            }
-                        }
-                    } catch (_: Exception) {}
+                        Log.d("AirSyncMainScreen", "Message type: ${json.optString("type")}")
+                        // Note: Clipboard updates are now handled by WebSocketMessageHandler callback
+                        // which ensures consistency regardless of connection method (manual or auto-reconnect)
+                    } catch (e: Exception) {
+                        Log.e("AirSyncMainScreen", "Error processing message: ${e.message}", e)
+                    }
                 }
             }
         )
@@ -199,14 +196,12 @@ fun AirSyncMainScreen(
                 scope.launch(Dispatchers.Main) {
                     Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
                     viewModel.setLoading(false)
-                    pendingExportJson = null
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 scope.launch(Dispatchers.Main) {
                     Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
                     viewModel.setLoading(false)
-                    pendingExportJson = null
                 }
             }
         }
@@ -262,7 +257,7 @@ fun AirSyncMainScreen(
             if (!qrCode.isNullOrEmpty()) {
                 // Parse the QR code (expected format: airsync://ip:port?name=...&plus=...&key=...)
                 try {
-                    val uri = Uri.parse(qrCode)
+                    val uri = qrCode.toUri()
                     val ip = uri.host ?: ""
                     val port = uri.port.takeIf { it != -1 }?.toString() ?: ""
 
@@ -368,12 +363,11 @@ fun AirSyncMainScreen(
     // Hide FAB on scroll down, show on scroll up for the active tab
     LaunchedEffect(pagerState.currentPage) {
         val state = if (pagerState.currentPage == 0) connectScrollState else settingsScrollState
-        var last = state.value
+        val last = state.value
         snapshotFlow { state.value }.collect { value ->
             val delta = value - last
             if (delta > 2) fabVisible = false
             else if (delta < -2) fabVisible = true
-            last = value
         }
     }
 
@@ -395,6 +389,13 @@ fun AirSyncMainScreen(
             ClipboardSyncManager.startSync(context)
         } else {
             ClipboardSyncManager.stopSync(context)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        com.sameerasw.airsync.utils.WebSocketMessageHandler.setOnClipboardEntryCallback { text ->
+            Log.d("AirSyncMainScreen", "Incoming clipboard update via WebSocketMessageHandler: ${text.take(50)}")
+            viewModel.addClipboardEntry(text, isFromPc = true)
         }
     }
 
@@ -539,7 +540,7 @@ fun AirSyncMainScreen(
     ) { innerPadding ->
         // Track page changes for haptic feedback on swipe
         LaunchedEffect(pagerState.currentPage) {
-            snapshotFlow { pagerState.currentPage }.collect { page ->
+            snapshotFlow { pagerState.currentPage }.collect { _ ->
                 HapticUtil.performLightTick(haptics)
             }
         }
@@ -631,7 +632,7 @@ fun AirSyncMainScreen(
                         // When connected: page 1 = Clipboard
                         ClipboardScreen(
                             clipboardHistory = uiState.clipboardHistory,
-                            isConnected = uiState.isConnected,
+                            isConnected = true,
                             onSendText = { text ->
                                 viewModel.addClipboardEntry(text, isFromPc = false)
                                 val clipboardJson = JsonUtil.createClipboardUpdateJson(text)
@@ -665,7 +666,7 @@ fun AirSyncMainScreen(
                                 onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
                                 isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
                                 onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
-                                isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
+                                isContinueBrowsingToggleEnabled = true,
                                 continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
                                 isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
                                 onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
@@ -695,7 +696,7 @@ fun AirSyncMainScreen(
                                         val adbPorts = try {
                                             val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
                                             discoveredServices.map { it.port.toString() }
-                                        } catch (e: Exception) {
+                                        } catch (_: Exception) {
                                             emptyList()
                                         }
                                         val message = JsonUtil.createDeviceInfoJson(
@@ -869,7 +870,7 @@ fun AirSyncMainScreen(
                                     val adbPorts = try {
                                         val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
                                         discoveredServices.map { it.port.toString() }
-                                    } catch (e: Exception) {
+                                    } catch (_: Exception) {
                                         emptyList()
                                     }
                                     val message = JsonUtil.createDeviceInfoJson(

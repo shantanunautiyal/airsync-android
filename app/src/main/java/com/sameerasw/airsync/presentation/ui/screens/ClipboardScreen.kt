@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,14 @@ fun ClipboardScreen(
 ) {
     val clipboardManager = LocalClipboardManager.current
     var inputText by remember { mutableStateOf("") }
+    val lazyListState = rememberLazyListState()
+
+    // Auto-scroll to newest message when clipboard history changes
+    LaunchedEffect(clipboardHistory.size) {
+        if (clipboardHistory.isNotEmpty()) {
+            lazyListState.animateScrollToItem(0)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -63,6 +72,7 @@ fun ClipboardScreen(
                 Box(modifier = Modifier.fillMaxWidth())
             } else {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -70,7 +80,10 @@ fun ClipboardScreen(
                     contentPadding = PaddingValues(bottom = 16.dp),
                     reverseLayout = true
                 ) {
-                    items(clipboardHistory) { entry ->
+                    items(
+                        items = clipboardHistory,
+                        key = { entry -> entry.id }
+                    ) { entry ->
                         ClipboardEntryBubble(
                             entry = entry,
                             onBubbleTap = {
