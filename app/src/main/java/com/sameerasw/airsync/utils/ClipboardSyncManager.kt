@@ -21,6 +21,13 @@ object ClipboardSyncManager {
     private var syncJob: Job? = null
     private val syncScope = CoroutineScope(Dispatchers.IO)
 
+    // Callback for clipboard history tracking
+    private var onClipboardSent: ((text: String) -> Unit)? = null
+
+    fun setOnClipboardSentCallback(callback: ((text: String) -> Unit)?) {
+        onClipboardSent = callback
+    }
+
     /**
      * Start clipboard sync
      */
@@ -40,23 +47,9 @@ object ClipboardSyncManager {
                     return@launch
                 }
 
-                // Register clipboard listener on Main thread
-                launch(Dispatchers.Main) {
-                    clipboardListener = ClipboardUtil.registerClipboardListener(context) { clipText ->
-                        Log.d(TAG, "Clipboard changed detected: ${clipText.take(50)}...")
-                        // Avoid infinite loop by checking both sent and received text
-                        if (clipText != lastReceivedText && clipText != lastSentText && clipText.isNotBlank()) {
-                            Log.d(TAG, "Syncing clipboard to desktop...")
-                            syncClipboardToDesktop(clipText)
-                        } else {
-                            Log.d(TAG, "Skipping clipboard sync - matches last sent/received text")
-                        }
-                    }
-
-                    isEnabled = true
-                    Log.d(TAG, "Clipboard sync started successfully")
-                }
-
+                // Clipboard monitoring disabled - only sync via manual share method
+                isEnabled = true
+                Log.d(TAG, "Clipboard sync started (share method only)")
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting clipboard sync: ${e.message}")
             }
@@ -95,6 +88,8 @@ object ClipboardSyncManager {
                 val success = WebSocketUtil.sendMessage(clipboardJson)
                 if (success) {
                     Log.d(TAG, "Clipboard synced to desktop: ${text.take(50)}...")
+                    // Notify callback about sent clipboard
+                    onClipboardSent?.invoke(text)
                 } else {
                     Log.w(TAG, "Failed to sync clipboard to desktop")
                     // Reset lastSentText if sending failed
@@ -194,6 +189,8 @@ object ClipboardSyncManager {
             val success = WebSocketUtil.sendMessage(clipboardJson)
             if (success) {
                 Log.d(TAG, "Text shared to desktop: ${text.take(50)}...")
+                // Notify callback about sent clipboard
+                onClipboardSent?.invoke(text)
             } else {
                 Log.w(TAG, "Failed to share text to desktop")
             }

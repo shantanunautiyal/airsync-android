@@ -32,12 +32,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
@@ -54,13 +56,14 @@ import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.PermissionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
+import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTipCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
@@ -79,7 +82,6 @@ fun AirSyncMainScreen(
     isPlus: Boolean = false,
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
-    onRequestNotificationPermission: () -> Unit = {},
     showAboutDialog: Boolean = false,
     onDismissAbout: () -> Unit = {}
 ) {
@@ -101,7 +103,7 @@ fun AirSyncMainScreen(
     val connectScrollState = rememberScrollState()
     val settingsScrollState = rememberScrollState()
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { if (uiState.isConnected) 3 else 2 })
     val navCallbackState = rememberUpdatedState(onNavigateToApps)
     LaunchedEffect(navCallbackState.value) {
     }
@@ -113,6 +115,13 @@ fun AirSyncMainScreen(
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
     
     fun connect() {
+        // Check if critical permissions are missing
+        val criticalPermissions = com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
+        if (criticalPermissions.isNotEmpty()) {
+            Toast.makeText(context, "Missing permissions", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         viewModel.setConnectionStatus(isConnected = false, isConnecting = true)
         viewModel.setUserManuallyDisconnected(false)
 
@@ -153,6 +162,9 @@ fun AirSyncMainScreen(
                             val data = json.optJSONObject("data")
                             val text = data?.optString("text")
                             if (!text.isNullOrEmpty()) {
+                                // Add to clipboard history (from PC)
+                                viewModel.addClipboardEntry(text, isFromPc = true)
+                                // Handle the clipboard update
                                 ClipboardSyncManager.handleClipboardUpdate(context, text)
                             }
                         }
@@ -304,6 +316,7 @@ fun AirSyncMainScreen(
             viewModel.setUserManuallyDisconnectedAwait(true)
             WebSocketUtil.disconnect(context)
             viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
+            viewModel.clearClipboardHistory()
             viewModel.setResponse("Disconnected")
         }
     }
@@ -313,6 +326,23 @@ fun AirSyncMainScreen(
 
         // Start network monitoring for dynamic Wi-Fi changes
         viewModel.startNetworkMonitoring(context)
+
+        // Refresh permissions on app launch
+        viewModel.refreshPermissions(context)
+    }
+
+    // Refresh permissions when app resumes from pause
+    DisposableEffect(lifecycle) {
+        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPermissions(context)
+            }
+        }
+        lifecycle.addObserver(lifecycleObserver)
+
+        onDispose {
+            lifecycle.removeObserver(lifecycleObserver)
+        }
     }
 
     // Mark QR dialog as processed when it's shown or when already connected
@@ -358,6 +388,10 @@ fun AirSyncMainScreen(
     // Start/stop clipboard sync based on connection status and settings
     LaunchedEffect(uiState.isConnected, uiState.isClipboardSyncEnabled) {
         if (uiState.isConnected && uiState.isClipboardSyncEnabled) {
+            // Register callback to track clipboard history
+            ClipboardSyncManager.setOnClipboardSentCallback { text ->
+                viewModel.addClipboardEntry(text, isFromPc = false)
+            }
             ClipboardSyncManager.startSync(context)
         } else {
             ClipboardSyncManager.stopSync(context)
@@ -422,6 +456,7 @@ fun AirSyncMainScreen(
 
     DisposableEffect(Unit) {
         onDispose {
+            ClipboardSyncManager.setOnClipboardSentCallback(null)
             ClipboardSyncManager.stopSync(context)
         }
     }
@@ -429,32 +464,48 @@ fun AirSyncMainScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        HapticUtil.performClick(haptics)
-                        if (uiState.isConnected) {
-                            disconnect()
-                        } else {
-                            launchScanner(context)
-                        }
-                    },
-                    icon = {
-                        if (uiState.isConnected) {
-                            Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
-                        } else {
-                            Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
-                        }
-                    },
-                    text = { Text(text = if (uiState.isConnected) "Disconnect" else "Scan to connect") },
-                    expanded = fabExpanded
-                )
+            // Hide FAB on Clipboard tab
+            if (pagerState.currentPage != 1) {
+                AnimatedVisibility(visible = fabVisible, enter = scaleIn(), exit = scaleOut()) {
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            if (uiState.isConnected) {
+                                disconnect()
+                            } else {
+                                launchScanner(context)
+                            }
+                        },
+                        icon = {
+                            if (uiState.isConnected) {
+                                Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
+                            } else {
+                                Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
+                            }
+                        },
+                        text = { Text(text = if (uiState.isConnected) "Disconnect" else "Scan to connect") },
+                        expanded = fabExpanded
+                    )
+                }
             }
         },
         bottomBar = {
-            val items = listOf("Connect", "Settings")
-            val selectedIcons = listOf(Icons.Filled.Phonelink, Icons.Filled.Settings)
-            val unselectedIcons = listOf(Icons.Outlined.Phonelink, Icons.Outlined.Settings)
+            // Dynamic tab list - only include Clipboard when connected
+            val items = if (uiState.isConnected) {
+                listOf("Connect", "Clipboard", "Settings")
+            } else {
+                listOf("Connect", "Settings")
+            }
+            val selectedIcons = if (uiState.isConnected) {
+                listOf(Icons.Filled.Phonelink, Icons.Filled.ContentPaste, Icons.Filled.Settings)
+            } else {
+                listOf(Icons.Filled.Phonelink, Icons.Filled.Settings)
+            }
+            val unselectedIcons = if (uiState.isConnected) {
+                listOf(Icons.Outlined.Phonelink, Icons.Rounded.ContentPaste, Icons.Outlined.Settings)
+            } else {
+                listOf(Icons.Outlined.Phonelink, Icons.Outlined.Settings)
+            }
             NavigationBar(
                 windowInsets = NavigationBarDefaults.windowInsets
             ) {
@@ -509,20 +560,6 @@ fun AirSyncMainScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-
-                    // Permission Status Card
-                    AnimatedVisibility(
-                        visible = uiState.missingPermissions.isNotEmpty(),
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        PermissionStatusCard(
-                            missingPermissions = uiState.missingPermissions,
-                            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) },
-                            onRefreshPermissions = { viewModel.refreshPermissions(context) },
-                            onRequestNotificationPermission = onRequestNotificationPermission
-                        )
-                    }
 
                     // Connection Status Card
                     ConnectionStatusCard(
@@ -589,6 +626,110 @@ fun AirSyncMainScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
+                0 -> {
+                    // Connect tab - always visible
+                    // ...existing content...
+                }
+                1 -> {
+                    if (uiState.isConnected) {
+                        // When connected: page 1 = Clipboard
+                        ClipboardScreen(
+                            clipboardHistory = uiState.clipboardHistory,
+                            isConnected = uiState.isConnected,
+                            onSendText = { text ->
+                                viewModel.addClipboardEntry(text, isFromPc = false)
+                                val clipboardJson = JsonUtil.createClipboardUpdateJson(text)
+                                WebSocketUtil.sendMessage(clipboardJson)
+                            },
+                            onClearHistory = { viewModel.clearClipboardHistory() },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = innerPadding.calculateBottomPadding())
+                        )
+                    } else {
+                        // When disconnected: page 1 = Settings
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = innerPadding.calculateBottomPadding())
+                                .verticalScroll(settingsScrollState)
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            PermissionsCard(missingPermissionsCount = uiState.missingPermissions.size)
+                            QuickSettingsTipCard(isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(context))
+                            NotificationSyncCard(
+                                isNotificationEnabled = uiState.isNotificationEnabled,
+                                isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
+                                onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
+                                onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
+                            )
+                            SyncFeaturesCard(
+                                isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                                onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
+                                isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
+                                onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
+                                isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
+                                continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                                isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                                onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
+                                isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
+                                onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
+                                isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
+                                onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
+                            )
+                            ExpandNetworkingCard(context)
+                            DeviceInfoCard(
+                                deviceName = uiState.deviceNameInput,
+                                localIp = deviceInfo.localIp,
+                                onDeviceNameChange = { viewModel.updateDeviceName(it) }
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
+                    }
+                }
+                2 -> {
+                    // Page 2 only exists when connected = Settings tab
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = innerPadding.calculateBottomPadding())
+                            .verticalScroll(settingsScrollState)
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        PermissionsCard(missingPermissionsCount = uiState.missingPermissions.size)
+                        QuickSettingsTipCard(isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(context))
+                        NotificationSyncCard(
+                            isNotificationEnabled = uiState.isNotificationEnabled,
+                            isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
+                            onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
+                            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
+                        )
+                        SyncFeaturesCard(
+                            isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
+                            onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
+                            isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
+                            onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
+                            isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
+                            continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                            isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                            onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
+                            isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
+                            onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
+                            isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
+                            onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
+                        )
+                        ExpandNetworkingCard(context)
+                        DeviceInfoCard(
+                            deviceName = uiState.deviceNameInput,
+                            localIp = deviceInfo.localIp,
+                            onDeviceNameChange = { viewModel.updateDeviceName(it) }
+                        )
+                        // Developer mode and other elements here...
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                }
                 else -> {
                     // Settings tab content
                     Column(
@@ -599,6 +740,16 @@ fun AirSyncMainScreen(
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                    // Permissions Card
+                    PermissionsCard(
+                        missingPermissionsCount = uiState.missingPermissions.size
+                    )
+
+                    // Quick Settings Tip Card
+                    QuickSettingsTipCard(
+                        isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(context)
+                    )
+
                     // Notification Sync Settings Card
                     NotificationSyncCard(
                         isNotificationEnabled = uiState.isNotificationEnabled,
@@ -645,11 +796,18 @@ fun AirSyncMainScreen(
                             onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
                             isLoading = uiState.isLoading,
                             onSendDeviceInfo = {
+                                val adbPorts = try {
+                                    val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
+                                    discoveredServices.map { it.port.toString() }
+                                } catch (e: Exception) {
+                                    emptyList()
+                                }
                                 val message = JsonUtil.createDeviceInfoJson(
                                     deviceInfo.name,
                                     deviceInfo.localIp,
                                     uiState.port.toIntOrNull() ?: 6996,
-                                    versionName ?: "2.0.0"
+                                    versionName ?: "2.0.0",
+                                    adbPorts
                                 )
                                 sendMessage(message)
                             },

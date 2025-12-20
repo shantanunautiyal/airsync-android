@@ -16,12 +16,15 @@ import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
+import com.sameerasw.airsync.utils.ContactLookupHelper
 import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.google.gson.Gson
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -462,6 +465,12 @@ class MediaNotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
+                // Skip Phone app notifications - call handling is done via BroadcastReceiver
+                if (sbn.packageName == "com.google.android.dialer") {
+                    Log.d(TAG, "Skipping Phone app notification - call handling via BroadcastReceiver")
+                    return@launch
+                }
+
                 // Check if notification sync is enabled
                 val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
                 if (!isSyncEnabled) {
@@ -574,97 +583,6 @@ class MediaNotificationListener : NotificationListenerService() {
         }
     }
 
-    private suspend fun saveNewAppToPreferences(packageName: String, appName: String) {
-        try {
-            val currentApps = dataStoreManager.getNotificationApps().first().toMutableList()
-
-            // Check if app doesn't already exist
-            if (currentApps.none { it.packageName == packageName }) {
-                val packageManager = packageManager
-                val isSystemApp = try {
-                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                    (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
-                    (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error checking app: ${e.message}")
-                    false
-                }
-
-                val newApp = com.sameerasw.airsync.domain.model.NotificationApp(
-                    packageName = packageName,
-                    appName = appName,
-                    isEnabled = true, // Auto-enable new apps
-                    isSystemApp = isSystemApp,
-                    lastUpdated = System.currentTimeMillis()
-                )
-
-                currentApps.add(newApp)
-                dataStoreManager.saveNotificationApps(currentApps)
-                Log.d(TAG, "Added new app to preferences: $appName ($packageName)")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving new app to preferences: ${e.message}")
-        }
-    }
-
-    private fun shouldSkipNotification(sbn: StatusBarNotification): Boolean {
-        // Skip system packages
-        if (SYSTEM_PACKAGES.contains(sbn.packageName)) {
-            return true
-        }
-
-        // Skip if notification is not clearable (usually system notifications)
-        if (!sbn.isClearable) {
-            return true
-        }
-
-        // Skip ongoing notifications (like music players, downloads, etc.)
-        if (sbn.notification.flags and Notification.FLAG_ONGOING_EVENT != 0) {
-            return true
-        }
-
-        // Skip notifications without meaningful content
-        val extras = sbn.notification.extras
-        val title = extras.getString(Notification.EXTRA_TITLE)
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
-
-        return title.isNullOrEmpty() && text.isNullOrEmpty()
-    }
-
-    private fun getAppNameFromPackage(packageName: String): String {
-        return try {
-            val packageManager = packageManager
-            val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
-            packageManager.getApplicationLabel(applicationInfo).toString()
-        } catch (_: Exception) {
-            // Fallback to package name or friendly name
-            when (packageName) {
-                "com.whatsapp" -> "WhatsApp"
-                "com.telegram.messenger" -> "Telegram"
-                "com.discord" -> "Discord"
-                "com.slack" -> "Slack"
-                "com.microsoft.teams" -> "Microsoft Teams"
-                "com.google.android.gm" -> "Gmail"
-                "com.android.email" -> "Email"
-                "com.samsung.android.messaging" -> "Messages"
-                "com.google.android.apps.messaging" -> "Messages"
-                else -> packageName.split(".").lastOrNull()?.replaceFirstChar { it.uppercase() } ?: packageName
-            }
-        }
-    }
-
-    private suspend fun sendNotificationToDesktop(title: String, body: String, appName: String, sbn: StatusBarNotification) {
-        // replaced by processNotificationForSync path; keep for compatibility if referenced elsewhere
-        try {
-            val ipAddress = dataStoreManager.getIpAddress().first()
-            val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-            Log.d(TAG, "Skipping legacy send path to $ipAddress:$port; using unified processNotificationForSync")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in legacy sendNotificationToDesktop: ${e.message}")
-        }
-    }
-
-
     private fun updateMediaInfo() {
         currentMediaInfo = getMediaInfo(this)
         Log.d(TAG, "Updated media info: $currentMediaInfo")
@@ -685,5 +603,47 @@ class MediaNotificationListener : NotificationListenerService() {
         }
 
         return isDuplicate
+    }
+
+    private fun shouldSkipNotification(sbn: StatusBarNotification): Boolean {
+        // Skip system packages
+        if (SYSTEM_PACKAGES.contains(sbn.packageName)) {
+            return true
+        }
+        return false
+    }
+
+    private fun getAppNameFromPackage(packageName: String): String {
+        return try {
+            val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+            packageManager.getApplicationLabel(applicationInfo).toString()
+        } catch (e: Exception) {
+            packageName
+        }
+    }
+
+    private suspend fun saveNewAppToPreferences(packageName: String, appName: String) {
+        try {
+            val currentApps = dataStoreManager.getNotificationApps().first().toMutableList()
+            val isSystemApp = try {
+                val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
+                (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            } catch (e: Exception) {
+                false
+            }
+
+            val newApp = com.sameerasw.airsync.domain.model.NotificationApp(
+                packageName = packageName,
+                appName = appName,
+                isEnabled = true,
+                isSystemApp = isSystemApp,
+                lastUpdated = System.currentTimeMillis()
+            )
+
+            currentApps.add(newApp)
+            dataStoreManager.saveNotificationApps(currentApps)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving new app to preferences", e)
+        }
     }
 }
