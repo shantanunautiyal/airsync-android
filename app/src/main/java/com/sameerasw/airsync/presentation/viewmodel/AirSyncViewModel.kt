@@ -45,6 +45,19 @@ class AirSyncViewModel(
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
 
+    // Notes Role state
+    private val _stylusMode = MutableStateFlow(false)
+    val stylusMode: StateFlow<Boolean> = _stylusMode.asStateFlow()
+
+    private val _launchedFromLockScreen = MutableStateFlow(true)
+    val launchedFromLockScreen: StateFlow<Boolean> = _launchedFromLockScreen.asStateFlow()
+
+    private val _isFloatingWindow = MutableStateFlow(true)
+    val isFloatingWindow: StateFlow<Boolean> = _isFloatingWindow.asStateFlow()
+
+    private val _isNotesRoleHeld = MutableStateFlow(false)
+    val isNotesRoleHeld: StateFlow<Boolean> = _isNotesRoleHeld.asStateFlow()
+
     // Network monitoring
     private var isNetworkMonitoringActive = false
     private var previousNetworkIp: String? = null
@@ -665,6 +678,23 @@ class AirSyncViewModel(
     fun clearDisconnectionClipboardHistory() {
         // Clear clipboard history when disconnected
         _uiState.value = _uiState.value.copy(clipboardHistory = emptyList())
+    }
+
+    // Notes Role state setters
+    fun setStylusMode(enabled: Boolean) {
+        _stylusMode.value = enabled
+    }
+
+    fun setLaunchedFromLockScreen(isLockScreen: Boolean) {
+        _launchedFromLockScreen.value = isLockScreen
+    }
+
+    fun setIsFloatingWindow(isFloating: Boolean) {
+        _isFloatingWindow.value = isFloating
+    }
+
+    fun setIsNotesRoleHeld(held: Boolean) {
+        _isNotesRoleHeld.value = held
     }
 
 }

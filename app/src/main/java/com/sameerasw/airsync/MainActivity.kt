@@ -32,6 +32,10 @@ import android.content.Intent
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import com.sameerasw.airsync.utils.AdbMdnsDiscovery
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.NotesRoleManager
+import com.sameerasw.airsync.utils.KeyguardHelper
+import com.sameerasw.airsync.utils.ContentCaptureManager
+import android.widget.Toast
 
 object AdbDiscoveryHolder {
     private var discovery: AdbMdnsDiscovery? = null
@@ -73,6 +77,46 @@ class MainActivity : ComponentActivity() {
     ) { isGranted ->
     }
 
+    // Notes Role request launcher
+    private val notesRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            Log.d("MainActivity", "Notes Role granted successfully")
+            Toast.makeText(this, "Notes Role granted!", Toast.LENGTH_SHORT).show()
+        } else {
+            Log.d("MainActivity", "Notes Role request denied or cancelled")
+            Toast.makeText(this, "Notes Role request cancelled", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Content capture launcher
+    private val contentCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        ContentCaptureManager.handleCaptureResult(
+            resultCode = result.resultCode,
+            data = result.data,
+            onSuccess = { uri ->
+                Log.d("MainActivity", "Content captured: $uri")
+                Toast.makeText(this, "Content captured successfully", Toast.LENGTH_SHORT).show()
+                // TODO: Handle pasting captured image into clipboard chat
+            },
+            onFailed = {
+                Toast.makeText(this, "Content capture failed", Toast.LENGTH_SHORT).show()
+            },
+            onUserCanceled = {
+                Log.d("MainActivity", "User cancelled content capture")
+            },
+            onWindowModeUnsupported = {
+                Toast.makeText(this, "Content capture only available in floating window", Toast.LENGTH_SHORT).show()
+            },
+            onBlockedByAdmin = {
+                Toast.makeText(this, "Content capture blocked by administrator", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     private val qrScannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -90,6 +134,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Handle Notes Role intent
+        handleNotesRoleIntent(intent)
 
         // Start ADB discovery once at app startup and keep it running
         AdbDiscoveryHolder.initialize(this)
@@ -310,6 +357,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
 
+        // Handle Notes Role intent
+        handleNotesRoleIntent(intent)
+
         // Check if this is a QS tile long-press intent
         if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
             // Check if device is connected
@@ -336,5 +386,67 @@ class MainActivity : ComponentActivity() {
      */
     fun getDiscoveredAdbServices(): List<AdbMdnsDiscovery.AdbServiceInfo> {
         return AdbDiscoveryHolder.getDiscoveredServices()
+    }
+
+    /**
+     * Handles intents related to the Notes Role feature.
+     * Extracts stylus mode hint and lock screen status from the intent.
+     */
+    private fun handleNotesRoleIntent(intent: Intent?) {
+        // Check if this is an ACTION_CREATE_NOTE intent
+        if (intent?.action == Intent.ACTION_CREATE_NOTE) {
+            Log.d("MainActivity", "Received ACTION_CREATE_NOTE intent")
+
+            // Check if stylus mode is requested
+            val useStylusMode = NotesRoleManager.shouldUseStylusMode(intent)
+            Log.d("MainActivity", "Stylus mode: $useStylusMode")
+
+            // Check if launched from lock screen
+            val launchedFromLockScreen = KeyguardHelper.isKeyguardLocked(this)
+            Log.d("MainActivity", "Launched from lock screen: $launchedFromLockScreen")
+
+            // If locked and device is secure, request unlock
+            if (launchedFromLockScreen && KeyguardHelper.isKeyguardSecure(this)) {
+                KeyguardHelper.requestDismissKeyguard(
+                    this,
+                    onDismissSucceeded = {
+                        Log.d("MainActivity", "Device unlocked successfully")
+                    },
+                    onDismissError = {
+                        Log.w("MainActivity", "Failed to unlock device")
+                    }
+                )
+            }
+        }
+    }
+
+    /**
+     * Request the Notes Role for this app.
+     * Call this from a UI button or during app initialization.
+     */
+    fun requestNotesRole() {
+        if (NotesRoleManager.isNotesRoleAvailable(this)) {
+            NotesRoleManager.requestNotesRole(this, notesRoleLauncher)
+        } else {
+            Toast.makeText(this, "Notes Role not available on this device", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Launch content capture for note annotation.
+     * Should only be called when in floating window mode.
+     */
+    fun launchContentCapture() {
+        if (!NotesRoleManager.isRunningInFloatingWindow(this)) {
+            Toast.makeText(this, "Content capture only available in floating window", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (ContentCaptureManager.isScreenCaptureDisabled(this)) {
+            Toast.makeText(this, "Screen capture disabled by administrator", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        ContentCaptureManager.launchContentCapture(contentCaptureLauncher)
     }
 }
