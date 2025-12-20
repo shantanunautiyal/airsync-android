@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -23,9 +24,11 @@ import android.content.ClipDescription
 import android.view.DragEvent
 import android.util.Log
 import com.sameerasw.airsync.domain.model.ClipboardEntry
+import com.sameerasw.airsync.utils.HapticUtil
 import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.Job
 
 @Composable
 fun ClipboardScreen(
@@ -40,6 +43,18 @@ fun ClipboardScreen(
     var isDraggingOver by remember { mutableStateOf(false) }
     val lazyListState = rememberLazyListState()
     val view = LocalView.current
+    val haptics = LocalHapticFeedback.current
+    var dragHapticsJob by remember { mutableStateOf<Job?>(null) }
+
+    // Haptic feedback effect - continuous tick while dragging
+    LaunchedEffect(isDraggingOver) {
+        if (isDraggingOver && isConnected) {
+            dragHapticsJob = HapticUtil.startLoadingHaptics(haptics)
+        } else {
+            dragHapticsJob?.cancel()
+            dragHapticsJob = null
+        }
+    }
 
     // Auto-scroll to newest message when clipboard history changes
     LaunchedEffect(clipboardHistory.size) {
@@ -112,21 +127,44 @@ fun ClipboardScreen(
             }
         }
 
-        // Visual feedback when dragging over
+        // Drag and drop overlay
         if (isDraggingOver && isConnected) {
-            Surface(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                shape = RoundedCornerShape(ExtraCornerRadius),
-                color = MaterialTheme.colorScheme.primaryContainer
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Drop to send",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .wrapContentHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .size(80.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Drop to send",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+
+                    // Text feedback
+                    Text(
+                        text = "Drop to send",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
             }
         }
 
