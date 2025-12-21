@@ -9,7 +9,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -148,7 +149,7 @@ fun ClipboardScreen(
                         color = MaterialTheme.colorScheme.primary
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            imageVector = Icons.AutoMirrored.Rounded.Send,
                             contentDescription = "Drop to send",
                             modifier = Modifier
                                 .fillMaxSize()
@@ -167,35 +168,30 @@ fun ClipboardScreen(
             }
         }
 
-        // Clear button - only show when connected and chat not empty
-        if (isConnected && clipboardHistory.isNotEmpty()) {
-            Button(
-                onClick = onClearHistory,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            ) {
-                Text("Clear History")
-            }
-        }
-
         // Scrollable Message Area - takes remaining space
         Box(modifier = Modifier.weight(1f)) {
             // History List or Empty State
             if (clipboardHistory.isEmpty()) {
-                // Just show nothing when empty - spacer will center it visually
-                Box(modifier = Modifier.fillMaxWidth())
+                // Show "Nothing shared yet" when connected but no history
+                if (isConnected) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Nothing shared yet",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 16.dp),
                     reverseLayout = true
                 ) {
@@ -255,6 +251,9 @@ fun ClipboardScreen(
                             if (inputText.isNotBlank()) {
                                 onSendText(inputText)
                                 inputText = ""
+                            } else {
+                                // Clear history when input is empty
+                                onClearHistory()
                             }
                         },
                         modifier = Modifier
@@ -263,19 +262,23 @@ fun ClipboardScreen(
                                 color = if (inputText.isNotBlank()) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
+                                    MaterialTheme.colorScheme.errorContainer
                                 },
                                 shape = CircleShape
                             ),
-                        enabled = inputText.isNotBlank()
+                        enabled = inputText.isNotBlank() || clipboardHistory.isNotEmpty()
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
+                            imageVector = if (inputText.isNotBlank()) {
+                                Icons.AutoMirrored.Rounded.Send
+                            } else {
+                                Icons.Rounded.Delete
+                            },
+                            contentDescription = if (inputText.isNotBlank()) "Send" else "Clear history",
                             tint = if (inputText.isNotBlank()) {
                                 MaterialTheme.colorScheme.onPrimary
                             } else {
-                                MaterialTheme.colorScheme.outlineVariant
+                                MaterialTheme.colorScheme.onErrorContainer
                             }
                         )
                     }
@@ -312,14 +315,44 @@ private fun ClipboardEntryBubble(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
-        horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        // For received messages, show time first (on left)
+        if (isSent) {
+            Text(
+                text = timeString,
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+
+        // Create custom shape: very rounded except on the bottom corner opposite to sender
+        val bubbleShape = if (isSent) {
+            // Sent message: flat bottom-right, rounded everywhere else
+            RoundedCornerShape(
+                topStart = 28.dp,
+                topEnd = 28.dp,
+                bottomStart = 28.dp,
+                bottomEnd = 4.dp
+            )
+        } else {
+            // Received message: flat bottom-left, rounded everywhere else
+            RoundedCornerShape(
+                topStart = 28.dp,
+                topEnd = 28.dp,
+                bottomStart = 4.dp,
+                bottomEnd = 28.dp
+            )
+        }
+
         Surface(
             modifier = Modifier
                 .widthIn(max = 300.dp)
                 .wrapContentHeight()
                 .clickable { onBubbleTap() },
-            shape = MaterialTheme.shapes.extraSmall,
+            shape = bubbleShape,
             color = bubbleColor
         ) {
             Column(
@@ -333,19 +366,17 @@ private fun ClipboardEntryBubble(
                     maxLines = 5,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = timeString,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = textColor.copy(alpha = 0.7f)
-                    )
-                }
             }
+        }
+
+        // For sent messages, show time after (on left after reversing)
+        if (!isSent) {
+            Text(
+                text = timeString,
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
         }
     }
 }
