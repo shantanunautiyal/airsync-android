@@ -153,12 +153,14 @@ fun ConnectionStatusCard(
                 }
 
                 if (isConnected) {
-                    Icon(
-                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_24),
-                        contentDescription = "Connected",
-                        modifier = Modifier.padding(end = 8.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { LoadingIndicator() }
+//                    Icon(
+//                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_24),
+//                        contentDescription = "Connected",
+//                        modifier = Modifier.padding(end = 8.dp),
+//                        tint = MaterialTheme.colorScheme.primary
+//                    )
+
                 } else if (!isConnecting) {
                     Icon(
                         painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),

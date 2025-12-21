@@ -227,6 +227,8 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         "AirSync",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                     )
                                 }
