@@ -22,8 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.domain.model.ConnectedDevice
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
-import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
@@ -37,12 +35,8 @@ fun LastConnectedDeviceCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(
-            topStart = minCornerRadius,
-            topEnd = minCornerRadius,
-            bottomStart = ExtraCornerRadius,
-            bottomEnd = ExtraCornerRadius
-        ),) {
+        shape = MaterialTheme.shapes.extraSmall,
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Last Connected Device", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(8.dp))
@@ -120,12 +114,6 @@ fun LastConnectedDeviceCard(
                     onQuickConnect()
                 },
                 modifier = Modifier.fillMaxWidth().requiredHeight(65.dp).padding(top = 16.dp),
-                shape = RoundedCornerShape(
-                    topStart = minCornerRadius,
-                    topEnd = minCornerRadius,
-                    bottomStart = ExtraCornerRadius - minCornerRadius,
-                    bottomEnd = ExtraCornerRadius - minCornerRadius
-                )
             ) {
                 Text("Quick Connect")
             }

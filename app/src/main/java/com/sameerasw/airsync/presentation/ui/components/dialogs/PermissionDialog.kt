@@ -13,7 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 
 enum class PermissionType {
     NOTIFICATION_ACCESS,
@@ -53,8 +52,7 @@ fun PermissionExplanationDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            shape = RoundedCornerShape(ExtraCornerRadius),
-            tonalElevation = 8.dp
+            shape = MaterialTheme.shapes.extraSmall,
         ) {
             Column(
                 modifier = Modifier

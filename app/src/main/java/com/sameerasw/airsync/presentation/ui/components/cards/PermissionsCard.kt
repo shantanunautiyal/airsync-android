@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.painterResource
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.ui.activities.PermissionsActivity
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
@@ -31,18 +30,12 @@ fun PermissionsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 20.dp)
             .clickable {
                 HapticUtil.performClick(haptics)
                 val intent = Intent(context, PermissionsActivity::class.java)
                 context.startActivity(intent)
             },
-        shape = RoundedCornerShape(
-            topStart = ExtraCornerRadius,
-            topEnd = ExtraCornerRadius,
-            bottomStart = 8.dp,
-            bottomEnd = 8.dp
-        ),
+        shape = MaterialTheme.shapes.extraSmall,
         colors = CardDefaults.cardColors(
             containerColor = if (missingPermissionsCount > 0)
                 MaterialTheme.colorScheme.errorContainer

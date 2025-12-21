@@ -32,13 +32,7 @@ fun ExpandNetworkingCard(context: Context) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 0.dp, horizontal = 0.dp),
-        shape = RoundedCornerShape(
-            topStart = minCornerRadius,
-            topEnd = minCornerRadius,
-            bottomStart = minCornerRadius,
-            bottomEnd = minCornerRadius
-        ),
-        elevation = CardDefaults.cardElevation(2.dp)
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Row(
             modifier = Modifier

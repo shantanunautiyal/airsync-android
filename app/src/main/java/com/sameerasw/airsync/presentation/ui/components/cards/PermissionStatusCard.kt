@@ -26,7 +26,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionExplanationDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.PermissionType
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.QuickSettingsUtil
 import com.sameerasw.airsync.utils.HapticUtil
@@ -52,9 +51,7 @@ fun PermissionStatusCard(
     if (missingPermissions.isNotEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-            shape = RoundedCornerShape(
-                ExtraCornerRadius
-            ),
+            shape = MaterialTheme.shapes.extraSmall,
             colors = CardDefaults.cardColors(
                 containerColor = if (criticalPermissions.isNotEmpty())
                     MaterialTheme.colorScheme.secondaryContainer

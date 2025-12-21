@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 import com.sameerasw.airsync.utils.QuickSettingsUtil
 
@@ -28,12 +27,7 @@ fun QuickSettingsTipCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 0.dp),
-        shape = RoundedCornerShape(
-            topStart = 8.dp,
-            topEnd = 8.dp,
-            bottomStart = ExtraCornerRadius,
-            bottomEnd = ExtraCornerRadius
-        ),
+        shape = MaterialTheme.shapes.extraSmall,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )

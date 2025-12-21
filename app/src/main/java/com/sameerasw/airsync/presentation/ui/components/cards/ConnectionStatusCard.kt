@@ -4,14 +4,11 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -30,11 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.UiState
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
-import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.HapticUtil
 
@@ -50,17 +44,6 @@ fun ConnectionStatusCard(
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
 
-    val cardShape = if (!isConnected) {
-        RoundedCornerShape(
-            topStart = ExtraCornerRadius,
-            topEnd = ExtraCornerRadius,
-            bottomStart = minCornerRadius,
-            bottomEnd = minCornerRadius
-        )
-    } else {
-        RoundedCornerShape(ExtraCornerRadius)
-    }
-
     // Determine gradient color
     val gradientColor = when {
         isConnected -> Color(0xFF4CAF50) // Green
@@ -71,10 +54,9 @@ fun ConnectionStatusCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 20.dp)
             .defaultMinSize(minHeight = if (isConnected) 160.dp else 50.dp)
             .animateContentSize(),
-        shape = cardShape,
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Column(
             modifier = Modifier

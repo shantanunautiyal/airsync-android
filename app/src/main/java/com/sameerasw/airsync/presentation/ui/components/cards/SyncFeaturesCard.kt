@@ -44,12 +44,7 @@ fun SyncFeaturesCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(
-            topStart = minCornerRadius,
-            topEnd = minCornerRadius,
-            bottomStart = minCornerRadius,
-            bottomEnd = minCornerRadius
-        ),
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(

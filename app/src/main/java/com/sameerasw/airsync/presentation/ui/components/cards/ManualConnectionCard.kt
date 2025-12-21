@@ -15,8 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.UiState
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
-import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
@@ -34,21 +32,10 @@ fun ManualConnectionCard(
 ) {
     val haptics = LocalHapticFeedback.current
     var expanded by remember { mutableStateOf(false) }
-    val cardShape =if (lastConnected) {
-        RoundedCornerShape(minCornerRadius)
-    } else {
-        RoundedCornerShape(
-            topStart = minCornerRadius,
-            topEnd = minCornerRadius,
-            bottomStart = ExtraCornerRadius,
-            bottomEnd = ExtraCornerRadius
-        )
-    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = cardShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -78,7 +65,6 @@ fun ManualConnectionCard(
                                 onQrScanClick()
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(minCornerRadius)
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.rounded_qr_code_scanner_24),
@@ -133,12 +119,6 @@ fun ManualConnectionCard(
                             onConnect()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(
-                            topStart = minCornerRadius,
-                            topEnd = minCornerRadius,
-                            bottomStart = ExtraCornerRadius - minCornerRadius,
-                            bottomEnd = ExtraCornerRadius - minCornerRadius
-                        )
                     ) {
                         Text("Connect")
                     }

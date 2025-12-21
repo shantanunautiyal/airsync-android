@@ -25,7 +25,6 @@ import android.view.DragEvent
 import android.util.Log
 import com.sameerasw.airsync.domain.model.ClipboardEntry
 import com.sameerasw.airsync.utils.HapticUtil
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.Job
@@ -220,7 +219,7 @@ fun ClipboardScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = ExtraCornerRadius, topEnd = ExtraCornerRadius),
+                shape = MaterialTheme.shapes.extraSmall,
                 color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Row(
@@ -242,7 +241,7 @@ fun ClipboardScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.extraSmall,
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                             focusedContainerColor = MaterialTheme.colorScheme.surface
@@ -320,12 +319,7 @@ private fun ClipboardEntryBubble(
                 .widthIn(max = 300.dp)
                 .wrapContentHeight()
                 .clickable { onBubbleTap() },
-            shape = RoundedCornerShape(
-                topStart = 12.dp,
-                topEnd = 12.dp,
-                bottomStart = if (isSent) 12.dp else 4.dp,
-                bottomEnd = if (isSent) 4.dp else 12.dp
-            ),
+            shape = MaterialTheme.shapes.extraSmall,
             color = bubbleColor
         ) {
             Column(
