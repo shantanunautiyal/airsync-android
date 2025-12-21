@@ -53,7 +53,8 @@ fun AboutDialog(
         text = {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier.padding(top = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = description,
@@ -61,7 +62,7 @@ fun AboutDialog(
                     textAlign = TextAlign.Left
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Website button
                 Button(
@@ -74,8 +75,6 @@ fun AboutDialog(
                 ) {
                     Text("Website")
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 // HOw to
                 OutlinedButton(
@@ -101,8 +100,6 @@ fun AboutDialog(
                     Text("Get the mac app")
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
                 // Get AirSync+ button
                 OutlinedButton(
                     onClick = {
@@ -115,7 +112,7 @@ fun AboutDialog(
                     Text("Get AirSync+")
                 }
 
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Image(
                     painter = painterResource(id = R.drawable.avatar),
@@ -139,7 +136,7 @@ fun AboutDialog(
                         }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     "Developed by $developerName",
@@ -148,12 +145,12 @@ fun AboutDialog(
                 )
                 
                 Text(
-                    "With ❤\uFE0F",
+                    "With ❤\uFE0F from \uD83C\uDDF1\uD83C\uDDF0",
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 Text(
                     "Version $versionName",
