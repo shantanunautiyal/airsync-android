@@ -53,7 +53,7 @@ fun PermissionsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 20.dp),
-                shape = MaterialTheme.shapes.extraSmall,
+                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -66,7 +66,7 @@ fun PermissionsScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        "＼(>o<)ノ All Permissions Granted",
+                        "(/^▽^)/ All Permissions Granted",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )

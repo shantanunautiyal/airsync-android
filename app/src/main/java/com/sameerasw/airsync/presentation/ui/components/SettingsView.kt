@@ -35,7 +35,9 @@ import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCa
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTipCard
-import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
+import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardFeaturesCard
+import com.sameerasw.airsync.presentation.ui.components.cards.SendNowPlayingCard
+import com.sameerasw.airsync.presentation.ui.components.cards.SmartspacerCard
 import com.sameerasw.airsync.utils.HapticUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,30 +109,38 @@ fun SettingsView(
                     },
                     onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                 )
-                SyncFeaturesCard(
+
+                ClipboardFeaturesCard(
                     isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                    onToggleClipboardSync = { enabled ->
+                    onToggleClipboardSync = { enabled: Boolean ->
                         viewModel.setClipboardSyncEnabled(enabled)
                     },
                     isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
-                    onToggleContinueBrowsing = { enabled ->
+                    onToggleContinueBrowsing = { enabled: Boolean ->
                         viewModel.setContinueBrowsingEnabled(enabled)
                     },
                     isContinueBrowsingToggleEnabled = true,
                     continueBrowsingSubtitle = "Prompt to open shared links in browser",
-                    isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                    onToggleSendNowPlaying = { enabled ->
-                        viewModel.setSendNowPlayingEnabled(enabled)
-                    },
                     isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                    onToggleKeepPreviousLink = { enabled ->
+                    onToggleKeepPreviousLink = { enabled: Boolean ->
                         viewModel.setKeepPreviousLinkEnabled(enabled)
-                    },
+                    }
+                )
+
+                SendNowPlayingCard(
+                    isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
+                    onToggleSendNowPlaying = { enabled: Boolean ->
+                        viewModel.setSendNowPlayingEnabled(enabled)
+                    }
+                )
+
+                SmartspacerCard(
                     isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
-                    onToggleSmartspacerShowWhenDisconnected = { enabled ->
+                    onToggleSmartspacerShowWhenDisconnected = { enabled: Boolean ->
                         viewModel.setSmartspacerShowWhenDisconnected(enabled)
                     }
                 )
+
                 ExpandNetworkingCard(context)
             }
 

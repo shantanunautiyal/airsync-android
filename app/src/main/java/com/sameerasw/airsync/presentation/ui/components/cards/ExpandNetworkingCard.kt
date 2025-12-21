@@ -41,7 +41,7 @@ fun ExpandNetworkingCard(context: Context) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("Expand networking")
+                Text("Expand networking", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Allow connecting to device outside the local network",
                     modifier = Modifier.padding(top = 4.dp),

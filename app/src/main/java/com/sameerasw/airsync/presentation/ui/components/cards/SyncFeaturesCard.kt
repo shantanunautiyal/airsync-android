@@ -21,7 +21,7 @@ import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
-fun SyncFeaturesCard(
+fun ClipboardFeaturesCard(
     isClipboardSyncEnabled: Boolean,
     onToggleClipboardSync: (Boolean) -> Unit,
     // Continue Browsing props
@@ -30,15 +30,9 @@ fun SyncFeaturesCard(
     // New: control the UI enabled state and subtitle for Continue Browsing
     isContinueBrowsingToggleEnabled: Boolean,
     continueBrowsingSubtitle: String,
-    // New: Send now playing props
-    isSendNowPlayingEnabled: Boolean,
-    onToggleSendNowPlaying: (Boolean) -> Unit,
     // New: Keep previous link props
     isKeepPreviousLinkEnabled: Boolean,
     onToggleKeepPreviousLink: (Boolean) -> Unit,
-    // New: Smartspacer props
-    isSmartspacerShowWhenDisconnected: Boolean,
-    onToggleSmartspacerShowWhenDisconnected: (Boolean) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
 
@@ -95,7 +89,7 @@ fun SyncFeaturesCard(
                 )
             }
 
-            // Keep previous link toggle under Send now playing
+            // Keep previous link toggle under Continue Browsing
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -118,56 +112,6 @@ fun SyncFeaturesCard(
                         onToggleKeepPreviousLink(enabled)
                     },
                     enabled = isContinueBrowsingToggleEnabled
-                )
-            }
-
-            // Send now playing toggle under Continue Browsing
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Send now playing", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Share media playback details with desktop",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = isSendNowPlayingEnabled,
-                    onCheckedChange = { enabled ->
-                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
-                        onToggleSendNowPlaying(enabled)
-                    }
-                )
-            }
-
-            // Smartspacer toggle displayed under Send now playing
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Smartspacer", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Show Smartspacer when disconnected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = isSmartspacerShowWhenDisconnected,
-                    onCheckedChange = { enabled ->
-                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(haptics)
-                        onToggleSmartspacerShowWhenDisconnected(enabled)
-                    }
                 )
             }
 
