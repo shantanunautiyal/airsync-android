@@ -37,6 +37,11 @@ import com.sameerasw.airsync.utils.KeyguardHelper
 import com.sameerasw.airsync.utils.ContentCaptureManager
 import android.widget.Toast
 
+import android.animation.ObjectAnimator
+import android.view.animation.AnticipateInterpolator
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.animation.doOnEnd
+
 object AdbDiscoveryHolder {
     private var discovery: AdbMdnsDiscovery? = null
 
@@ -54,6 +59,8 @@ object AdbDiscoveryHolder {
 }
 
 class MainActivity : ComponentActivity() {
+    // Flag to keep splash screen visible during app initialization
+    private var isAppReady = false
 
     // Permission launcher for Android 13+ notification permission
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -134,6 +141,64 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Install and configure the splash screen before any UI rendering
+        val splashScreen = installSplashScreen()
+
+        // Keep splash screen visible while app is loading
+        splashScreen.setKeepOnScreenCondition { !isAppReady }
+
+        // Customize the exit animation
+        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+            try {
+                val splashScreenView = splashScreenViewProvider.view
+                val splashIcon = splashScreenViewProvider.iconView
+
+                // Animate the splash screen view fade out
+                val fadeOut = ObjectAnimator.ofFloat(splashScreenView, "alpha", 1f, 0f).apply {
+                    interpolator = AnticipateInterpolator()
+                    duration = 750
+                }
+                fadeOut.doOnEnd {
+                    splashScreenViewProvider.remove()
+                }
+
+                // Safely animate the icon if it exists (OEM device compatibility)
+                try {
+                    @Suppress("SENSELESS_COMPARISON")
+                    if (splashIcon != null) {
+                        // Scale down animation
+                        val scaleUp = ObjectAnimator.ofFloat(splashIcon, "scaleX", 1f, 0.2f).apply {
+                            interpolator = AnticipateInterpolator()
+                            duration = 750
+                        }
+
+                        val scaleUpY = ObjectAnimator.ofFloat(splashIcon, "scaleY", 1f, 0.2f).apply {
+                            interpolator = AnticipateInterpolator()
+                            duration = 750
+                        }
+
+                        scaleUp.start()
+                        scaleUpY.start()
+                    } else {
+                        Log.w("SplashScreen", "iconView is null - OEM device detected")
+                    }
+                } catch (e: NullPointerException) {
+                    // Handle the edge case where iconView becomes null between check and animation
+                    Log.w("SplashScreen", "NullPointerException on iconView animation - likely OEM device", e)
+                }
+
+                fadeOut.start()
+            } catch (e: Exception) {
+                // Fallback for any unexpected exceptions during animation
+                Log.e("SplashScreen", "Exception during splash screen animation", e)
+                try {
+                    splashScreenViewProvider.remove()
+                } catch (e2: Exception) {
+                    Log.e("SplashScreen", "Exception during splash screen removal", e2)
+                }
+            }
+        }
 
         // Handle Notes Role intent
         handleNotesRoleIntent(intent)
@@ -263,6 +328,11 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                }
+
+                // Mark app as ready after composing so splash screen can exit
+                LaunchedEffect(Unit) {
+                    isAppReady = true
                 }
             }
         }
