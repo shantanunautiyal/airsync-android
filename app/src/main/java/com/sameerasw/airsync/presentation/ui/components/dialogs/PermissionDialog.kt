@@ -1,18 +1,18 @@
 package com.sameerasw.airsync.presentation.ui.components.dialogs
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.sameerasw.airsync.R
 
 enum class PermissionType {
     NOTIFICATION_ACCESS,
@@ -26,7 +26,7 @@ enum class PermissionType {
 
 data class PermissionInfo(
     val title: String,
-    val icon: String,
+    val icon: Int,
     val description: String,
     val whyNeeded: String,
     val buttonText: String
@@ -52,12 +52,12 @@ fun PermissionExplanationDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            shape = MaterialTheme.shapes.extraSmall,
+            shape = MaterialTheme.shapes.extraLarge,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
+                    .padding(18.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -66,9 +66,11 @@ fun PermissionExplanationDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = permissionInfo.icon,
-                        style = MaterialTheme.typography.headlineMedium
+                    Icon(
+                        painter = painterResource(id = permissionInfo.icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = permissionInfo.title,
@@ -78,8 +80,6 @@ fun PermissionExplanationDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
-
-                HorizontalDivider()
 
                 // Description
                 Text(
@@ -92,7 +92,7 @@ fun PermissionExplanationDialog(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     )
                 ) {
                     Column(
@@ -114,18 +114,18 @@ fun PermissionExplanationDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
                 // Action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+
+                    Spacer(modifier = Modifier.weight(1f))
+
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Maybe Later")
+                        Text("Dismiss")
                     }
 
                     Button(
@@ -133,7 +133,6 @@ fun PermissionExplanationDialog(
                             onGrantPermission()
                             onDismiss()
                         },
-                        modifier = Modifier.weight(2f)
                     ) {
                         Text(permissionInfo.buttonText)
                     }
@@ -147,7 +146,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
     return when (permissionType) {
         PermissionType.NOTIFICATION_ACCESS -> PermissionInfo(
             title = "Notification Access",
-            icon = "🔔",
+            icon = R.drawable.rounded_notification_settings_24,
             description = "AirSync needs access to read your device notifications to sync them with your mac in real-time.",
             whyNeeded = "This is the core functionality of AirSync. Without notification access, the app cannot read incoming notifications from other apps and forward them to your mac. \nThe media now playing status also relies on this permission. \nThe app will use this permission only for the explained use cases and will always sync these data via an encrypted local network",
             buttonText = "Grant Notification Access"
@@ -155,7 +154,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
 
         PermissionType.POST_NOTIFICATIONS -> PermissionInfo(
             title = "Post Notifications",
-            icon = "📱",
+            icon = R.drawable.rounded_notifications_active_24,
             description = "On Android 13+, apps need explicit permission to display notifications. AirSync uses this to show connection status and sync confirmations.",
             whyNeeded = "AirSync needs to show you important notifications about connection status, sync progress, and any errors that occur during operation.",
             buttonText = "Allow Notifications"
@@ -163,7 +162,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
 
         PermissionType.BACKGROUND_USAGE -> PermissionInfo(
             title = "Background App Usage",
-            icon = "🔋",
+            icon = R.drawable.rounded_local_laundry_service_24,
             description = "Android's battery optimization can kill background apps. Disabling this for AirSync ensures reliable notification syncing even when you're not actively using the app.",
             whyNeeded = "Modern Android aggressively kills background apps to save battery. AirSync needs to run continuously to sync notifications in real-time. \nThis may result in minor battery drain increases but will ensure the connection stays stable and functions when the app is not in focus like QS tiles work well.",
             buttonText = "Disable Battery Optimization"
@@ -171,7 +170,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
 
         PermissionType.WALLPAPER_ACCESS -> PermissionInfo(
             title = "Wallpaper & File Access",
-            icon = "🖼️",
+            icon = R.drawable.rounded_folder_managed_24,
             description = "This optional permission allows AirSync to sync your phone's wallpaper to your mac.",
             whyNeeded = "To read your current wallpaper which is not accessible with regular privileges,  AirSync needs external storage permissions. \nBut the app will only use the permission for the given explained use cases and will not alter or read any other files on the storage.",
             buttonText = "Grant Storage Access"
@@ -179,7 +178,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
 
         PermissionType.CALL_LOG -> PermissionInfo(
             title = "Call Log Access",
-            icon = "📞",
+            icon = R.drawable.rounded_call_log_24,
             description = "Read call log of the device.",
             whyNeeded = "Gather and sync call status to your other devices.",
             buttonText = "Grant Call Log Access"
@@ -187,7 +186,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
 
         PermissionType.CONTACTS -> PermissionInfo(
             title = "Contacts Access",
-            icon = "👤",
+            icon = R.drawable.rounded_contacts_24,
             description = "Show caller info on mac",
             whyNeeded = "Use your contacts registry to find and display details about any calls and the caller.",
             buttonText = "Grant Contacts Access"
@@ -195,7 +194,7 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
 
         PermissionType.PHONE -> PermissionInfo(
             title = "Phone Access",
-            icon = "📱",
+            icon = R.drawable.rounded_settings_phone_24,
             description = "Detect call state",
             whyNeeded = "AirSync will monitor and display ongoing call status on mac. \nAirSync will never access your call audio or store any sensitive data. Android system does not allow accessing call audio to any other application than the dialer.",
             buttonText = "Grant Phone Access"
