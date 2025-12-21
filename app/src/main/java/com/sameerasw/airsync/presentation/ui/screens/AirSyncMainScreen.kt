@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.outlined.Phonelink
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
@@ -505,11 +507,29 @@ fun AirSyncMainScreen(
                         icon = {
                             val selected = pagerState.currentPage == index
                             val iconOffset by animateDpAsState(targetValue = if (selected) 0.dp else 2.dp, label = "NavIconOffset")
-                            Icon(
-                                imageVector = if (selected) selectedIcons[index] else unselectedIcons[index],
-                                contentDescription = item,
-                                modifier = Modifier.offset(y = iconOffset)
-                            )
+
+                            // Show badge on Settings tab if there are missing permissions
+                            if (item == "Settings") {
+                                BadgedBox(
+                                    badge = {
+                                        if (uiState.missingPermissions.isNotEmpty()) {
+                                            Badge() // Show dot without number
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (selected) selectedIcons[index] else unselectedIcons[index],
+                                        contentDescription = item,
+                                        modifier = Modifier.offset(y = iconOffset)
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = if (selected) selectedIcons[index] else unselectedIcons[index],
+                                    contentDescription = item,
+                                    modifier = Modifier.offset(y = iconOffset)
+                                )
+                            }
                         },
                         label = {
                             val selected = pagerState.currentPage == index
