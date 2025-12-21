@@ -17,7 +17,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
@@ -44,24 +43,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
-import com.sameerasw.airsync.utils.DeviceInfoUtil
 import com.sameerasw.airsync.utils.JsonUtil
-import com.sameerasw.airsync.utils.TestNotificationUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.utils.HapticUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.sameerasw.airsync.presentation.ui.components.cards.SyncFeaturesCard
-import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
-import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
-import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
-import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
-import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTipCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
@@ -70,6 +60,7 @@ import kotlinx.coroutines.Job
 import java.net.URLDecoder
 import androidx.core.net.toUri
 import com.sameerasw.airsync.presentation.ui.components.RoundedCardContainer
+import com.sameerasw.airsync.presentation.ui.components.SettingsView
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -561,6 +552,8 @@ fun AirSyncMainScreen(
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
 
+                        Spacer(modifier = Modifier.height(0.dp))
+
                         RoundedCardContainer {
 
                             // Connection Status Card
@@ -654,382 +647,44 @@ fun AirSyncMainScreen(
                         )
                     } else {
                         // When disconnected: page 1 = Settings
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(bottom = innerPadding.calculateBottomPadding())
-                                .verticalScroll(settingsScrollState)
-                                .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(24.dp)
-                        ) {
-                            RoundedCardContainer {
-                                PermissionsCard(missingPermissionsCount = uiState.missingPermissions.size)
-                                QuickSettingsTipCard(
-                                    isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(
-                                        context
-                                    )
-                                )
-                            }
-
-                            RoundedCardContainer {
-                                NotificationSyncCard(
-                                    isNotificationEnabled = uiState.isNotificationEnabled,
-                                    isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
-                                    onToggleSync = { enabled ->
-                                        viewModel.setNotificationSyncEnabled(
-                                            enabled
-                                        )
-                                    },
-                                    onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
-                                )
-                                SyncFeaturesCard(
-                                    isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                                    onToggleClipboardSync = { enabled ->
-                                        viewModel.setClipboardSyncEnabled(
-                                            enabled
-                                        )
-                                    },
-                                    isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
-                                    onToggleContinueBrowsing = { enabled ->
-                                        viewModel.setContinueBrowsingEnabled(
-                                            enabled
-                                        )
-                                    },
-                                    isContinueBrowsingToggleEnabled = true,
-                                    continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
-                                    isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                                    onToggleSendNowPlaying = { enabled ->
-                                        viewModel.setSendNowPlayingEnabled(
-                                            enabled
-                                        )
-                                    },
-                                    isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                                    onToggleKeepPreviousLink = { enabled ->
-                                        viewModel.setKeepPreviousLinkEnabled(
-                                            enabled
-                                        )
-                                    },
-                                    isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
-                                    onToggleSmartspacerShowWhenDisconnected = { enabled ->
-                                        viewModel.setSmartspacerShowWhenDisconnected(
-                                            enabled
-                                        )
-                                    }
-                                )
-                                ExpandNetworkingCard(context)
-                            }
-
-                            RoundedCardContainer {
-                                DeviceInfoCard(
-                                    deviceName = uiState.deviceNameInput,
-                                    localIp = deviceInfo.localIp,
-                                    onDeviceNameChange = { viewModel.updateDeviceName(it) }
-                                )
-                            }
-
-                            RoundedCardContainer {
-                                // Developer Mode Card
-                                AnimatedVisibility(
-                                    visible = uiState.isDeveloperModeVisible,
-                                    enter = expandVertically() + fadeIn(),
-                                    exit = shrinkVertically() + fadeOut()
-                                ) {
-                                    DeveloperModeCard(
-                                        isDeveloperMode = uiState.isDeveloperMode,
-                                        onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
-                                        isLoading = uiState.isLoading,
-                                        onSendDeviceInfo = {
-                                            val adbPorts = try {
-                                                val discoveredServices =
-                                                    com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
-                                                discoveredServices.map { it.port.toString() }
-                                            } catch (_: Exception) {
-                                                emptyList()
-                                            }
-                                            val message = JsonUtil.createDeviceInfoJson(
-                                                deviceInfo.name,
-                                                deviceInfo.localIp,
-                                                uiState.port.toIntOrNull() ?: 6996,
-                                                versionName ?: "2.0.0",
-                                                adbPorts
-                                            )
-                                            sendMessage(message)
-                                        },
-                                        onSendNotification = {
-                                            val testNotification =
-                                                TestNotificationUtil.generateRandomNotification()
-                                            val message = JsonUtil.createNotificationJson(
-                                                testNotification.id,
-                                                testNotification.title,
-                                                testNotification.body,
-                                                testNotification.appName,
-                                                testNotification.packageName
-                                            )
-                                            sendMessage(message)
-                                        },
-                                        onSendDeviceStatus = {
-                                            val message =
-                                                DeviceInfoUtil.generateDeviceStatusJson(context)
-                                            sendMessage(message)
-                                        },
-                                        onExportData = {
-                                            viewModel.setLoading(true)
-                                            scope.launch(Dispatchers.IO) {
-                                                val json = viewModel.exportAllDataToJson(context)
-                                                if (json == null) {
-                                                    scope.launch(Dispatchers.Main) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Export failed",
-                                                            Toast.LENGTH_LONG
-                                                        ).show()
-                                                        viewModel.setLoading(false)
-                                                    }
-                                                } else {
-                                                    pendingExportJson = json
-                                                    scope.launch(Dispatchers.Main) {
-                                                        createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        onImportData = {
-                                            openDocLauncher.launch(arrayOf("application/json"))
-                                        }
-                                    )
-                                }
-
-                                // Manual Icon Sync Button
-                                Button(
-                                    onClick = {
-                                        HapticUtil.performClick(haptics)
-                                        viewModel.manualSyncAppIcons(context)
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                    enabled = uiState.isConnected && !uiState.isIconSyncLoading
-                                ) {
-                                    if (uiState.isIconSyncLoading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                    }
-                                    Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
-                                }
-
-                                // Icon Sync Message Display
-                                AnimatedVisibility(
-                                    visible = uiState.iconSyncMessage.isNotEmpty(),
-                                    enter = expandVertically() + fadeIn(),
-                                    exit = shrinkVertically() + fadeOut()
-                                ) {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = MaterialTheme.shapes.extraSmall,
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
-                                                MaterialTheme.colorScheme.primaryContainer
-                                            else MaterialTheme.colorScheme.errorContainer
-                                        )
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = uiState.iconSyncMessage,
-                                                modifier = Modifier.weight(1f),
-                                                color = if (uiState.iconSyncMessage.contains("Successfully"))
-                                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                                else MaterialTheme.colorScheme.onErrorContainer
-                                            )
-                                            TextButton(onClick = {
-                                                HapticUtil.performClick(haptics)
-                                                viewModel.clearIconSyncMessage()
-                                            }) {
-                                                Text("Dismiss")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-                        }
+                        SettingsView(
+                            modifier = Modifier.fillMaxSize(),
+                            context = context,
+                            innerPaddingBottom = innerPadding.calculateBottomPadding(),
+                            uiState = uiState,
+                            deviceInfo = deviceInfo,
+                            versionName = versionName,
+                            viewModel = viewModel,
+                            scrollState = settingsScrollState,
+                            scope = scope,
+                            onSendMessage = { message -> sendMessage(message) },
+                            onExport = { json ->
+                                pendingExportJson = json
+                                createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
+                            },
+                            onImport = { openDocLauncher.launch(arrayOf("application/json")) }
+                        )
                     }
                 }
                 2 -> {
                     // Page 2 only exists when connected = Settings tab
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = innerPadding.calculateBottomPadding())
-                            .verticalScroll(settingsScrollState)
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        PermissionsCard(missingPermissionsCount = uiState.missingPermissions.size)
-                        QuickSettingsTipCard(isQSTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(context))
-                        NotificationSyncCard(
-                            isNotificationEnabled = uiState.isNotificationEnabled,
-                            isNotificationSyncEnabled = uiState.isNotificationSyncEnabled,
-                            onToggleSync = { enabled -> viewModel.setNotificationSyncEnabled(enabled) },
-                            onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
-                        )
-                        SyncFeaturesCard(
-                            isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
-                            onToggleClipboardSync = { enabled -> viewModel.setClipboardSyncEnabled(enabled) },
-                            isContinueBrowsingEnabled = uiState.isContinueBrowsingEnabled,
-                            onToggleContinueBrowsing = { enabled -> viewModel.setContinueBrowsingEnabled(enabled) },
-                            isContinueBrowsingToggleEnabled = if (uiState.isConnected) uiState.lastConnectedDevice?.isPlus == true else true,
-                            continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
-                            isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                            onToggleSendNowPlaying = { enabled -> viewModel.setSendNowPlayingEnabled(enabled) },
-                            isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
-                            onToggleKeepPreviousLink = { enabled -> viewModel.setKeepPreviousLinkEnabled(enabled) },
-                            isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
-                            onToggleSmartspacerShowWhenDisconnected = { enabled -> viewModel.setSmartspacerShowWhenDisconnected(enabled) }
-                        )
-                        ExpandNetworkingCard(context)
-                        DeviceInfoCard(
-                            deviceName = uiState.deviceNameInput,
-                            localIp = deviceInfo.localIp,
-                            onDeviceNameChange = { viewModel.updateDeviceName(it) }
-                        )
-
-                        // Developer Mode Card
-                        AnimatedVisibility(
-                            visible = uiState.isDeveloperModeVisible,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            DeveloperModeCard(
-                                isDeveloperMode = uiState.isDeveloperMode,
-                                onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
-                                isLoading = uiState.isLoading,
-                                onSendDeviceInfo = {
-                                    val adbPorts = try {
-                                        val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
-                                        discoveredServices.map { it.port.toString() }
-                                    } catch (_: Exception) {
-                                        emptyList()
-                                    }
-                                    val message = JsonUtil.createDeviceInfoJson(
-                                        deviceInfo.name,
-                                        deviceInfo.localIp,
-                                        uiState.port.toIntOrNull() ?: 6996,
-                                        versionName ?: "2.0.0",
-                                        adbPorts
-                                    )
-                                    sendMessage(message)
-                                },
-                                onSendNotification = {
-                                    val testNotification = TestNotificationUtil.generateRandomNotification()
-                                    val message = JsonUtil.createNotificationJson(
-                                        testNotification.id,
-                                        testNotification.title,
-                                        testNotification.body,
-                                        testNotification.appName,
-                                        testNotification.packageName
-                                    )
-                                    sendMessage(message)
-                                },
-                                onSendDeviceStatus = {
-                                    val message = DeviceInfoUtil.generateDeviceStatusJson(context)
-                                    sendMessage(message)
-                                },
-                                onExportData = {
-                                    viewModel.setLoading(true)
-                                    scope.launch(Dispatchers.IO) {
-                                        val json = viewModel.exportAllDataToJson(context)
-                                        if (json == null) {
-                                            scope.launch(Dispatchers.Main) {
-                                                Toast.makeText(context, "Export failed", Toast.LENGTH_LONG).show()
-                                                viewModel.setLoading(false)
-                                            }
-                                        } else {
-                                            pendingExportJson = json
-                                            scope.launch(Dispatchers.Main) {
-                                                createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
-                                            }
-                                        }
-                                    }
-                                },
-                                onImportData = {
-                                    openDocLauncher.launch(arrayOf("application/json"))
-                                }
-                            )
-                        }
-
-                        // Manual Icon Sync Button
-                        OutlinedButton(
-                            onClick = {
-                                HapticUtil.performClick(haptics)
-                                viewModel.manualSyncAppIcons(context)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            enabled = uiState.isConnected && !uiState.isIconSyncLoading
-                        ) {
-                            if (uiState.isIconSyncLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(if (uiState.isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
-                        }
-
-                        // Icon Sync Message Display
-                        AnimatedVisibility(
-                            visible = uiState.iconSyncMessage.isNotEmpty(),
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.extraSmall,
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (uiState.iconSyncMessage.contains("Successfully"))
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.errorContainer
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = uiState.iconSyncMessage,
-                                        modifier = Modifier.weight(1f),
-                                        color = if (uiState.iconSyncMessage.contains("Successfully"))
-                                            MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                    TextButton(onClick = {
-                                        HapticUtil.performClick(haptics)
-                                        viewModel.clearIconSyncMessage()
-                                    }) {
-                                        Text("Dismiss")
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
+                    SettingsView(
+                        modifier = Modifier.fillMaxSize(),
+                        context = context,
+                        innerPaddingBottom = innerPadding.calculateBottomPadding(),
+                        uiState = uiState,
+                        deviceInfo = deviceInfo,
+                        versionName = versionName,
+                        viewModel = viewModel,
+                        scrollState = settingsScrollState,
+                        scope = scope,
+                        onSendMessage = { message -> sendMessage(message) },
+                        onExport = { json ->
+                            pendingExportJson = json
+                            createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
+                        },
+                        onImport = { openDocLauncher.launch(arrayOf("application/json")) }
+                    )
                 }
             }
         }
