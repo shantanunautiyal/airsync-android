@@ -116,8 +116,8 @@ fun SettingsView(
                     onToggleContinueBrowsing = { enabled ->
                         viewModel.setContinueBrowsingEnabled(enabled)
                     },
-                    isContinueBrowsingToggleEnabled = uiState.lastConnectedDevice?.isPlus == true,
-                    continueBrowsingSubtitle = "Prompt to open shared links with AirSync+",
+                    isContinueBrowsingToggleEnabled = true,
+                    continueBrowsingSubtitle = "Prompt to open shared links in browser",
                     isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
                     onToggleSendNowPlaying = { enabled ->
                         viewModel.setSendNowPlayingEnabled(enabled)

@@ -84,20 +84,6 @@ fun SyncFeaturesCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // Status badge
-                Card(
-                    colors = CardDefaults.cardColors(
-                            MaterialTheme.colorScheme.primaryContainer
-                    ),
-                    modifier = Modifier.padding(start = 16.dp)
-                ) {
-                    Text(
-                        text = "PLUS",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color =  MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
                 Spacer(modifier = Modifier.padding(end = 8.dp))
                 Switch(
                     checked = isContinueBrowsingEnabled,
