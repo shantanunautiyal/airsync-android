@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12+ splash screen colors -->
+    <!-- Splash screen theme with animation for light theme -->
     <style name="Theme.AirSync.Splash" parent="Theme.SplashScreen">
         <!-- Prevent any system bar/title from showing -->
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="windowActionBar">false</item>
+        <!-- Splash screen background color -->
         <item name="windowSplashScreenBackground">@color/app_window_background</item>
-        <!-- Optional: use app icon for center mark; can be adjusted -->
+        <!-- Animated icon displayed in splash screen -->
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <!-- Splash screen animation duration in milliseconds -->
+        <item name="windowSplashScreenAnimationDuration">3000</item>
+        <!-- Theme to apply after splash screen exits -->
         <item name="postSplashScreenTheme">@style/Theme.AirSync</item>
     </style>
 </resources>

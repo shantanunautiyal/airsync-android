@@ -13,8 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
-import com.sameerasw.airsync.ui.theme.minCornerRadius
 
 @Composable
 fun DeviceInfoCard(
@@ -24,12 +22,7 @@ fun DeviceInfoCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(
-            topStart = minCornerRadius,
-            topEnd = minCornerRadius,
-            bottomStart = ExtraCornerRadius,
-            bottomEnd = ExtraCornerRadius
-        ),
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("My Android", style = MaterialTheme.typography.titleMedium)
@@ -43,12 +36,7 @@ fun DeviceInfoCard(
                 onValueChange = onDeviceNameChange,
                 label = { Text("Device Name") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(
-                    topStart = minCornerRadius,
-                    topEnd = minCornerRadius,
-                    bottomStart = ExtraCornerRadius - minCornerRadius,
-                    bottomEnd = ExtraCornerRadius - minCornerRadius
-                ),
+                shape = MaterialTheme.shapes.medium,
             )
         }
     }

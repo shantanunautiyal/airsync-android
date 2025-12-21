@@ -35,7 +35,16 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.utils.NotesRoleManager
 import com.sameerasw.airsync.utils.KeyguardHelper
 import com.sameerasw.airsync.utils.ContentCaptureManager
+import com.sameerasw.airsync.utils.DevicePreviewResolver
 import android.widget.Toast
+
+import android.animation.ObjectAnimator
+import android.view.animation.AnticipateInterpolator
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.animation.doOnEnd
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import android.widget.ImageView
 
 object AdbDiscoveryHolder {
     private var discovery: AdbMdnsDiscovery? = null
@@ -54,6 +63,8 @@ object AdbDiscoveryHolder {
 }
 
 class MainActivity : ComponentActivity() {
+    // Flag to keep splash screen visible during app initialization
+    private var isAppReady = false
 
     // Permission launcher for Android 13+ notification permission
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -134,6 +145,113 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Install and configure the splash screen before any UI rendering
+        val splashScreen = installSplashScreen()
+
+        // Dynamically set the splash screen icon based on last connected device
+        splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+            try {
+                val splashScreenView = splashScreenViewProvider.view
+                val splashIcon = splashScreenViewProvider.iconView
+
+                // Retrieve last connected device in background while showing splash
+                var deviceIconRes: Int? = null
+                try {
+                    val dataStoreManager = DataStoreManager(this@MainActivity)
+                    val lastDevice = runBlocking {
+                        dataStoreManager.getLastConnectedDevice().first()
+                    }
+
+                    // If a last connected device exists, get its preview icon
+                    if (lastDevice != null) {
+                        deviceIconRes = DevicePreviewResolver.getPreviewRes(lastDevice)
+                        Log.d("MainActivity", "Found last connected device, will crossfade to icon: $deviceIconRes")
+                    } else {
+                        Log.d("MainActivity", "No last connected device found")
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error retrieving last connected device: ${e.message}", e)
+                }
+
+                // Perform crossfade animation if device icon was found
+                if (splashIcon is ImageView && deviceIconRes != null) {
+                    // Fade out the original app icon
+                    val fadeOutIcon = ObjectAnimator.ofFloat(splashIcon, "alpha", 1f, 0f).apply {
+                        duration = 150 // 0.5 seconds
+                    }
+
+                    fadeOutIcon.doOnEnd {
+                        // Switch to device icon - with null check for OEM device compatibility
+                        try {
+                            splashIcon.setImageResource(deviceIconRes)
+                            Log.d("MainActivity", "Switched to device icon")
+
+                            // Fade in the new device icon
+                            val fadeInIcon = ObjectAnimator.ofFloat(splashIcon, "alpha", 0f, 1f).apply {
+                                duration = 350 // 0.5 seconds
+                            }
+
+                            fadeInIcon.doOnEnd {
+                                // Hold on device icon for 0.5s, then start outro animation
+                                try {
+                                    splashIcon.postDelayed({
+                                        startOutroAnimation(splashScreenView, splashIcon, splashScreenViewProvider)
+                                    }, 250) // 0.5 second hold
+                                } catch (e: Exception) {
+                                    Log.e("MainActivity", "Error scheduling outro animation: ${e.message}", e)
+                                    // Fallback: start outro immediately
+                                    startOutroAnimation(splashScreenView, splashIcon, splashScreenViewProvider)
+                                }
+                            }
+
+                            fadeInIcon.start()
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error during icon switch/fade in: ${e.message}", e)
+                            // Fallback: skip to outro animation if icon switch fails
+                            startOutroAnimation(splashScreenView, splashIcon, splashScreenViewProvider)
+                        }
+                    }
+
+                    fadeOutIcon.start()
+                } else {
+                    // No device icon found, or splashIcon is null/not ImageView (OEM device compatibility)
+                    when {
+                        splashIcon == null -> {
+                            Log.w("SplashScreen", "iconView is null - OEM device detected, skipping crossfade")
+                        }
+                        deviceIconRes == null -> {
+                            Log.d("MainActivity", "No device icon resource, proceeding with app icon")
+                        }
+                        else -> {
+                            Log.w("SplashScreen", "iconView is not an ImageView - OEM device detected")
+                        }
+                    }
+
+                    // Proceed directly to outro after a brief hold
+                    try {
+                        splashIcon?.postDelayed({
+                            startOutroAnimation(splashScreenView, splashIcon, splashScreenViewProvider)
+                        }, 500)
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error scheduling outro with no icon: ${e.message}", e)
+                        // Fallback: start outro immediately
+                        startOutroAnimation(splashScreenView, splashIcon, splashScreenViewProvider)
+                    }
+                }
+            } catch (e: Exception) {
+                // Fallback for any unexpected exceptions during animation
+                Log.e("SplashScreen", "Exception during splash screen animation", e)
+                try {
+                    splashScreenViewProvider.remove()
+                } catch (e2: Exception) {
+                    Log.e("SplashScreen", "Exception during splash screen removal", e2)
+                }
+            }
+        }
+
+        // Keep splash screen visible while app is loading
+        splashScreen.setKeepOnScreenCondition { !isAppReady }
 
         // Handle Notes Role intent
         handleNotesRoleIntent(intent)
@@ -227,25 +345,13 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         "AirSync",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                     )
                                 }
                             },
                             actions = {
-                                IconButton(
-                                    onClick = {
-                                        val airSyncPlusUrl =
-                                            "https://airsync.notion.site"
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
-                                        startActivity(intent)
-                                    }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.outline_feedback_24),
-                                        contentDescription = "Feedback"
-                                    )
-                                }
-
                                 IconButton(onClick = { showAboutDialog = true }) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.outline_info_24),
@@ -276,6 +382,64 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
+                // Mark app as ready after composing so splash screen can exit
+                LaunchedEffect(Unit) {
+                    isAppReady = true
+                }
+            }
+        }
+    }
+
+    /**
+     * Animate the outro of the splash screen: fade out screen and scale down icon
+     */
+    private fun startOutroAnimation(
+        splashScreenView: android.view.View,
+        splashIcon: android.view.View?,
+        splashScreenViewProvider: androidx.core.splashscreen.SplashScreenViewProvider
+    ) {
+        try {
+            // Animate the splash screen view fade out
+            val fadeOut = ObjectAnimator.ofFloat(splashScreenView, "alpha", 1f, 0f).apply {
+                interpolator = AnticipateInterpolator()
+                duration = 750
+            }
+            fadeOut.doOnEnd {
+                splashScreenViewProvider.remove()
+            }
+
+            // Safely animate the icon if it exists (OEM device compatibility)
+            try {
+                @Suppress("SENSELESS_COMPARISON")
+                if (splashIcon != null) {
+                    // Scale down animation
+                    val scaleX = ObjectAnimator.ofFloat(splashIcon, "scaleX", 1f, 0.2f).apply {
+                        interpolator = AnticipateInterpolator()
+                        duration = 750
+                    }
+
+                    val scaleY = ObjectAnimator.ofFloat(splashIcon, "scaleY", 1f, 0.2f).apply {
+                        interpolator = AnticipateInterpolator()
+                        duration = 750
+                    }
+
+                    scaleX.start()
+                    scaleY.start()
+                } else {
+                    Log.w("SplashScreen", "iconView is null - OEM device detected")
+                }
+            } catch (e: NullPointerException) {
+                Log.w("SplashScreen", "NullPointerException on iconView animation - likely OEM device", e)
+            }
+
+            fadeOut.start()
+        } catch (e: Exception) {
+            Log.e("SplashScreen", "Exception during outro animation", e)
+            try {
+                splashScreenViewProvider.remove()
+            } catch (e2: Exception) {
+                Log.e("SplashScreen", "Exception removing splash screen", e2)
             }
         }
     }

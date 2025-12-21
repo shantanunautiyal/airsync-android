@@ -9,7 +9,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,11 +26,11 @@ import android.view.DragEvent
 import android.util.Log
 import com.sameerasw.airsync.domain.model.ClipboardEntry
 import com.sameerasw.airsync.utils.HapticUtil
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.Job
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ClipboardScreen(
     clipboardHistory: List<ClipboardEntry>,
@@ -149,7 +150,7 @@ fun ClipboardScreen(
                         color = MaterialTheme.colorScheme.primary
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            imageVector = Icons.AutoMirrored.Rounded.Send,
                             contentDescription = "Drop to send",
                             modifier = Modifier
                                 .fillMaxSize()
@@ -168,35 +169,30 @@ fun ClipboardScreen(
             }
         }
 
-        // Clear button - only show when connected and chat not empty
-        if (isConnected && clipboardHistory.isNotEmpty()) {
-            Button(
-                onClick = onClearHistory,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            ) {
-                Text("Clear History")
-            }
-        }
-
         // Scrollable Message Area - takes remaining space
         Box(modifier = Modifier.weight(1f)) {
             // History List or Empty State
             if (clipboardHistory.isEmpty()) {
-                // Just show nothing when empty - spacer will center it visually
-                Box(modifier = Modifier.fillMaxWidth())
+                // Show "Nothing shared yet" when connected but no history
+                if (isConnected) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Nothing shared yet",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 16.dp),
                     reverseLayout = true
                 ) {
@@ -220,7 +216,7 @@ fun ClipboardScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = ExtraCornerRadius, topEnd = ExtraCornerRadius),
+                shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Row(
@@ -239,10 +235,10 @@ fun ClipboardScreen(
                         placeholder = {
                             Text(
                                 text = "Type a message or drag text here...",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.extraLarge,
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                             focusedContainerColor = MaterialTheme.colorScheme.surface
@@ -251,32 +247,35 @@ fun ClipboardScreen(
                         maxLines = 4
                     )
 
-                    IconButton(
+                    OutlinedIconButton(
                         onClick = {
                             if (inputText.isNotBlank()) {
                                 onSendText(inputText)
                                 inputText = ""
+                            } else {
+                                // Clear history when input is empty
+                                onClearHistory()
                             }
                         },
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(60.dp)
                             .background(
-                                color = if (inputText.isNotBlank()) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                },
+                                color = MaterialTheme.colorScheme.background,
                                 shape = CircleShape
                             ),
-                        enabled = inputText.isNotBlank()
+                        enabled = inputText.isNotBlank() || clipboardHistory.isNotEmpty()
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = if (inputText.isNotBlank()) {
-                                MaterialTheme.colorScheme.onPrimary
+                            imageVector = if (inputText.isNotBlank()) {
+                                Icons.AutoMirrored.Rounded.Send
                             } else {
-                                MaterialTheme.colorScheme.outlineVariant
+                                Icons.Rounded.Delete
+                            },
+                            contentDescription = if (inputText.isNotBlank()) "Send" else "Clear history",
+                            tint = if (inputText.isNotBlank()) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
                             }
                         )
                     }
@@ -313,19 +312,44 @@ private fun ClipboardEntryBubble(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
-        horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
     ) {
+        // For received messages, show time first (on left)
+        if (isSent) {
+            Text(
+                text = timeString,
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+
+        // Create custom shape: very rounded except on the bottom corner opposite to sender
+        val bubbleShape = if (isSent) {
+            // Sent message: flat bottom-right, rounded everywhere else
+            RoundedCornerShape(
+                topStart = 28.dp,
+                topEnd = 28.dp,
+                bottomStart = 28.dp,
+                bottomEnd = 4.dp
+            )
+        } else {
+            // Received message: flat bottom-left, rounded everywhere else
+            RoundedCornerShape(
+                topStart = 28.dp,
+                topEnd = 28.dp,
+                bottomStart = 4.dp,
+                bottomEnd = 28.dp
+            )
+        }
+
         Surface(
             modifier = Modifier
                 .widthIn(max = 300.dp)
                 .wrapContentHeight()
                 .clickable { onBubbleTap() },
-            shape = RoundedCornerShape(
-                topStart = 12.dp,
-                topEnd = 12.dp,
-                bottomStart = if (isSent) 12.dp else 4.dp,
-                bottomEnd = if (isSent) 4.dp else 12.dp
-            ),
+            shape = bubbleShape,
             color = bubbleColor
         ) {
             Column(
@@ -339,19 +363,17 @@ private fun ClipboardEntryBubble(
                     maxLines = 5,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = timeString,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = textColor.copy(alpha = 0.7f)
-                    )
-                }
             }
+        }
+
+        // For sent messages, show time after (on left after reversing)
+        if (!isSent) {
+            Text(
+                text = timeString,
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
         }
     }
 }

@@ -35,8 +35,6 @@
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
 
     <application
         android:allowBackup="true"
@@ -167,7 +165,7 @@
         <service
             android:name=".service.CallMonitorService"
             android:exported="false"
-            android:foregroundServiceType="phoneCall" />
+            android:foregroundServiceType="dataSync" />
 
         <!-- Call Receiver - listens for telephony events -->
         <receiver
@@ -193,14 +191,6 @@
                 android:resource="@xml/widget_airsync_info" />
         </receiver>
 
-        <!-- Boot Completed Receiver - restarts call monitoring after device reboot -->
-        <receiver
-            android:name=".service.BootCompletedReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
 
         <receiver
             android:name=".service.NotificationActionReceiver"

@@ -18,8 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalHapticFeedback
-import com.sameerasw.airsync.ui.theme.ExtraCornerRadius
-import com.sameerasw.airsync.ui.theme.minCornerRadius
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
@@ -35,13 +33,8 @@ fun DeveloperModeCard(
 ) {
     val haptics = LocalHapticFeedback.current
 
-    Card(modifier = Modifier.fillMaxWidth().padding(top=20.dp),
-        shape = RoundedCornerShape(
-            topStart = ExtraCornerRadius,
-            topEnd = ExtraCornerRadius,
-            bottomStart = minCornerRadius,
-            bottomEnd = minCornerRadius
-        ),
+    Card(modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
