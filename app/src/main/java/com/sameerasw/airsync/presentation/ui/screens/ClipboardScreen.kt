@@ -30,6 +30,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.Job
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ClipboardScreen(
     clipboardHistory: List<ClipboardEntry>,
@@ -215,7 +216,7 @@ fun ClipboardScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraSmall,
+                shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Row(
@@ -234,10 +235,10 @@ fun ClipboardScreen(
                         placeholder = {
                             Text(
                                 text = "Type a message or drag text here...",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         },
-                        shape = MaterialTheme.shapes.extraSmall,
+                        shape = MaterialTheme.shapes.extraLarge,
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                             focusedContainerColor = MaterialTheme.colorScheme.surface
@@ -246,7 +247,7 @@ fun ClipboardScreen(
                         maxLines = 4
                     )
 
-                    IconButton(
+                    OutlinedIconButton(
                         onClick = {
                             if (inputText.isNotBlank()) {
                                 onSendText(inputText)
@@ -257,13 +258,9 @@ fun ClipboardScreen(
                             }
                         },
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(60.dp)
                             .background(
-                                color = if (inputText.isNotBlank()) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.errorContainer
-                                },
+                                color = MaterialTheme.colorScheme.background,
                                 shape = CircleShape
                             ),
                         enabled = inputText.isNotBlank() || clipboardHistory.isNotEmpty()
@@ -276,9 +273,9 @@ fun ClipboardScreen(
                             },
                             contentDescription = if (inputText.isNotBlank()) "Send" else "Clear history",
                             tint = if (inputText.isNotBlank()) {
-                                MaterialTheme.colorScheme.onPrimary
+                                MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.onErrorContainer
+                                MaterialTheme.colorScheme.error
                             }
                         )
                     }
