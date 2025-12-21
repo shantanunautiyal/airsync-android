@@ -36,6 +36,7 @@ fun DeviceInfoCard(
                 onValueChange = onDeviceNameChange,
                 label = { Text("Device Name") },
                 modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
             )
         }
     }

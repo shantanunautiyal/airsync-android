@@ -81,6 +81,7 @@ fun ManualConnectionCard(
                         onValueChange = onIpChange,
                         label = { Text("IP Address") },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
@@ -88,19 +89,22 @@ fun ManualConnectionCard(
                         onValueChange = onPortChange,
                         label = { Text("Port") },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
                         value = uiState.manualPcName,
                         onValueChange = onPcNameChange,
                         label = { Text("PC Name (Optional)") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                     )
                     OutlinedTextField(
                         value = uiState.symmetricKey ?: "",
                         onValueChange = onSymmetricKeyChange,
                         label = { Text("Encryption Key") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("AirSync+")

@@ -77,6 +77,18 @@ fun AboutDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // HOw to
+                OutlinedButton(
+                    onClick = {
+                        val macAppUrl = "https://airsync.notion.site"
+                        val intent = Intent(Intent.ACTION_VIEW, macAppUrl.toUri())
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Help and troubleshoot")
+                }
+
                 // Get the mac app button
                 OutlinedButton(
                     onClick = {

@@ -232,20 +232,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             actions = {
-                                IconButton(
-                                    onClick = {
-                                        val airSyncPlusUrl =
-                                            "https://airsync.notion.site"
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, airSyncPlusUrl.toUri())
-                                        startActivity(intent)
-                                    }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.outline_feedback_24),
-                                        contentDescription = "Feedback"
-                                    )
-                                }
-
                                 IconButton(onClick = { showAboutDialog = true }) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.outline_info_24),
