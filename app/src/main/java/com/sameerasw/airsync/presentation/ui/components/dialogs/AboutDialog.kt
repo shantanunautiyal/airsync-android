@@ -151,7 +151,7 @@ fun AboutDialog(
             }
         },
         dismissButton = {
-            Button(onClick = {
+            OutlinedButton(onClick = {
                 val websiteUrl = "https://www.sameerasw.com"
                 val intent = Intent(Intent.ACTION_VIEW, websiteUrl.toUri())
                 context.startActivity(intent)
