@@ -189,6 +189,14 @@ object WebSocketUtil {
                                     kotlinx.coroutines.runBlocking { ds.setUserManuallyDisconnected(false) }
                                 } catch (_: Exception) { }
                                 try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
+
+                                // Start call monitoring service on successful connection
+                                try {
+                                    com.sameerasw.airsync.service.CallMonitorService.start(context)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error starting CallMonitorService on connection: ${e.message}")
+                                }
+
                                 onConnectionStatusChanged?.invoke(true)
                                 notifyConnectionStatusListeners(true)
                                 try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
@@ -212,6 +220,14 @@ object WebSocketUtil {
                         isConnecting.set(false)
                         handshakeCompleted.set(false)
                         handshakeTimeoutJob?.cancel()
+
+                        // Stop call monitoring service on disconnect
+                        try {
+                            com.sameerasw.airsync.service.CallMonitorService.stop(context)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error stopping CallMonitorService on close: ${e.message}")
+                        }
+
                         onConnectionStatusChanged?.invoke(false)
                         // Clear continue browsing notifs on disconnect
                         try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
@@ -232,6 +248,13 @@ object WebSocketUtil {
                         isSocketOpen.set(false)
                         handshakeCompleted.set(false)
                         handshakeTimeoutJob?.cancel()
+
+                        // Stop call monitoring service on failure
+                        try {
+                            com.sameerasw.airsync.service.CallMonitorService.stop(context)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error stopping CallMonitorService on failure: ${e.message}")
+                        }
 
                         // Update connection status
                         onConnectionStatusChanged?.invoke(false)
@@ -317,10 +340,18 @@ object WebSocketUtil {
 
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
+
+        // Stop call monitoring service on disconnect
+        val ctx = context ?: appContext
+        ctx?.let { c ->
+            try { com.sameerasw.airsync.service.CallMonitorService.stop(c) } catch (e: Exception) {
+                Log.e(TAG, "Error stopping CallMonitorService on disconnect: ${e.message}")
+            }
+        }
+
         onConnectionStatusChanged?.invoke(false)
 
         // Resolve a context for side-effects (try provided one, fall back to appContext)
-        val ctx = context ?: appContext
         // Clear continue browsing notifications if possible
         ctx?.let { c ->
             try { NotificationUtil.clearContinueBrowsingNotifications(c) } catch (_: Exception) {}
