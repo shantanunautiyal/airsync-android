@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -143,12 +144,28 @@ fun ConnectionStatusCard(
             ) {
                 val statusText = when {
                     isConnecting -> "Connecting..."
-                    isConnected -> "  🟢 Syncing"
-                    else -> "  🔴 Disconnected"
+                    isConnected -> "Syncing"
+                    else -> "Disconnected"
                 }
 
                 if (isConnecting) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) { LoadingIndicator() }
+                }
+
+                if (isConnected) {
+                    Icon(
+                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_24),
+                        contentDescription = "Connected",
+                        modifier = Modifier.padding(end = 8.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                } else if (!isConnecting) {
+                    Icon(
+                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
+                        contentDescription = "Disconnected",
+                        modifier = Modifier.padding(end = 8.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
 
                 Text(
