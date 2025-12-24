@@ -179,24 +179,24 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
         PermissionType.CALL_LOG -> PermissionInfo(
             title = "Call Log Access",
             icon = R.drawable.rounded_call_log_24,
-            description = "Read call log of the device.",
-            whyNeeded = "Gather and sync call status to your other devices.",
+            description = "AirSync needs call log access to identify the caller's phone number for real-time alerts on your Mac.",
+            whyNeeded = "To provide accurate call notifications on your Mac, Android requires the Call Log permission to see the phone number of an incoming call. \n\nWithout this, your Mac will only show 'Unknown Caller'. This permission is used strictly to identify the caller in real-time and provide alerts for missed or incoming calls. \n\nThis data is only shared with your own Mac over your secure local network and is never stored on our servers.",
             buttonText = "Grant Call Log Access"
         )
 
         PermissionType.CONTACTS -> PermissionInfo(
             title = "Contacts Access",
             icon = R.drawable.rounded_contacts_24,
-            description = "Show caller info on mac",
-            whyNeeded = "Use your contacts registry to find and display details about any calls and the caller.",
+            description = "AirSync needs access to your contacts to match phone numbers with names on your Mac.",
+            whyNeeded = "To provide a seamless companion experience, AirSync uses your contact names so you can see who is calling or who sent a notification directly on your Mac desktop. \n\nWithout this, you would only see phone numbers. Your contacts are never uploaded to any external servers; they are only used locally to enhance the connection between your phone and your Mac.",
             buttonText = "Grant Contacts Access"
         )
 
         PermissionType.PHONE -> PermissionInfo(
             title = "Phone Access",
             icon = R.drawable.rounded_settings_phone_24,
-            description = "Detect call state",
-            whyNeeded = "AirSync will monitor and display ongoing call status on mac. \nAirSync will never access your call audio or store any sensitive data. Android system does not allow accessing call audio to any other application than the dialer.",
+            description = "AirSync needs to detect your phone's state to notify you of incoming calls in real-time.",
+            whyNeeded = "This permission allows AirSync to detect when your phone is ringing, when you answer, or when a call ends, so it can display a live call status on your Mac. \n\nAirSync NEVER accesses your call audio or records conversations. This is used solely to facilitate the remote call notification feature as a device companion.",
             buttonText = "Grant Phone Access"
         )
     }

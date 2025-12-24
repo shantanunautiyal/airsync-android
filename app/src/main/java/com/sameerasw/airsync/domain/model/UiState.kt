@@ -27,6 +27,7 @@ data class UiState(
     val isSendNowPlayingEnabled: Boolean = true,
     val isKeepPreviousLinkEnabled: Boolean = true,
     val isSmartspacerShowWhenDisconnected: Boolean = false,
+    val isMacMediaControlsEnabled: Boolean = true,
     // Mac device status
     val macDeviceStatus: MacDeviceStatus? = null,
     // Auth failure dialog

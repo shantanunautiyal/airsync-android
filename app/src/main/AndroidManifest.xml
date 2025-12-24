@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_WALLPAPER_INTERNAL" />
@@ -21,8 +21,7 @@
     <!-- Notes Role permission for content capture in floating windows -->
     <uses-permission android:name="android.permission.LAUNCH_CAPTURE_CONTENT_ACTIVITY_FOR_NOTE" />
 
-    <!-- Media playback permissions -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Media playback control  -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Camera permission for QR code scanner -->
@@ -137,11 +136,10 @@
             android:theme="@style/Theme.AirSync" />
 
 
-        <!-- Mac Media Player Service - creates native Android media player UI -->
         <service
             android:name=".service.MacMediaPlayerService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="connectedDevice">
         </service>
 
         <!-- Quick Settings Tile Service -->
@@ -161,11 +159,11 @@
             android:name=".service.WakeupService"
             android:exported="false" />
 
-        <!-- Call Monitor Service - detects incoming/outgoing/missed calls -->
+        <!-- AirSync Service - maintains connection to Mac and handles call monitoring -->
         <service
-            android:name=".service.CallMonitorService"
+            android:name=".service.AirSyncService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Call Receiver - listens for telephony events -->
         <receiver

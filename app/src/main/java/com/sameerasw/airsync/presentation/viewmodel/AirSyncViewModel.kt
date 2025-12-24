@@ -184,6 +184,7 @@ class AirSyncViewModel(
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
             val isSmartspacerShowWhenDisconnected = repository.getSmartspacerShowWhenDisconnected().first()
+            val isMacMediaControlsEnabled = repository.getMacMediaControlsEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -227,7 +228,8 @@ class AirSyncViewModel(
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
                 isSendNowPlayingEnabled = isSendNowPlayingEnabled,
-                isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled
+                isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
+                isMacMediaControlsEnabled = isMacMediaControlsEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -632,7 +634,21 @@ class AirSyncViewModel(
         appContext?.let { context ->
             try {
                 AirSyncDeviceTarget.notifyChange(context)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun setMacMediaControlsEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isMacMediaControlsEnabled = enabled)
+        viewModelScope.launch {
+            repository.setMacMediaControlsEnabled(enabled)
+            // If disabled, stop the service immediately
+            if (!enabled) {
+                appContext?.let { ctx ->
+                    com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(ctx)
+                }
+            }
         }
     }
 
@@ -665,7 +681,8 @@ class AirSyncViewModel(
             timestamp = System.currentTimeMillis(),
             isFromPc = isFromPc
         )
-        val updatedHistory = (listOf(entry) + _uiState.value.clipboardHistory).take(100) // Keep last 100 entries
+        val updatedHistory =
+            (listOf(entry) + _uiState.value.clipboardHistory).take(100) // Keep last 100 entries
         _uiState.value = _uiState.value.copy(clipboardHistory = updatedHistory)
     }
 

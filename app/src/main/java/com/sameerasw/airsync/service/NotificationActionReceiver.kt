@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.sameerasw.airsync.utils.WebSocketUtil
 
 /**
  * Receives notification actions and updates sync/connection state and notifications.
@@ -39,6 +40,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         Log.w(TAG, "Failed to cancel continue-browsing notif: ${e.message}")
                     }
                 }
+            }
+            AirSyncService.ACTION_DISCONNECT -> {
+                Log.d(TAG, "Disconnecting from notification")
+                WebSocketUtil.disconnect(context)
             }
         }
     }

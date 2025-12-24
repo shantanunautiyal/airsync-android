@@ -166,4 +166,11 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getUserManuallyDisconnected()
     }
 
+    override suspend fun setMacMediaControlsEnabled(enabled: Boolean) {
+        dataStoreManager.setMacMediaControlsEnabled(enabled)
+    }
+
+    override fun getMacMediaControlsEnabled(): Flow<Boolean> {
+        return dataStoreManager.getMacMediaControlsEnabled()
+    }
 }
