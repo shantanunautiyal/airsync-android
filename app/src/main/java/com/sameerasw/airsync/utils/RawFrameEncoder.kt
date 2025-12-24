@@ -45,7 +45,7 @@ class RawFrameEncoder(
     
     // Adaptive frame skipping for smooth scrolling
     private var consecutiveSkips = 0
-    private val maxConsecutiveSkips = 1 // Skip at most 1 frame to maintain smoothness
+    private val maxConsecutiveSkips = 2 // Skip at most 2 frames to maintain smoothness
     
     // Performance tracking
     private var framesSent = 0
@@ -54,7 +54,7 @@ class RawFrameEncoder(
     
     companion object {
         private const val TAG = "RawFrameEncoder"
-        private const val MAX_IMAGES = 2 // Double buffering
+        private const val MAX_IMAGES = 3 // Triple buffering for smoother capture
         private const val LOG_INTERVAL_MS = 5000L // Log stats every 5 seconds
     }
     
@@ -126,11 +126,13 @@ class RawFrameEncoder(
         val currentTime = System.nanoTime()
         val timeSinceLastFrame = currentTime - lastFrameTime
         
-        // Smart frame skipping - maintain consistent frame rate
-        if (timeSinceLastFrame < frameIntervalNs) {
+        // Adaptive frame skipping - allow slight bursts for smoother scrolling
+        // but maintain target FPS on average
+        val minInterval = frameIntervalNs * 7 / 10 // Allow 30% faster bursts
+        if (timeSinceLastFrame < minInterval) {
             consecutiveSkips++
-            // Allow burst during scrolling but maintain average FPS
-            if (consecutiveSkips < maxConsecutiveSkips && timeSinceLastFrame < frameIntervalNs / 2) {
+            // Force frame through if we've skipped too many
+            if (consecutiveSkips < maxConsecutiveSkips) {
                 return
             }
         }
@@ -147,9 +149,16 @@ class RawFrameEncoder(
             val bitmap = imageToBitmap(image)
             if (bitmap != null) {
                 try {
-                    // Compress to JPEG with quality 0-100 (convert from 0.0-1.0)
-                    // Lower quality for lower latency
-                    val jpegQuality = (mirroringOptions.quality * 100).toInt().coerceIn(55, 75)
+                    // Adaptive JPEG quality based on frame rate
+                    // Higher quality when FPS is stable, lower when struggling
+                    val baseQuality = (mirroringOptions.quality * 100).toInt()
+                    val jpegQuality = if (consecutiveSkips > 0) {
+                        // Reduce quality slightly when skipping frames
+                        (baseQuality * 0.85).toInt().coerceIn(50, 70)
+                    } else {
+                        baseQuality.coerceIn(55, 80)
+                    }
+                    
                     val jpegData = bitmapToJpeg(bitmap, jpegQuality)
                     
                     // Always recycle bitmap to prevent memory leaks
@@ -171,7 +180,8 @@ class RawFrameEncoder(
                             val elapsed = (now - lastLogTime) / 1000.0
                             val fps = framesSent / elapsed
                             val kbps = (totalBytes * 8 / 1024) / elapsed
-                            Log.d(TAG, "📊 Performance: ${String.format("%.1f", fps)} FPS, ${String.format("%.0f", kbps)} kbps, avg size: ${totalBytes / framesSent / 1024}KB")
+                            val avgSize = if (framesSent > 0) totalBytes / framesSent / 1024 else 0
+                            Log.d(TAG, "📊 Performance: ${String.format("%.1f", fps)} FPS, ${String.format("%.0f", kbps)} kbps, avg size: ${avgSize}KB")
                             framesSent = 0
                             totalBytes = 0
                             lastLogTime = now
