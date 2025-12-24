@@ -51,19 +51,33 @@ class DataStoreManager(private val context: Context) {
     private val USER_MANUALLY_DISCONNECTED = booleanPreferencesKey("user_manually_disconnected")
         // Auto reconnect toggle
         private val AUTO_RECONNECT_ENABLED = booleanPreferencesKey("auto_reconnect_enabled")
-        // New: Continue Browsing feature toggle
+        // Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
-        // New: Send now playing toggle
+        // Send now playing toggle
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
-        // New: Keep previous link toggle
+        // Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
-        // New: Always show in Smartspacer toggle
+        // Always show in Smartspacer toggle
         private val SMARTSPACER_SHOW_WHEN_DISCONNECTED = booleanPreferencesKey("smartspacer_show_when_disconnected")
         private val EXPAND_NETWORKING_ENABLED = booleanPreferencesKey("expand_networking_enabled")
+        // Mac Media controls toggle (for user-initiated proof for Play Store)
+        private val MAC_MEDIA_CONTROLS_ENABLED = booleanPreferencesKey("mac_media_controls_enabled")
 
-        // Network-aware device connections
-        private val NETWORK_DEVICES_PREFIX = "network_device_"
-        private val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
+        // Call monitoring preferences
+        private val CALL_SYNC_ENABLED = booleanPreferencesKey("call_sync_enabled")
+        private val LAST_CALL_SYNC_TIMESTAMP = longPreferencesKey("last_call_sync_timestamp")
+        private val DEVICE_ID = stringPreferencesKey("device_id")
+
+        private const val NETWORK_DEVICES_PREFIX = "network_device_"
+        private const val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
+
+        private var instance: DataStoreManager? = null
+
+        fun getInstance(context: Context): DataStoreManager {
+            return instance ?: DataStoreManager(context).also {
+                instance = it
+            }
+        }
     }
 
     suspend fun saveIpAddress(ipAddress: String) {
@@ -74,7 +88,7 @@ class DataStoreManager(private val context: Context) {
 
     fun getIpAddress(): Flow<String> {
         return context.dataStore.data.map { preferences ->
-            preferences[IP_ADDRESS] ?: "192.168.1.100"
+            preferences[IP_ADDRESS] ?: ""
         }
     }
 
@@ -163,7 +177,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // New: Continue Browsing toggle
+    // Continue Browsing toggle
     suspend fun setContinueBrowsingEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[CONTINUE_BROWSING_ENABLED] = enabled
@@ -176,7 +190,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // New: Send now playing toggle
+    // Send now playing toggle
     suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[SEND_NOW_PLAYING_ENABLED] = enabled
@@ -189,7 +203,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // New: Keep previous link toggle
+    // Keep previous link toggle
     suspend fun setKeepPreviousLinkEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEEP_PREVIOUS_LINK_ENABLED] = enabled
@@ -202,7 +216,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // New: Always show in Smartspacer toggle
+    // Always show in Smartspacer toggle
     suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] = enabled
@@ -224,6 +238,18 @@ class DataStoreManager(private val context: Context) {
     fun getExpandNetworkingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { prefs ->
             prefs[EXPAND_NETWORKING_ENABLED] ?: false
+        }
+    }
+
+    suspend fun setMacMediaControlsEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[MAC_MEDIA_CONTROLS_ENABLED] = enabled
+        }
+    }
+
+    fun getMacMediaControlsEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { prefs ->
+            prefs[MAC_MEDIA_CONTROLS_ENABLED] ?: true // Default to true
         }
     }
 
@@ -701,6 +727,43 @@ class DataStoreManager(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             return false
+        }
+    }
+
+    // Call sync methods
+    suspend fun setCallSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CALL_SYNC_ENABLED] = enabled
+        }
+    }
+
+    fun getCallSyncEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[CALL_SYNC_ENABLED] ?: false // Default to disabled
+        }
+    }
+
+    suspend fun setLastCallSyncTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_CALL_SYNC_TIMESTAMP] = timestamp
+        }
+    }
+
+    fun getLastCallSyncTimestamp(): Flow<Long> {
+        return context.dataStore.data.map { preferences ->
+            preferences[LAST_CALL_SYNC_TIMESTAMP] ?: 0L
+        }
+    }
+
+    suspend fun setDeviceId(deviceId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[DEVICE_ID] = deviceId
+        }
+    }
+
+    fun getDeviceId(): Flow<String> {
+        return context.dataStore.data.map { preferences ->
+            preferences[DEVICE_ID] ?: ""
         }
     }
 }

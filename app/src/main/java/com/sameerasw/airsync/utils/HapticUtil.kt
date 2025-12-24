@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import androidx.lifecycle.Lifecycle
 
 object HapticUtil {
     /**
@@ -47,29 +48,16 @@ object HapticUtil {
     }
 
     /**
-     * Perform a success haptic - for successful connections
+     * Perform a success haptic - 3 quick taps for successful operations
      */
     fun performSuccess(haptics: HapticFeedback?) {
         try {
-            haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
             CoroutineScope(Dispatchers.Main).launch {
+                haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
                 delay(100)
                 haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
-            }
-        } catch (_: Exception) {}
-    }
-
-    /**
-     * Perform an error haptic - for failed connections
-     */
-    fun performError(haptics: HapticFeedback?) {
-        try {
-            haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
-            CoroutineScope(Dispatchers.Main).launch {
-                delay(100)
-                haptics?.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                delay(100)
-                haptics?.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                delay(50)
+                haptics?.performHapticFeedback(HapticFeedbackType.LongPress)
             }
         } catch (_: Exception) {}
     }
@@ -77,12 +65,27 @@ object HapticUtil {
     /**
      * Start repeating haptic ticks for loading states
      * Returns a Job that can be cancelled to stop the haptics
+     *
+     * If a lifecycle is provided, haptics will only fire while the lifecycle
+     * is at least STARTED (i.e. the app/screen is in foreground). This prevents
+     * haptics from triggering while the app is backgrounded.
      */
-    fun startLoadingHaptics(haptics: HapticFeedback?): Job {
+    fun startLoadingHaptics(haptics: HapticFeedback?, lifecycle: Lifecycle? = null): Job {
         return CoroutineScope(Dispatchers.Main).launch {
             while (isActive) {
-                performLightTick(haptics)
-                delay(200) // 5 times per second
+                try {
+                    val shouldRun = lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) ?: true
+                    if (shouldRun) {
+                        performLightTick(haptics)
+                        delay(200) // 5 times per second
+                    } else {
+                        // Backoff while app is backgrounded; poll until it becomes STARTED again
+                        delay(200)
+                    }
+                } catch (_: Exception) {
+                    // swallow any exceptions from lifecycle or haptics and continue
+                    delay(200)
+                }
             }
         }
     }

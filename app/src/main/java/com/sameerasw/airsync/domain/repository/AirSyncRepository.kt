@@ -72,4 +72,7 @@ interface AirSyncRepository {
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>
 
+    // Mac Media controls
+    suspend fun setMacMediaControlsEnabled(enabled: Boolean)
+    fun getMacMediaControlsEnabled(): Flow<Boolean>
 }

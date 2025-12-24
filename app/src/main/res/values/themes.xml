@@ -4,7 +4,7 @@
     <!-- App theme that adapts to system light/dark and avoids white flash by setting windowBackground -->
     <style name="Theme.AirSync" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Ensure the initial window background matches theme mode -->
-        <item name="android:windowBackground">@color/app_window_background</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
 
         <!-- Explicitly disable any system action bar/title -->
         <item name="android:windowNoTitle">true</item>
@@ -12,8 +12,12 @@
         <item name="windowNoTitle">true</item>
         <item name="windowActionBar">false</item>
 
-        <!-- Edge-to-edge; colors handled in code based on content -->
+        <!-- Edge-to-edge transparency -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+
+        <!-- Light icons true for light theme (black icons) -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>

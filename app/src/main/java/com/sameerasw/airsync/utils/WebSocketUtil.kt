@@ -192,6 +192,16 @@ object WebSocketUtil {
                                     kotlinx.coroutines.runBlocking { ds.setUserManuallyDisconnected(false) }
                                 } catch (_: Exception) { }
                                 try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
+
+                                // Start AirSync service on successful connection
+                                try {
+                                    val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
+                                    val lastDevice = kotlinx.coroutines.runBlocking { ds.getLastConnectedDevice().first() }
+                                    com.sameerasw.airsync.service.AirSyncService.start(context, lastDevice?.name)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error starting AirSyncService on connection: ${e.message}")
+                                }
+
                                 onConnectionStatusChanged?.invoke(true)
                                 notifyConnectionStatusListeners(true)
                                 try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
@@ -215,6 +225,14 @@ object WebSocketUtil {
                         isConnecting.set(false)
                         handshakeCompleted.set(false)
                         handshakeTimeoutJob?.cancel()
+
+                        // Stop AirSync service on disconnect
+                        try {
+                            com.sameerasw.airsync.service.AirSyncService.stop(context)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error stopping AirSyncService on close: ${e.message}")
+                        }
+
                         onConnectionStatusChanged?.invoke(false)
                         // Clear continue browsing notifs on disconnect
                         try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
@@ -235,6 +253,13 @@ object WebSocketUtil {
                         isSocketOpen.set(false)
                         handshakeCompleted.set(false)
                         handshakeTimeoutJob?.cancel()
+
+                        // Stop AirSync service on failure
+                        try {
+                            com.sameerasw.airsync.service.AirSyncService.stop(context)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error stopping AirSyncService on failure: ${e.message}")
+                        }
 
                         // Update connection status
                         onConnectionStatusChanged?.invoke(false)
@@ -320,10 +345,18 @@ object WebSocketUtil {
 
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
+
+        // Stop AirSync service on disconnect
+        val ctx = context ?: appContext
+        ctx?.let { c ->
+            try { com.sameerasw.airsync.service.AirSyncService.stop(c) } catch (e: Exception) {
+                Log.e(TAG, "Error stopping AirSyncService on disconnect: ${e.message}")
+            }
+        }
+
         onConnectionStatusChanged?.invoke(false)
 
         // Resolve a context for side-effects (try provided one, fall back to appContext)
-        val ctx = context ?: appContext
         // Clear continue browsing notifications if possible
         ctx?.let { c ->
             try { NotificationUtil.clearContinueBrowsingNotifications(c) } catch (_: Exception) {}

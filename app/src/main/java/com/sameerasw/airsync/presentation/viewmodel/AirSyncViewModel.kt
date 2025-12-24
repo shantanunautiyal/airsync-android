@@ -8,7 +8,6 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.DeviceInfo
-import com.sameerasw.airsync.domain.model.MirroringOptions
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
@@ -22,8 +21,6 @@ import com.sameerasw.airsync.service.WakeupService
 import com.sameerasw.airsync.smartspacer.AirSyncDeviceTarget
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -45,6 +42,19 @@ class AirSyncViewModel(
 
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
+
+    // Notes Role state
+    private val _stylusMode = MutableStateFlow(false)
+    val stylusMode: StateFlow<Boolean> = _stylusMode.asStateFlow()
+
+    private val _launchedFromLockScreen = MutableStateFlow(true)
+    val launchedFromLockScreen: StateFlow<Boolean> = _launchedFromLockScreen.asStateFlow()
+
+    private val _isFloatingWindow = MutableStateFlow(true)
+    val isFloatingWindow: StateFlow<Boolean> = _isFloatingWindow.asStateFlow()
+
+    private val _isNotesRoleHeld = MutableStateFlow(false)
+    val isNotesRoleHeld: StateFlow<Boolean> = _isNotesRoleHeld.asStateFlow()
 
     // Network monitoring
     private var isNetworkMonitoringActive = false
@@ -92,7 +102,7 @@ class AirSyncViewModel(
         }
         // Observe manual disconnect flag to immediately cancel any running auto-reconnect
         viewModelScope.launch {
-            repository.getUserManuallyDisconnected().collect { manual ->
+            repository.getUserManuallyDisconnected().collect { _ ->
                 // No device status notification to update
             }
         }
@@ -174,6 +184,7 @@ class AirSyncViewModel(
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
             val isSmartspacerShowWhenDisconnected = repository.getSmartspacerShowWhenDisconnected().first()
+            val isMacMediaControlsEnabled = repository.getMacMediaControlsEnabled().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -217,7 +228,8 @@ class AirSyncViewModel(
                 symmetricKey = symmetricKey ?: lastConnectedSymmetricKey,
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
                 isSendNowPlayingEnabled = isSendNowPlayingEnabled,
-                isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled
+                isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
+                isMacMediaControlsEnabled = isMacMediaControlsEnabled
             )
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
@@ -244,23 +256,6 @@ class AirSyncViewModel(
                 try { WakeupService.startService(context) } catch (_: Exception) {}
             }
         }
-    }
-
-    fun onMirroringRequest(fps: Int, quality: Float, maxWidth: Int, bitrateKbps: Int) {
-        val url = "ws://${_uiState.value.ipAddress}:6997"
-        _uiState.value = _uiState.value.copy(
-            showMirroringDialog = true,
-            mirroringWebSocketUrl = url,
-            mirroringOptions = MirroringOptions(fps, quality, maxWidth, bitrateKbps)
-        )
-    }
-
-    fun dismissMirroringDialog() {
-        _uiState.value = _uiState.value.copy(showMirroringDialog = false)
-    }
-
-    fun clearMirroringUrl() {
-        _uiState.value = _uiState.value.copy(mirroringWebSocketUrl = null)
     }
 
     fun updateIpAddress(ipAddress: String) {
@@ -445,7 +440,7 @@ class AirSyncViewModel(
     fun manualSyncAppIcons(context: Context) {
         _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
 
-        SyncManager.manualSyncAppIcons(context) { success, message ->
+        SyncManager.manualSyncAppIcons(context) { _, message ->
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(
                     isIconSyncLoading = false,
@@ -639,7 +634,21 @@ class AirSyncViewModel(
         appContext?.let { context ->
             try {
                 AirSyncDeviceTarget.notifyChange(context)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun setMacMediaControlsEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isMacMediaControlsEnabled = enabled)
+        viewModelScope.launch {
+            repository.setMacMediaControlsEnabled(enabled)
+            // If disabled, stop the service immediately
+            if (!enabled) {
+                appContext?.let { ctx ->
+                    com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(ctx)
+                }
+            }
         }
     }
 
@@ -662,6 +671,45 @@ class AirSyncViewModel(
             e.printStackTrace()
             false
         }
+    }
+
+    // Clipboard history management
+    fun addClipboardEntry(text: String, isFromPc: Boolean) {
+        val entry = com.sameerasw.airsync.domain.model.ClipboardEntry(
+            id = java.util.UUID.randomUUID().toString(),
+            text = text,
+            timestamp = System.currentTimeMillis(),
+            isFromPc = isFromPc
+        )
+        val updatedHistory =
+            (listOf(entry) + _uiState.value.clipboardHistory).take(100) // Keep last 100 entries
+        _uiState.value = _uiState.value.copy(clipboardHistory = updatedHistory)
+    }
+
+    fun clearClipboardHistory() {
+        _uiState.value = _uiState.value.copy(clipboardHistory = emptyList())
+    }
+
+    fun clearDisconnectionClipboardHistory() {
+        // Clear clipboard history when disconnected
+        _uiState.value = _uiState.value.copy(clipboardHistory = emptyList())
+    }
+
+    // Notes Role state setters
+    fun setStylusMode(enabled: Boolean) {
+        _stylusMode.value = enabled
+    }
+
+    fun setLaunchedFromLockScreen(isLockScreen: Boolean) {
+        _launchedFromLockScreen.value = isLockScreen
+    }
+
+    fun setIsFloatingWindow(isFloating: Boolean) {
+        _isFloatingWindow.value = isFloating
+    }
+
+    fun setIsNotesRoleHeld(held: Boolean) {
+        _isNotesRoleHeld.value = held
     }
 
 }

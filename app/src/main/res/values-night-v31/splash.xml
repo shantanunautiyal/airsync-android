@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash screen theme with animation for Android 12+ (API 31+) dark theme -->
+    <!-- Note: Android 12+ doesn't support windowSplashScreenBackground, so we omit it -->
+    <style name="Theme.AirSync.Splash" parent="Theme.SplashScreen">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <!-- Animated icon displayed in splash screen -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <!-- Splash screen animation duration in milliseconds -->
+        <item name="windowSplashScreenAnimationDuration">3000</item>
+        <!-- Theme to apply after splash screen exits -->
+        <item name="postSplashScreenTheme">@style/Theme.AirSync</item>
+    </style>
+</resources>
+

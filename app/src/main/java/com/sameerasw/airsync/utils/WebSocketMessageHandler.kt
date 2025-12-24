@@ -22,6 +22,14 @@ object WebSocketMessageHandler {
     // Track if we're currently receiving playing media from Mac to prevent feedback loop
     private var isReceivingPlayingMedia = false
 
+    // Callback for clipboard entry history tracking
+    private var onClipboardEntryReceived: ((text: String) -> Unit)? = null
+
+    fun setOnClipboardEntryCallback(callback: ((text: String) -> Unit)?) {
+        onClipboardEntryReceived = callback
+        Log.d(TAG, "Clipboard entry callback ${if (callback != null) "registered" else "unregistered"}")
+    }
+
     /**
      * Handle incoming WebSocket messages from Mac
      */
@@ -345,6 +353,12 @@ object WebSocketMessageHandler {
 
             val text = data.optString("text")
             if (!text.isNullOrEmpty()) {
+                Log.d(TAG, "Clipboard update received from desktop: ${text.take(50)}...")
+
+                // Notify ViewModel/UI to add entry to clipboard history
+                onClipboardEntryReceived?.invoke(text)
+
+                // Update system clipboard
                 ClipboardSyncManager.handleClipboardUpdate(context, text)
                 Log.d(TAG, "Clipboard updated from desktop: ${text.take(50)}...")
             } else {

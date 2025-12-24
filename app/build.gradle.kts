@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-parcelize")
+    kotlin("kapt")
 }
 
 android {
@@ -16,8 +17,8 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         targetSdk = 36
-        versionCode = 10
-        versionName = "2.1.4"
+        versionCode = 17
+        versionName = "2.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -26,7 +27,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(
-                getDefaultProguardFile  ("proguard-android-optimize.txt"),
+                getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
@@ -63,7 +64,7 @@ dependencies {
     // Android 12+ SplashScreen API with backward compatibility attributes
     implementation(libs.androidx.core.splashscreen)
 
-    implementation (libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
 
@@ -95,6 +96,27 @@ dependencies {
 
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)
+
+    // CameraX for QR scanning
+    implementation("androidx.camera:camera-core:1.4.0")
+    implementation("androidx.camera:camera-camera2:1.4.0")
+    implementation("androidx.camera:camera-lifecycle:1.4.0")
+    implementation("androidx.camera:camera-view:1.4.0")
+    implementation("androidx.camera:camera-mlkit-vision:1.4.0")
+
+    // Room database for call history
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
+
+    // Phone number normalization
+    implementation(libs.libphonenumber)
+
+    // Coroutines for async operations
+    implementation(libs.kotlinx.coroutines.android)
+
+    // ML Kit barcode scanner (QR code only)
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

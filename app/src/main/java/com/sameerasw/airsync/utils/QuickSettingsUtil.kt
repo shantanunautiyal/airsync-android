@@ -5,12 +5,22 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.service.AirSyncTileService
 
 object QuickSettingsUtil {
+    fun isQSTileAdded(context: Context): Boolean {
+        return try {
+            val tiles = Settings.Secure.getString(context.contentResolver, "sysui_qs_tiles") ?: ""
+            tiles.contains("AirSyncTileService") || tiles.contains("com.sameerasw.airsync/.service.AirSyncTileService")
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun requestAddQuickSettingsTile(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val statusBarManager = context.getSystemService(StatusBarManager::class.java)

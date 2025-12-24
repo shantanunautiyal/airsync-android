@@ -1,0 +1,147 @@
+package com.sameerasw.airsync.service
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.IBinder
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.sameerasw.airsync.MainActivity
+import com.sameerasw.airsync.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+
+/**
+ * Foreground service that maintains the airsync connection and handles call monitoring.
+ * 
+ * Uses connectedDevice foreground service type as per Google Play Store requirements.
+ */
+class AirSyncService : Service() {
+
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var connectedDeviceName: String? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "AirSyncService created")
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "AirSyncService started with action: ${intent?.action}")
+
+        val action = intent?.action
+        when (action) {
+            ACTION_START_SYNC -> {
+                connectedDeviceName = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Mac"
+                startSync()
+            }
+            ACTION_STOP_SYNC -> stopSync()
+            else -> {
+                if (connectedDeviceName == null) {
+                    connectedDeviceName = intent?.getStringExtra(EXTRA_DEVICE_NAME) ?: "Mac"
+                }
+                startSync()
+            }
+        }
+
+        return START_STICKY
+    }
+
+    private fun startSync() {
+        Log.d(TAG, "Starting AirSync foreground service")
+        startForeground(NOTIFICATION_ID, buildNotification())
+    }
+
+    private fun stopSync() {
+        Log.d(TAG, "Stopping AirSync foreground service")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "AirSync Connection",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows that AirSync is connected to your Mac"
+            }
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+
+        val disconnectIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+            action = ACTION_DISCONNECT
+        }
+        val disconnectPendingIntent = PendingIntent.getBroadcast(this, 1, disconnectIntent, PendingIntent.FLAG_IMMUTABLE)
+
+        val name = connectedDeviceName ?: "Mac"
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("AirSync")
+            .setContentText("Connected to $name")
+            .setSmallIcon(R.drawable.ic_laptop_24)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setContentIntent(pendingIntent)
+            .addAction(R.drawable.rounded_link_off_24, "Disconnect", disconnectPendingIntent)
+            .build()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        Log.d(TAG, "AirSyncService destroyed")
+        scope.coroutineContext.cancel()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val TAG = "AirSyncService"
+        private const val CHANNEL_ID = "airsync_connection_channel"
+        private const val NOTIFICATION_ID = 4001
+
+        const val ACTION_START_SYNC = "com.sameerasw.airsync.START_SYNC"
+        const val ACTION_STOP_SYNC = "com.sameerasw.airsync.STOP_SYNC"
+        const val ACTION_DISCONNECT = "com.sameerasw.airsync.DISCONNECT_FROM_NOTIFICATION"
+        
+        const val EXTRA_DEVICE_NAME = "device_name"
+
+        fun start(context: Context, deviceName: String?) {
+            val intent = Intent(context, AirSyncService::class.java).apply {
+                action = ACTION_START_SYNC
+                putExtra(EXTRA_DEVICE_NAME, deviceName)
+            }
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting foreground service", e)
+            }
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, AirSyncService::class.java).apply {
+                action = ACTION_STOP_SYNC
+            }
+            context.startService(intent)
+        }
+    }
+}

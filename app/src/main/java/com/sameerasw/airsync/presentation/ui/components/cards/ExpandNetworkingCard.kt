@@ -32,28 +32,20 @@ fun ExpandNetworkingCard(context: Context) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 0.dp, horizontal = 0.dp),
-        shape = RoundedCornerShape(
-            topStart = minCornerRadius,
-            topEnd = minCornerRadius,
-            bottomStart = minCornerRadius,
-            bottomEnd = minCornerRadius
-        ),
-        elevation = CardDefaults.cardElevation(2.dp)
+        shape = MaterialTheme.shapes.extraSmall,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Column {
                 Text("Expand networking", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Allow connecting to device outside the local network",
                     modifier = Modifier.padding(top = 4.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
             Switch(

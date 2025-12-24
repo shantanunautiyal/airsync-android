@@ -130,7 +130,17 @@ object SyncManager {
             try {
                 val dataStoreManager = DataStoreManager(context)
 
-                // 1. Send lightweight device info immediately (no wallpaper) to trigger macInfo
+                // 1. Ensure ADB discovery is running (started at app startup)
+                try {
+                    val activity = context as? com.sameerasw.airsync.MainActivity
+                    activity?.initializeAdbDiscovery()
+                    Log.d(TAG, "ADB discovery is running")
+                    delay(1000)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not access ADB discovery: ${e.message}")
+                }
+
+                // 2. Send lightweight device info immediately (no wallpaper) to trigger macInfo
 
                 // Prefer the persisted device name set in the app. Fall back to system device name only if empty.
                 val persistedName = dataStoreManager.getDeviceName().first().ifBlank { null }
@@ -147,7 +157,22 @@ object SyncManager {
                 val version = context.packageManager
                     .getPackageInfo(context.packageName, 0).versionName ?: "2.0.0"
 
-                val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version)
+                // Get discovered ADB ports from the running mDNS discovery
+                val adbPorts = try {
+                    // Access the discovery holder directly - it's a true singleton object
+                    val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
+                    Log.d(TAG, "Retrieved ${discoveredServices.size} discovered ADB services from holder")
+                    discoveredServices.forEach { service ->
+                        Log.d(TAG, "  - Service: ${service.serviceName} at ${service.hostAddress}:${service.port}")
+                    }
+                    discoveredServices.map { it.port.toString() }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to get ADB ports: ${e.message}")
+                    emptyList()
+                }
+                Log.d(TAG, "Discovered ADB ports: $adbPorts")
+
+                val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, adbPorts)
                 if (WebSocketUtil.sendMessage(liteDeviceInfoJson)) {
                     Log.d(TAG, "Lite device info sent to trigger macInfo")
                 } else {
@@ -159,7 +184,13 @@ object SyncManager {
                     try {
                         delay(1500)
                         val wallpaperBase64 = try { WallpaperUtil.getWallpaperAsBase64(context) } catch (_: Exception) { null }
-                        val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, wallpaperBase64)
+                        val discoveredServices = try {
+                            AdbMdnsDiscovery(context).getDiscoveredServices()
+                        } catch (e: Exception) {
+                            emptyList()
+                        }
+                        val currentAdbPorts = discoveredServices.map { it.port.toString() }
+                        val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, wallpaperBase64, currentAdbPorts)
                         if (WebSocketUtil.sendMessage(fullDeviceInfoJson)) {
                             Log.d(TAG, "Full device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}")
                         }
@@ -270,8 +301,16 @@ object SyncManager {
                     ""
                 }
 
+                // Get discovered ADB ports from the running mDNS discovery
+                val adbPorts = try {
+                    val discoveredServices = com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
+                    discoveredServices.map { it.port.toString() }
+                } catch (e: Exception) {
+                    emptyList()
+                }
+
                 val wallpaperBase64 = try { WallpaperUtil.getWallpaperAsBase64(context) } catch (_: Exception) { null }
-                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, wallpaperBase64)
+                val deviceInfoJson = JsonUtil.createDeviceInfoJson(deviceName, localIp, port, version, wallpaperBase64, adbPorts)
 
                 if (WebSocketUtil.sendMessage(deviceInfoJson)) {
                     Log.d(TAG, "Sent updated device info: $deviceName")

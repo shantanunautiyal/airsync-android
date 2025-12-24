@@ -30,9 +30,12 @@ data class UiState(
     val mirroringWebSocketUrl: String? = null,
     val mirroringOptions: MirroringOptions? = null,
     val isSmartspacerShowWhenDisconnected: Boolean = false,
+    val isMacMediaControlsEnabled: Boolean = true,
     // Mac device status
     val macDeviceStatus: MacDeviceStatus? = null,
     // Auth failure dialog
     val showAuthFailureDialog: Boolean = false,
-    val authFailureMessage: String = ""
+    val authFailureMessage: String = "",
+    // Clipboard history
+    val clipboardHistory: List<ClipboardEntry> = emptyList()
 )
