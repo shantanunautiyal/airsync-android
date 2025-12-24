@@ -181,20 +181,21 @@ class InputAccessibilityService : AccessibilityService() {
     
     /**
      * Inject text input using accessibility service
+     * Falls back to shell command if no focused input field
      */
     fun injectText(text: String): Boolean {
         return try {
             val rootNode = this.rootInActiveWindow
             if (rootNode == null) {
-                Log.e(TAG, "Root node is null, cannot inject text")
-                return false
+                Log.w(TAG, "Root node is null, trying shell input")
+                return injectTextViaShell(text)
             }
             
             val focusedNode = rootNode.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
             if (focusedNode == null) {
-                Log.w(TAG, "No focused input field found")
+                Log.w(TAG, "No focused input field found, trying shell input")
                 rootNode.recycle()
-                return false
+                return injectTextViaShell(text)
             }
             
             // Get current text and append new text
@@ -208,16 +209,52 @@ class InputAccessibilityService : AccessibilityService() {
             focusedNode.recycle()
             rootNode.recycle()
             
-            Log.d(TAG, "Text injection ${if (result) "succeeded" else "failed"}: $text")
-            return result
+            if (!result) {
+                Log.w(TAG, "Accessibility text injection failed, trying shell input")
+                return injectTextViaShell(text)
+            }
+            
+            Log.d(TAG, "Text injection succeeded: $text")
+            return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error injecting text", e)
+            Log.e(TAG, "Error injecting text via accessibility, trying shell", e)
+            return injectTextViaShell(text)
+        }
+    }
+    
+    /**
+     * Inject text via shell command (fallback)
+     */
+    private fun injectTextViaShell(text: String): Boolean {
+        return try {
+            // Escape special characters for shell
+            val escapedText = text
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("'", "\\'")
+                .replace(" ", "\\ ")
+                .replace("&", "\\&")
+                .replace("|", "\\|")
+                .replace(";", "\\;")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+                .replace("<", "\\<")
+                .replace(">", "\\>")
+            
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "input text '$escapedText'"))
+            val exitCode = process.waitFor()
+            val result = exitCode == 0
+            Log.d(TAG, "Shell text injection ${if (result) "succeeded" else "failed"}: $text")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error injecting text via shell", e)
             false
         }
     }
     
     /**
      * Inject key event using accessibility service
+     * Falls back to shell command for unsupported keys
      */
     fun injectKeyEvent(keyCode: Int): Boolean {
         return try {
@@ -233,26 +270,58 @@ class InputAccessibilityService : AccessibilityService() {
                             arguments.putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
                             focusedNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
                         } else {
-                            false
+                            injectKeyViaShell(keyCode)
                         }
                     } else {
-                        false
+                        injectKeyViaShell(keyCode)
                     }
                     focusedNode?.recycle()
                     rootNode?.recycle()
                     Log.d(TAG, "Backspace key ${if (result) "succeeded" else "failed"}")
                     result
                 }
-                66 -> injectText("\n") // KEYCODE_ENTER
-                62 -> injectText(" ")  // KEYCODE_SPACE
-                61 -> injectText("\t") // KEYCODE_TAB
+                66 -> { // KEYCODE_ENTER
+                    if (!injectText("\n")) {
+                        injectKeyViaShell(keyCode)
+                    } else true
+                }
+                62 -> { // KEYCODE_SPACE
+                    if (!injectText(" ")) {
+                        injectKeyViaShell(keyCode)
+                    } else true
+                }
+                61 -> { // KEYCODE_TAB
+                    if (!injectText("\t")) {
+                        injectKeyViaShell(keyCode)
+                    } else true
+                }
+                // Arrow keys - use shell input keyevent
+                19, 20, 21, 22 -> { // DPAD UP, DOWN, LEFT, RIGHT
+                    injectKeyViaShell(keyCode)
+                }
                 else -> {
-                    Log.w(TAG, "Unsupported key code: $keyCode")
-                    false
+                    Log.d(TAG, "Using shell for key code: $keyCode")
+                    injectKeyViaShell(keyCode)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error injecting key event", e)
+            injectKeyViaShell(keyCode)
+        }
+    }
+    
+    /**
+     * Inject key event via shell command (fallback)
+     */
+    private fun injectKeyViaShell(keyCode: Int): Boolean {
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "input keyevent $keyCode"))
+            val exitCode = process.waitFor()
+            val result = exitCode == 0
+            Log.d(TAG, "Shell key injection ${if (result) "succeeded" else "failed"}: keyCode=$keyCode")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error injecting key via shell", e)
             false
         }
     }
