@@ -16,6 +16,12 @@ import androidx.core.net.toUri
 
 object PermissionUtil {
 
+    // Special permission constants
+    const val NOTIFICATION_ACCESS = "notification_access"
+    const val ACCESSIBILITY_SERVICE = "accessibility_service"
+    const val BACKGROUND_APP_USAGE = "background_app_usage"
+    const val HEALTH_CONNECT = "health_connect"
+
     fun isNotificationListenerEnabled(context: Context): Boolean {
         val componentName = ComponentName(context, MediaNotificationListener::class.java)
         val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
@@ -270,5 +276,168 @@ object PermissionUtil {
             context,
             Manifest.permission.READ_PHONE_STATE
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Check if READ_MEDIA_IMAGES permission is granted (Android 13+)
+     */
+    fun hasReadMediaImagesPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_IMAGES
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // For older versions, check READ_EXTERNAL_STORAGE
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    /**
+     * Open accessibility settings
+     */
+    fun openAccessibilitySettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            openAppSettings(context)
+        }
+    }
+
+    /**
+     * Open Health Connect permissions
+     */
+    fun openHealthConnectPermissions(context: Context) {
+        try {
+            val intent = Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS").apply {
+                putExtra("android.intent.extra.PACKAGE_NAME", context.packageName)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            openAppSettings(context)
+        }
+    }
+
+    /**
+     * Open app settings
+     */
+    fun openAppSettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        }
+    }
+
+    /**
+     * Get runtime permissions that can be requested
+     */
+    fun getRuntimePermissionsToRequest(context: Context): List<String> {
+        val permissions = mutableListOf<String>()
+
+        // POST_NOTIFICATIONS (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!isPostNotificationPermissionGranted(context)) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Call log permission
+        if (!isCallLogPermissionGranted(context)) {
+            permissions.add(Manifest.permission.READ_CALL_LOG)
+        }
+
+        // Contacts permission
+        if (!isContactsPermissionGranted(context)) {
+            permissions.add(Manifest.permission.READ_CONTACTS)
+        }
+
+        // Phone state permission
+        if (!isPhoneStatePermissionGranted(context)) {
+            permissions.add(Manifest.permission.READ_PHONE_STATE)
+        }
+
+        return permissions
+    }
+
+    /**
+     * Get all permission groups for the permissions screen
+     */
+    fun getAllPermissionGroups(context: Context): List<com.sameerasw.airsync.models.PermissionGroup> {
+        return listOf(
+            com.sameerasw.airsync.models.PermissionGroup(
+                title = "Core",
+                description = "Essential permissions for app functionality",
+                category = com.sameerasw.airsync.models.PermissionCategory.CORE,
+                permissions = listOf(
+                    com.sameerasw.airsync.models.PermissionInfo(
+                        permission = NOTIFICATION_ACCESS,
+                        displayName = "Notification Access",
+                        description = "Required to sync notifications from your phone",
+                        category = com.sameerasw.airsync.models.PermissionCategory.CORE,
+                        isGranted = isNotificationListenerEnabled(context),
+                        isRequired = true,
+                        requiresSpecialHandling = true
+                    ),
+                    com.sameerasw.airsync.models.PermissionInfo(
+                        permission = BACKGROUND_APP_USAGE,
+                        displayName = "Background App Usage",
+                        description = "Keeps the app running in the background",
+                        category = com.sameerasw.airsync.models.PermissionCategory.CORE,
+                        isGranted = isBatteryOptimizationDisabled(context),
+                        isRequired = false,
+                        requiresSpecialHandling = true
+                    )
+                )
+            ),
+            com.sameerasw.airsync.models.PermissionGroup(
+                title = "Calls",
+                description = "Permissions for call-related features",
+                category = com.sameerasw.airsync.models.PermissionCategory.CALLS,
+                permissions = listOf(
+                    com.sameerasw.airsync.models.PermissionInfo(
+                        permission = Manifest.permission.READ_CALL_LOG,
+                        displayName = "Call Log",
+                        description = "View recent calls on your Mac",
+                        category = com.sameerasw.airsync.models.PermissionCategory.CALLS,
+                        isGranted = isCallLogPermissionGranted(context),
+                        isRequired = false,
+                        requiresSpecialHandling = false
+                    ),
+                    com.sameerasw.airsync.models.PermissionInfo(
+                        permission = Manifest.permission.READ_CONTACTS,
+                        displayName = "Contacts",
+                        description = "Show caller names in notifications",
+                        category = com.sameerasw.airsync.models.PermissionCategory.CALLS,
+                        isGranted = isContactsPermissionGranted(context),
+                        isRequired = false,
+                        requiresSpecialHandling = false
+                    ),
+                    com.sameerasw.airsync.models.PermissionInfo(
+                        permission = Manifest.permission.READ_PHONE_STATE,
+                        displayName = "Phone State",
+                        description = "Detect incoming calls",
+                        category = com.sameerasw.airsync.models.PermissionCategory.CALLS,
+                        isGranted = isPhoneStatePermissionGranted(context),
+                        isRequired = false,
+                        requiresSpecialHandling = false
+                    )
+                )
+            )
+        )
     }
 }

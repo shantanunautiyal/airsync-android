@@ -103,6 +103,10 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.0")
     implementation("androidx.camera:camera-view:1.4.0")
     implementation("androidx.camera:camera-mlkit-vision:1.4.0")
+    
+    // Guava for ListenableFuture (required by CameraX)
+    implementation("com.google.guava:guava:32.1.3-android")
+    implementation("androidx.concurrent:concurrent-futures:1.2.0")
 
     // Room database for call history
     implementation(libs.androidx.room.runtime)

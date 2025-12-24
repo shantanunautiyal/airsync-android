@@ -504,14 +504,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
 
         // Handle Notes Role intent
         handleNotesRoleIntent(intent)
 
         // Check if this is a QS tile long-press intent
-        if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
+        if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
             // Check if device is connected
             if (!WebSocketUtil.isConnected()) {
                 // Not connected, open QR scanner
