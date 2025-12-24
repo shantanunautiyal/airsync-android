@@ -1,12 +1,11 @@
-import org.gradle.api.JavaVersion.VERSION_11
 import org.gradle.api.JavaVersion.VERSION_17
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
     id("kotlin-parcelize")
-    kotlin("kapt")
 }
 
 android {
@@ -33,14 +32,17 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = VERSION_11
+        sourceCompatibility = VERSION_17
         targetCompatibility = VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -92,26 +94,26 @@ dependencies {
     implementation(libs.androidx.connect.client)
 
     // DocumentFile for folder access
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation(libs.androidx.documentfile)
 
     implementation(libs.ui.graphics)
     implementation(libs.androidx.foundation)
 
     // CameraX for QR scanning
-    implementation("androidx.camera:camera-core:1.4.0")
-    implementation("androidx.camera:camera-camera2:1.4.0")
-    implementation("androidx.camera:camera-lifecycle:1.4.0")
-    implementation("androidx.camera:camera-view:1.4.0")
-    implementation("androidx.camera:camera-mlkit-vision:1.4.0")
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.mlkit.vision)
     
     // Guava for ListenableFuture (required by CameraX)
-    implementation("com.google.guava:guava:32.1.3-android")
-    implementation("androidx.concurrent:concurrent-futures:1.2.0")
+    implementation(libs.guava)
+    implementation(libs.androidx.concurrent.futures)
 
     // Room database for call history
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    kapt(libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler)
 
     // Phone number normalization
     implementation(libs.libphonenumber)
@@ -120,7 +122,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // ML Kit barcode scanner (QR code only)
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation(libs.barcode.scanning)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

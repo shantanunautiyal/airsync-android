@@ -72,7 +72,7 @@ object HealthDataCache {
     
     /**
      * Load health summary from cache
-     * Returns null if not cached or cache is stale
+     * Returns null if not cached, cache is stale, or data is corrupted
      */
     suspend fun loadSummary(context: Context, date: Long): HealthSummary? = withContext(Dispatchers.IO) {
         try {
@@ -81,7 +81,21 @@ object HealthDataCache {
                 return@withContext null
             }
             
-            val json = JSONObject(file.readText())
+            val content = file.readText()
+            if (content.isBlank()) {
+                Log.w(TAG, "Cache file is empty, deleting: ${file.name}")
+                file.delete()
+                return@withContext null
+            }
+            
+            val json = try {
+                JSONObject(content)
+            } catch (e: Exception) {
+                Log.e(TAG, "Corrupted cache file, deleting: ${file.name}", e)
+                file.delete()
+                return@withContext null
+            }
+            
             val cachedAt = json.optLong("cachedAt", 0)
             
             // Check if cache is stale (older than 1 hour for today, otherwise keep indefinitely)
@@ -91,26 +105,46 @@ object HealthDataCache {
                 return@withContext null
             }
             
+            // Validate date field exists and is reasonable
+            val cachedDate = json.optLong("date", 0)
+            if (cachedDate <= 0) {
+                Log.w(TAG, "Invalid date in cache, deleting: ${file.name}")
+                file.delete()
+                return@withContext null
+            }
+            
+            // Helper to safely get nullable Int (returns null if key is null or missing)
+            fun getOptionalInt(key: String): Int? = 
+                if (json.isNull(key) || !json.has(key)) null else json.optInt(key)
+            
+            // Helper to safely get nullable Long
+            fun getOptionalLong(key: String): Long? = 
+                if (json.isNull(key) || !json.has(key)) null else json.optLong(key)
+            
+            // Helper to safely get nullable Double
+            fun getOptionalDouble(key: String): Double? = 
+                if (json.isNull(key) || !json.has(key)) null else json.optDouble(key)
+            
             HealthSummary(
-                date = json.getLong("date"),
-                steps = if (json.isNull("steps")) null else json.getInt("steps"),
-                distance = if (json.isNull("distance")) null else json.getDouble("distance"),
-                calories = if (json.isNull("calories")) null else json.getInt("calories"),
-                activeMinutes = if (json.isNull("activeMinutes")) null else json.getInt("activeMinutes"),
-                heartRateAvg = if (json.isNull("heartRateAvg")) null else json.getInt("heartRateAvg"),
-                heartRateMin = if (json.isNull("heartRateMin")) null else json.getInt("heartRateMin"),
-                heartRateMax = if (json.isNull("heartRateMax")) null else json.getInt("heartRateMax"),
-                sleepDuration = if (json.isNull("sleepDuration")) null else json.getLong("sleepDuration"),
-                floorsClimbed = if (json.isNull("floorsClimbed")) null else json.getInt("floorsClimbed"),
-                weight = if (json.isNull("weight")) null else json.getDouble("weight"),
-                bloodPressureSystolic = if (json.isNull("bloodPressureSystolic")) null else json.getInt("bloodPressureSystolic"),
-                bloodPressureDiastolic = if (json.isNull("bloodPressureDiastolic")) null else json.getInt("bloodPressureDiastolic"),
-                oxygenSaturation = if (json.isNull("oxygenSaturation")) null else json.getDouble("oxygenSaturation"),
-                restingHeartRate = if (json.isNull("restingHeartRate")) null else json.getInt("restingHeartRate"),
-                vo2Max = if (json.isNull("vo2Max")) null else json.getDouble("vo2Max"),
-                bodyTemperature = if (json.isNull("bodyTemperature")) null else json.getDouble("bodyTemperature"),
-                bloodGlucose = if (json.isNull("bloodGlucose")) null else json.getDouble("bloodGlucose"),
-                hydration = if (json.isNull("hydration")) null else json.getDouble("hydration")
+                date = cachedDate,
+                steps = getOptionalInt("steps"),
+                distance = getOptionalDouble("distance"),
+                calories = getOptionalInt("calories"),
+                activeMinutes = getOptionalInt("activeMinutes"),
+                heartRateAvg = getOptionalInt("heartRateAvg"),
+                heartRateMin = getOptionalInt("heartRateMin"),
+                heartRateMax = getOptionalInt("heartRateMax"),
+                sleepDuration = getOptionalLong("sleepDuration"),
+                floorsClimbed = getOptionalInt("floorsClimbed"),
+                weight = getOptionalDouble("weight"),
+                bloodPressureSystolic = getOptionalInt("bloodPressureSystolic"),
+                bloodPressureDiastolic = getOptionalInt("bloodPressureDiastolic"),
+                oxygenSaturation = getOptionalDouble("oxygenSaturation"),
+                restingHeartRate = getOptionalInt("restingHeartRate"),
+                vo2Max = getOptionalDouble("vo2Max"),
+                bodyTemperature = getOptionalDouble("bodyTemperature"),
+                bloodGlucose = getOptionalDouble("bloodGlucose"),
+                hydration = getOptionalDouble("hydration")
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error loading health cache", e)
@@ -170,6 +204,28 @@ object HealthDataCache {
         } catch (e: Exception) {
             Log.e(TAG, "Error cleaning old cache", e)
         }
+    }
+    
+    /**
+     * Clear cache for a specific date (useful for forcing refresh)
+     */
+    suspend fun clearCacheForDate(context: Context, date: Long) = withContext(Dispatchers.IO) {
+        try {
+            val file = getCacheFile(context, date)
+            if (file.exists()) {
+                file.delete()
+                Log.d(TAG, "Cleared cache for date: $date")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing cache for date", e)
+        }
+    }
+    
+    /**
+     * Clear today's cache
+     */
+    suspend fun clearTodayCache(context: Context) = withContext(Dispatchers.IO) {
+        clearCacheForDate(context, System.currentTimeMillis())
     }
     
     private fun isToday(timestamp: Long): Boolean {

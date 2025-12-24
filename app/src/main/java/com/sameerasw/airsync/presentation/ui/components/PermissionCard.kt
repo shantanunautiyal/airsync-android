@@ -292,9 +292,13 @@ private fun handleSpecialPermission(context: android.content.Context, permission
             PermissionUtil.openBatteryOptimizationSettings(context)
         }
         PermissionUtil.HEALTH_CONNECT -> {
-            // For Health Connect, we need to use the proper permission launcher
-            // This will be handled by the HealthDataScreen
             PermissionUtil.openHealthConnectPermissions(context)
+        }
+        "MANAGE_EXTERNAL_STORAGE" -> {
+            PermissionUtil.openManageExternalStorageSettings(context)
+        }
+        "SYSTEM_ALERT_WINDOW" -> {
+            PermissionUtil.openOverlaySettings(context)
         }
         else -> {
             PermissionUtil.openAppSettings(context)

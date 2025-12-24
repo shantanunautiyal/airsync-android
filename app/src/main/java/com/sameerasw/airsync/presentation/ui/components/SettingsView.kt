@@ -77,7 +77,9 @@ fun SettingsView(
     scope: CoroutineScope = androidx.compose.runtime.rememberCoroutineScope(),
     onSendMessage: (String) -> Unit = {},
     onExport: (String) -> Unit = {},
-    onImport: () -> Unit = {}
+    onImport: () -> Unit = {},
+    onNavigateToHealth: () -> Unit = {},
+    onNavigateToFileTransfer: () -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
 
@@ -153,6 +155,39 @@ fun SettingsView(
 
                 ExpandNetworkingCard(context)
             }
+
+        // Features Section - Health & File Transfer
+        RoundedCardContainer {
+            // Health & Fitness Button
+            Button(
+                onClick = {
+                    HapticUtil.performClick(haptics)
+                    onNavigateToHealth()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraSmall
+            ) {
+                Text("Health & Fitness")
+            }
+
+            // File Transfer Button (only when connected)
+            AnimatedVisibility(
+                visible = uiState.isConnected,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Button(
+                    onClick = {
+                        HapticUtil.performClick(haptics)
+                        onNavigateToFileTransfer()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text("Send Files to Mac")
+                }
+            }
+        }
 
         // Device Info Section
             RoundedCardContainer {

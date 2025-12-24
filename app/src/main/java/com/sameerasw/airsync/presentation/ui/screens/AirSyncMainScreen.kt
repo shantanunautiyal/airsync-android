@@ -75,6 +75,8 @@ fun AirSyncMainScreen(
     isPlus: Boolean = false,
     symmetricKey: String? = null,
     onNavigateToApps: () -> Unit = {},
+    onNavigateToHealth: () -> Unit = {},
+    onNavigateToFileTransfer: () -> Unit = {},
     showAboutDialog: Boolean = false,
     onDismissAbout: () -> Unit = {}
 ) {
@@ -682,7 +684,9 @@ fun AirSyncMainScreen(
                                 pendingExportJson = json
                                 createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
                             },
-                            onImport = { openDocLauncher.launch(arrayOf("application/json")) }
+                            onImport = { openDocLauncher.launch(arrayOf("application/json")) },
+                            onNavigateToHealth = onNavigateToHealth,
+                            onNavigateToFileTransfer = onNavigateToFileTransfer
                         )
                     }
                 }
@@ -703,7 +707,9 @@ fun AirSyncMainScreen(
                             pendingExportJson = json
                             createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
                         },
-                        onImport = { openDocLauncher.launch(arrayOf("application/json")) }
+                        onImport = { openDocLauncher.launch(arrayOf("application/json")) },
+                        onNavigateToHealth = onNavigateToHealth,
+                        onNavigateToFileTransfer = onNavigateToFileTransfer
                     )
                 }
             }

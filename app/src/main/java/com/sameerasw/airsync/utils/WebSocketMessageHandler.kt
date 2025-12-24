@@ -96,37 +96,48 @@ object WebSocketMessageHandler {
                     if (rawBitrate != bitrateKbps) {
                         Log.w(TAG, "Bitrate $rawBitrate out of range, clamped to $bitrateKbps")
                     }
+                    
+                    // Check for auto-approve flag
+                    val autoApprove = options?.optBoolean("autoApprove", false) ?: false
+                    
+                    // Check for audio mirroring flag
+                    val enableAudio = options?.optBoolean("enableAudio", false) ?: false
 
                     val mirroringOptions = MirroringOptions(
                         fps = fps,
                         quality = quality,
                         maxWidth = maxWidth,
-                        bitrateKbps = bitrateKbps
+                        bitrateKbps = bitrateKbps,
+                        enableAudio = enableAudio
                     )
 
                     // Log mirror request details
                     when (mode) {
                         "app" -> {
                             if (packageName.isNotEmpty()) {
-                                Log.d(TAG, "📱 App-specific mirror request: package=$packageName")
+                                Log.d(TAG, "📱 App-specific mirror request: package=$packageName, autoApprove=$autoApprove")
                                 Log.d(TAG, "ℹ️ Note: Mirroring current screen (not launching app)")
                                 // Just start mirroring - don't launch the app
                                 // User should already have the app open or will open it manually
-                                MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                                MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions, autoApprove)
                             } else {
                                 Log.w(TAG, "⚠️ App mirror requested but no package name provided")
-                                MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                                MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions, autoApprove)
                             }
                         }
                         "desktop" -> {
-                            Log.d(TAG, "🖥️ Desktop mirror request: fps=$fps, quality=$quality")
-                            MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                            Log.d(TAG, "🖥️ Desktop mirror request: fps=$fps, quality=$quality, autoApprove=$autoApprove")
+                            MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions, autoApprove)
                         }
                         else -> {
-                            Log.d(TAG, "📱 Device mirror request: fps=$fps, quality=$quality")
-                            MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions)
+                            Log.d(TAG, "📱 Device mirror request: fps=$fps, quality=$quality, autoApprove=$autoApprove")
+                            MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions, autoApprove)
                         }
                     }
+                }
+                "stopMirroring" -> {
+                    Log.d(TAG, "🛑 Stop mirroring request from Mac")
+                    MirrorRequestHelper.stopMirroring(context)
                 }
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
@@ -1171,29 +1182,42 @@ object WebSocketMessageHandler {
 
                 val action = data.optString("action")
                 
-                // Note: Answering/ending calls programmatically requires ANSWER_PHONE_CALLS permission
-                // and is restricted on Android 9+. This is a placeholder for future implementation.
-                
                 when (action) {
                     "answer" -> {
-                        // Requires ANSWER_PHONE_CALLS permission (Android 9+)
-                        // Implementation would use TelecomManager.acceptRingingCall()
-                        val response = JsonUtil.createCallActionResponse(action, false, "Answer call not implemented - requires system permissions")
+                        val success = answerCall(context)
+                        val response = JsonUtil.createCallActionResponse(action, success, 
+                            if (success) "Call answered" else "Failed to answer call - check permissions")
                         WebSocketUtil.sendMessage(response)
-                        Log.w(TAG, "Answer call action not implemented")
                     }
-                    "reject" -> {
-                        // Requires ANSWER_PHONE_CALLS permission (Android 9+)
-                        // Implementation would use TelecomManager.endCall()
-                        val response = JsonUtil.createCallActionResponse(action, false, "Reject call not implemented - requires system permissions")
+                    "reject", "hangup" -> {
+                        val success = endCall(context)
+                        val response = JsonUtil.createCallActionResponse(action, success,
+                            if (success) "Call ended" else "Failed to end call - check permissions")
                         WebSocketUtil.sendMessage(response)
-                        Log.w(TAG, "Reject call action not implemented")
                     }
                     "mute" -> {
-                        // Could be implemented with AudioManager
-                        val response = JsonUtil.createCallActionResponse(action, false, "Mute call not implemented")
+                        val success = muteCall(context)
+                        val response = JsonUtil.createCallActionResponse(action, success,
+                            if (success) "Call muted" else "Failed to mute call")
                         WebSocketUtil.sendMessage(response)
-                        Log.w(TAG, "Mute call action not implemented")
+                    }
+                    "unmute" -> {
+                        val success = unmuteCall(context)
+                        val response = JsonUtil.createCallActionResponse(action, success,
+                            if (success) "Call unmuted" else "Failed to unmute call")
+                        WebSocketUtil.sendMessage(response)
+                    }
+                    "speaker" -> {
+                        val success = toggleSpeaker(context, true)
+                        val response = JsonUtil.createCallActionResponse(action, success,
+                            if (success) "Speaker enabled" else "Failed to enable speaker")
+                        WebSocketUtil.sendMessage(response)
+                    }
+                    "speakerOff" -> {
+                        val success = toggleSpeaker(context, false)
+                        val response = JsonUtil.createCallActionResponse(action, success,
+                            if (success) "Speaker disabled" else "Failed to disable speaker")
+                        WebSocketUtil.sendMessage(response)
                     }
                     else -> {
                         val response = JsonUtil.createCallActionResponse(action, false, "Unknown action")
@@ -1206,6 +1230,130 @@ object WebSocketMessageHandler {
                 val response = JsonUtil.createCallActionResponse("unknown", false, "Error: ${e.message}")
                 WebSocketUtil.sendMessage(response)
             }
+        }
+    }
+    
+    @Suppress("DEPRECATION")
+    private fun answerCall(context: Context): Boolean {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                if (telecomManager != null && 
+                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ANSWER_PHONE_CALLS) 
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    telecomManager.acceptRingingCall()
+                    Log.d(TAG, "✅ Call answered via TelecomManager")
+                    true
+                } else {
+                    Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted")
+                    false
+                }
+            } else {
+                // For older Android versions, use ITelephony via reflection
+                answerCallLegacy(context)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error answering call", e)
+            false
+        }
+    }
+    
+    @Suppress("DEPRECATION")
+    private fun answerCallLegacy(context: Context): Boolean {
+        return try {
+            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+            val clazz = Class.forName(telephonyManager?.javaClass?.name)
+            val method = clazz.getDeclaredMethod("getITelephony")
+            method.isAccessible = true
+            val telephonyService = method.invoke(telephonyManager)
+            val telephonyServiceClass = Class.forName(telephonyService.javaClass.name)
+            val answerMethod = telephonyServiceClass.getDeclaredMethod("answerRingingCall")
+            answerMethod.invoke(telephonyService)
+            Log.d(TAG, "✅ Call answered via ITelephony (legacy)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error answering call (legacy)", e)
+            false
+        }
+    }
+    
+    @Suppress("DEPRECATION")
+    private fun endCall(context: Context): Boolean {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                if (telecomManager != null &&
+                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ANSWER_PHONE_CALLS)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    val result = telecomManager.endCall()
+                    Log.d(TAG, "✅ Call ended via TelecomManager: $result")
+                    result
+                } else {
+                    Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted for ending call")
+                    false
+                }
+            } else {
+                // For older Android versions, use ITelephony via reflection
+                endCallLegacy(context)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error ending call", e)
+            false
+        }
+    }
+    
+    @Suppress("DEPRECATION")
+    private fun endCallLegacy(context: Context): Boolean {
+        return try {
+            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+            val clazz = Class.forName(telephonyManager?.javaClass?.name)
+            val method = clazz.getDeclaredMethod("getITelephony")
+            method.isAccessible = true
+            val telephonyService = method.invoke(telephonyManager)
+            val telephonyServiceClass = Class.forName(telephonyService.javaClass.name)
+            val endMethod = telephonyServiceClass.getDeclaredMethod("endCall")
+            val result = endMethod.invoke(telephonyService) as Boolean
+            Log.d(TAG, "✅ Call ended via ITelephony (legacy): $result")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error ending call (legacy)", e)
+            false
+        }
+    }
+    
+    private fun muteCall(context: Context): Boolean {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            audioManager?.isMicrophoneMute = true
+            Log.d(TAG, "✅ Call muted")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error muting call", e)
+            false
+        }
+    }
+    
+    private fun unmuteCall(context: Context): Boolean {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            audioManager?.isMicrophoneMute = false
+            Log.d(TAG, "✅ Call unmuted")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unmuting call", e)
+            false
+        }
+    }
+    
+    private fun toggleSpeaker(context: Context, enabled: Boolean): Boolean {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            audioManager?.isSpeakerphoneOn = enabled
+            Log.d(TAG, "✅ Speaker ${if (enabled) "enabled" else "disabled"}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error toggling speaker", e)
+            false
         }
     }
 

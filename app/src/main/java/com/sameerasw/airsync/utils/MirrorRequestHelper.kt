@@ -1,6 +1,5 @@
 package com.sameerasw.airsync.utils
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -20,19 +19,67 @@ object MirrorRequestHelper {
     private const val CHANNEL_ID = "mirror_request_channel"
     private const val NOTIFICATION_ID = 9001
     
+    // Guard against multiple mirror requests
+    @Volatile
+    private var isMirrorRequestPending = false
+    
     /**
      * Handle mirror request from Mac
      * Prevents duplicate popups if mirroring is already active
      */
-    fun handleMirrorRequest(context: Context, mirroringOptions: MirroringOptions) {
+    fun handleMirrorRequest(context: Context, mirroringOptions: MirroringOptions, autoApprove: Boolean = false) {
+        // Guard against multiple mirror requests
+        synchronized(this) {
+            if (isMirrorRequestPending) {
+                Log.w(TAG, "Mirror request already pending, ignoring duplicate request")
+                sendMirrorStatus(context, false, "Request already pending")
+                return
+            }
+            isMirrorRequestPending = true
+        }
+        
         // Check if mirroring is already active
         if (ScreenCaptureService.isStreaming.value) {
             Log.w(TAG, "Screen mirroring already active, ignoring duplicate request")
             // Send acknowledgment to Mac that mirroring is already running
             sendMirrorStatus(context, true, "Already mirroring")
+            synchronized(this) { isMirrorRequestPending = false }
             return
         }
         
+        // If auto-approve is enabled, always go directly to system dialog (skip our custom UI)
+        if (autoApprove) {
+            Log.d(TAG, "Auto-approve enabled, going directly to system permission dialog")
+            startMirroringWithStoredPermission(context, mirroringOptions)
+        } else {
+            // Show our custom permission dialog first
+            showMirrorPermissionDialog(context, mirroringOptions)
+        }
+    }
+    
+    /**
+     * Start mirroring with stored permission (auto-approve flow)
+     */
+    private fun startMirroringWithStoredPermission(context: Context, mirroringOptions: MirroringOptions) {
+        try {
+            // We need to request permission again as MediaProjection tokens can't be stored
+            // But we can skip the UI dialog by going directly to the system permission
+            val intent = Intent(context, com.sameerasw.airsync.presentation.ui.activities.AutoApproveMirrorActivity::class.java).apply {
+                putExtra(ScreenCaptureService.EXTRA_MIRRORING_OPTIONS, mirroringOptions)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting auto-approve mirror", e)
+            synchronized(this) { isMirrorRequestPending = false }
+            sendMirrorStatus(context, false, "Failed to start: ${e.message}")
+        }
+    }
+    
+    /**
+     * Show mirror permission dialog (normal flow)
+     */
+    private fun showMirrorPermissionDialog(context: Context, mirroringOptions: MirroringOptions) {
         // Send broadcast to show permission dialog with correct extra key
         val intent = Intent("com.sameerasw.airsync.MIRROR_REQUEST").apply {
             `package` = context.packageName
@@ -44,6 +91,15 @@ object MirrorRequestHelper {
         
         // Also show notification in case app is minimized
         showMirrorRequestNotification(context, mirroringOptions)
+    }
+    
+    /**
+     * Reset the pending flag (called when mirror starts or fails)
+     */
+    fun resetPendingFlag() {
+        synchronized(this) {
+            isMirrorRequestPending = false
+        }
     }
     
     /**
@@ -107,5 +163,16 @@ object MirrorRequestHelper {
         } catch (e: Exception) {
             Log.e(TAG, "Error sending mirror status", e)
         }
+    }
+    
+    /**
+     * Stop mirroring from Android side
+     */
+    fun stopMirroring(context: Context) {
+        Log.d(TAG, "Stopping mirroring from Android")
+        val intent = Intent(context, ScreenCaptureService::class.java).apply {
+            action = ScreenCaptureService.ACTION_STOP
+        }
+        context.startService(intent)
     }
 }

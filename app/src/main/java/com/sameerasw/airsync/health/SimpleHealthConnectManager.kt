@@ -162,7 +162,11 @@ class SimpleHealthConnectManager(private val context: Context) {
             Log.d(TAG, "Is Today: ${date == java.time.LocalDate.now()}")
             
             // Try cache first unless force refresh
-            if (!forceRefresh) {
+            if (forceRefresh) {
+                // Clear cache for this date when force refreshing
+                HealthDataCache.clearCacheForDate(context, timestamp)
+                Log.d(TAG, "Force refresh: cleared cache for $date")
+            } else {
                 val cached = HealthDataCache.loadSummary(context, timestamp)
                 if (cached != null) {
                     Log.d(TAG, "Using cached health data for $date")
@@ -241,18 +245,18 @@ class SimpleHealthConnectManager(private val context: Context) {
             
             Log.d(TAG, "Final stats created: $stats")
             
-            // Cache the result
+            // Cache the result - preserve 0 values as valid data, only use null for truly missing data
             val summary = com.sameerasw.airsync.models.HealthSummary(
                 date = timestamp,
-                steps = if (stats.steps > 0) stats.steps.toInt() else null,
+                steps = stats.steps.toInt(),  // 0 steps is valid data
                 distance = if (stats.distance > 0) stats.distance else null,
                 calories = if (stats.calories > 0) stats.calories.toInt() else null,
-                activeMinutes = if (stats.activeMinutes > 0) stats.activeMinutes.toInt() else null,
+                activeMinutes = stats.activeMinutes.toInt(),  // 0 active minutes is valid
                 heartRateAvg = if (stats.heartRate > 0) stats.heartRate.toInt() else null,
                 heartRateMin = if (stats.heartRateMin > 0) stats.heartRateMin.toInt() else null,
                 heartRateMax = if (stats.heartRateMax > 0) stats.heartRateMax.toInt() else null,
                 sleepDuration = if (stats.sleepHours > 0) (stats.sleepHours * 60).toLong() else null,
-                floorsClimbed = if (stats.floorsClimbed > 0) stats.floorsClimbed.toInt() else null,
+                floorsClimbed = stats.floorsClimbed.toInt(),  // 0 floors is valid
                 weight = if (stats.weight > 0) stats.weight else null,
                 bloodPressureSystolic = if (stats.bloodPressureSystolic > 0) stats.bloodPressureSystolic else null,
                 bloodPressureDiastolic = if (stats.bloodPressureDiastolic > 0) stats.bloodPressureDiastolic else null,

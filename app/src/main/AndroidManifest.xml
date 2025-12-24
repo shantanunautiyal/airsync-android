@@ -27,6 +27,9 @@
     <!-- Screen capture permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     
+    <!-- Audio capture permission for mirroring audio to Mac -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
     <!-- Screen overlay permission (for black screen curtain) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
@@ -170,6 +173,12 @@
         
         <activity
             android:name=".presentation.ui.activities.ScreenShareActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:noHistory="true" />
+        
+        <activity
+            android:name=".presentation.ui.activities.AutoApproveMirrorActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:noHistory="true" />

@@ -35,7 +35,9 @@ class ScreenCaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
     private var screenMirroringManager: ScreenMirroringManager? = null
     private var rawFrameEncoder: RawFrameEncoder? = null
+    private var audioCaptureService: AudioCaptureService? = null
     private var useRawFrames = true // Use raw frames by default, H.264 as fallback
+    private var enableAudio = false // Audio mirroring flag
 
     private var handlerThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
@@ -94,6 +96,8 @@ class ScreenCaptureService : Service() {
 
                 if (resultCode == Activity.RESULT_OK && data != null && mirroringOptions != null) {
                     _isStreaming.value = true
+                    // Reset pending flag now that mirroring has started
+                    com.sameerasw.airsync.utils.MirrorRequestHelper.resetPendingFlag()
                     initializeMediaProjection(resultCode, data, mirroringOptions)
                     if (useRawFrames) {
                         rawFrameEncoder?.startCapture()
@@ -102,6 +106,7 @@ class ScreenCaptureService : Service() {
                     }
                 } else {
                     Log.e(TAG, "Invalid start parameters for screen capture. Stopping service.")
+                    com.sameerasw.airsync.utils.MirrorRequestHelper.resetPendingFlag()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 }
@@ -128,6 +133,7 @@ class ScreenCaptureService : Service() {
         
         // Check if we should use raw frames or H.264
         useRawFrames = mirroringOptions.useRawFrames ?: true
+        enableAudio = mirroringOptions.enableAudio
         
         if (useRawFrames) {
             Log.d(TAG, "Using raw frame encoder (JPEG)")
@@ -135,6 +141,19 @@ class ScreenCaptureService : Service() {
         } else {
             Log.d(TAG, "Using H.264 encoder (fallback)")
             screenMirroringManager = ScreenMirroringManager(this, mediaProjection!!, backgroundHandler!!, ::sendMirrorFrame, mirroringOptions)
+        }
+        
+        // Initialize audio capture if enabled (Android 10+)
+        if (enableAudio && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Log.d(TAG, "Initializing audio capture")
+            audioCaptureService = AudioCaptureService(this, mediaProjection!!)
+            if (audioCaptureService?.isSupported() == true) {
+                audioCaptureService?.startCapture()
+            } else {
+                Log.w(TAG, "Audio capture not supported on this device")
+            }
+        } else if (enableAudio) {
+            Log.w(TAG, "Audio capture requires Android 10+ (API 29)")
         }
         
         // Send mirrorStart message to Mac
@@ -166,6 +185,10 @@ class ScreenCaptureService : Service() {
     fun stopMirroring() {
         if (!_isStreaming.compareAndSet(expect = true, update = false)) return
         Log.d(TAG, "Stopping screen capture.")
+
+        // Stop audio capture first
+        audioCaptureService?.stopCapture()
+        audioCaptureService = null
 
         rawFrameEncoder?.stopCapture()
         rawFrameEncoder = null
@@ -222,8 +245,11 @@ class ScreenCaptureService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID, "Screen Capture",
-            NotificationManager.IMPORTANCE_LOW
-        )
+            NotificationManager.IMPORTANCE_DEFAULT  // Changed from LOW to show actions
+        ).apply {
+            description = "Shows when screen mirroring is active"
+            setShowBadge(false)
+        }
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
     }
@@ -237,14 +263,26 @@ class ScreenCaptureService : Service() {
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
         } else {
+            @Suppress("DEPRECATION")
             Notification.Builder(this)
         }
 
         return builder
-            .setContentTitle("AirSync")
-            .setContentText("Screen mirroring is active.")
+            .setContentTitle("AirSync Mirror")
+            .setContentText("Screen mirroring is active")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .addAction(0, "Stop", pendingStopIntent)
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Stop Mirroring",
+                    pendingStopIntent
+                ).build()
+            )
+            .setOngoing(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setStyle(Notification.BigTextStyle()
+                .bigText("Screen mirroring is active. Tap 'Stop Mirroring' button below to end the session."))
             .build()
     }
 

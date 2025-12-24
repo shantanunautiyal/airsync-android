@@ -17,10 +17,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class ScreenShareActivity : ComponentActivity() {
+/**
+ * Transparent activity that handles auto-approve mirror requests.
+ * Shows the system MediaProjection permission dialog but auto-dismisses
+ * once permission is granted.
+ */
+class AutoApproveMirrorActivity : ComponentActivity() {
     
     companion object {
-        private const val TAG = "ScreenShareActivity"
+        private const val TAG = "AutoApproveMirror"
     }
 
     private val screenCaptureLauncher = registerForActivityResult(
@@ -41,7 +46,7 @@ class ScreenShareActivity : ComponentActivity() {
                     
                     // Store that we have permission for future auto-approve
                     CoroutineScope(Dispatchers.IO).launch {
-                        val dataStore = DataStoreManager(this@ScreenShareActivity)
+                        val dataStore = DataStoreManager(this@AutoApproveMirrorActivity)
                         dataStore.setMirrorPermission(true)
                     }
                     
@@ -60,12 +65,17 @@ class ScreenShareActivity : ComponentActivity() {
         
         // Reset pending flag and finish
         MirrorRequestHelper.resetPendingFlag()
-        finish() // Finish the activity regardless of the result
+        finish()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        
+        // Make activity transparent
+        window.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        Log.d(TAG, "Starting auto-approve mirror flow")
+        
         val mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         val screenCaptureIntent = mediaProjectionManager.createScreenCaptureIntent()
         screenCaptureLauncher.launch(screenCaptureIntent)
