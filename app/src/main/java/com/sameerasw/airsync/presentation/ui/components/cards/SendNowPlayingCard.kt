@@ -20,6 +20,8 @@ import com.sameerasw.airsync.utils.HapticUtil
 fun SendNowPlayingCard(
     isSendNowPlayingEnabled: Boolean,
     onToggleSendNowPlaying: (Boolean) -> Unit,
+    title: String = "Send now playing",
+    subtitle: String = "Share media playback details with desktop"
 ) {
     val haptics = LocalHapticFeedback.current
 
@@ -35,9 +37,9 @@ fun SendNowPlayingCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Send now playing", style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Share media playback details with desktop",
+                    subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

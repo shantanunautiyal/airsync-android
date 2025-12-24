@@ -21,8 +21,7 @@
     <!-- Notes Role permission for content capture in floating windows -->
     <uses-permission android:name="android.permission.LAUNCH_CAPTURE_CONTENT_ACTIVITY_FOR_NOTE" />
 
-    <!-- Media playback permissions -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Media playback control  -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Camera permission for QR code scanner -->
@@ -137,11 +136,10 @@
             android:theme="@style/Theme.AirSync" />
 
 
-        <!-- Mac Media Player Service - creates native Android media player UI -->
         <service
             android:name=".service.MacMediaPlayerService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="connectedDevice">
         </service>
 
         <!-- Quick Settings Tile Service -->

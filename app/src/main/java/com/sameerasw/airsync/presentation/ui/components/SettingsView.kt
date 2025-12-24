@@ -141,6 +141,16 @@ fun SettingsView(
                     }
                 )
 
+                // Mac Media Controls toggle for Play Store initiation proof
+                SendNowPlayingCard(
+                    isSendNowPlayingEnabled = uiState.isMacMediaControlsEnabled,
+                    onToggleSendNowPlaying = { enabled: Boolean ->
+                        viewModel.setMacMediaControlsEnabled(enabled)
+                    },
+                    title = "Show Mac Media Controls",
+                    subtitle = "Show media controls when Mac is playing music"
+                )
+
                 ExpandNetworkingCard(context)
             }
 
