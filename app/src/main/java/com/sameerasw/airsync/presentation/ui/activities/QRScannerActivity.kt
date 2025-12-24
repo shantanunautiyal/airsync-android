@@ -7,8 +7,11 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import android.os.Build
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -50,7 +53,23 @@ class QRScannerActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
+        )
         super.onCreate(savedInstanceState)
+
+        // Disable scrim on 3-button navigation (API 29+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
 
         // Check camera permission
         if (ContextCompat.checkSelfPermission(
@@ -99,12 +118,7 @@ private fun QRScannerScreen(
     var loadingHapticsJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val haptics = LocalHapticFeedback.current
 
-    // Make camera draw behind system bars
-    LaunchedEffect(Unit) {
-        if (activity != null) {
-            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
-        }
-    }
+    // Make camera draw behind system bars - handled by enableEdgeToEdge
 
     // Continuous subtle haptic feedback while actively scanning
     LaunchedEffect(isActivelyScanning) {

@@ -144,6 +144,18 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Enable full edge-to-edge drawing for both status and navigation bars
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
+        )
+
         super.onCreate(savedInstanceState)
 
         // Install and configure the splash screen before any UI rendering
@@ -270,21 +282,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Enable full edge-to-edge drawing for both status and navigation bars
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            ),
-            navigationBarStyle = SystemBarStyle.auto(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            )
-        )
-
         // On Android 10+ disable forced high-contrast nav bar, so app can draw beneath gesture bar
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
         }
 
         val data: android.net.Uri? = intent?.data
