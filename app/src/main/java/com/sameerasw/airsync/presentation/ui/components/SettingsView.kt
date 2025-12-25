@@ -38,6 +38,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTipCa
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.SendNowPlayingCard
 import com.sameerasw.airsync.presentation.ui.components.cards.SmartspacerCard
+import com.sameerasw.airsync.presentation.ui.components.cards.BluetoothCard
 import com.sameerasw.airsync.utils.HapticUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -187,6 +188,11 @@ fun SettingsView(
                     Text("Send Files to Mac")
                 }
             }
+        }
+        
+        // Bluetooth Connection Section
+        RoundedCardContainer {
+            BluetoothCard()
         }
 
         // Device Info Section

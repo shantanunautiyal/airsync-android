@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.content.Context
 
 class InputAccessibilityService : AccessibilityService() {
 
@@ -191,9 +192,24 @@ class InputAccessibilityService : AccessibilityService() {
                 return injectTextViaShell(text)
             }
             
-            val focusedNode = rootNode.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+            // Try to find focused input field
+            var focusedNode = rootNode.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+            
+            // If no input focus, try to find any editable node
             if (focusedNode == null) {
-                Log.w(TAG, "No focused input field found, trying shell input")
+                focusedNode = findEditableNode(rootNode)
+            }
+            
+            if (focusedNode == null) {
+                Log.w(TAG, "No focused or editable input field found, trying shell input")
+                rootNode.recycle()
+                return injectTextViaShell(text)
+            }
+            
+            // Check if node is editable
+            if (!focusedNode.isEditable) {
+                Log.w(TAG, "Focused node is not editable, trying shell input")
+                focusedNode.recycle()
                 rootNode.recycle()
                 return injectTextViaShell(text)
             }
@@ -210,7 +226,19 @@ class InputAccessibilityService : AccessibilityService() {
             rootNode.recycle()
             
             if (!result) {
-                Log.w(TAG, "Accessibility text injection failed, trying shell input")
+                Log.w(TAG, "Accessibility text injection failed, trying PASTE")
+                // Try to paste the text instead
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("AirSync Input", text)
+                clipboard.setPrimaryClip(clip)
+                
+                val pasteResult = focusedNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_PASTE)
+                if (pasteResult) {
+                    Log.d(TAG, "Text injection via PASTE succeeded")
+                    return true
+                }
+                
+                Log.w(TAG, "Paste failed, trying shell input")
                 return injectTextViaShell(text)
             }
             
@@ -223,16 +251,41 @@ class InputAccessibilityService : AccessibilityService() {
     }
     
     /**
+     * Find an editable node in the view hierarchy
+     */
+    private fun findEditableNode(node: android.view.accessibility.AccessibilityNodeInfo): android.view.accessibility.AccessibilityNodeInfo? {
+        if (node.isEditable && node.isFocused) {
+            return node
+        }
+        
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            if (child.isEditable && child.isFocused) {
+                return child
+            }
+            val found = findEditableNode(child)
+            if (found != null) {
+                child.recycle()
+                return found
+            }
+            child.recycle()
+        }
+        return null
+    }
+    
+    /**
      * Inject text via shell command (fallback)
+     * Note: This requires either root access or ADB connection
      */
     private fun injectTextViaShell(text: String): Boolean {
         return try {
-            // Escape special characters for shell
+            // For shell input, we need to escape special characters properly
+            // The 'input text' command has specific escaping requirements
             val escapedText = text
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("'", "\\'")
-                .replace(" ", "\\ ")
+                .replace("\\", "\\\\\\\\")  // Backslash needs quadruple escape
+                .replace("\"", "\\\\\\\"")  // Quote needs triple escape
+                .replace("'", "'\\''")      // Single quote: end quote, escaped quote, start quote
+                .replace(" ", "%s")         // Space as %s (input text special)
                 .replace("&", "\\&")
                 .replace("|", "\\|")
                 .replace(";", "\\;")
@@ -240,14 +293,27 @@ class InputAccessibilityService : AccessibilityService() {
                 .replace(")", "\\)")
                 .replace("<", "\\<")
                 .replace(">", "\\>")
+                .replace("\n", "")          // Remove newlines (not supported)
+                .replace("\t", "")          // Remove tabs (not supported)
             
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "input text '$escapedText'"))
+            // Use ProcessBuilder for better control
+            val processBuilder = ProcessBuilder("sh", "-c", "input text \"$escapedText\"")
+            processBuilder.redirectErrorStream(true)
+            val process = processBuilder.start()
+            
+            // Read output for debugging
+            val output = process.inputStream.bufferedReader().readText()
             val exitCode = process.waitFor()
+            
             val result = exitCode == 0
-            Log.d(TAG, "Shell text injection ${if (result) "succeeded" else "failed"}: $text")
+            if (!result) {
+                Log.e(TAG, "Shell text injection failed: $text (exit=$exitCode, output=$output)")
+            } else {
+                Log.d(TAG, "Shell text injection succeeded: $text")
+            }
             result
         } catch (e: Exception) {
-            Log.e(TAG, "Error injecting text via shell", e)
+            Log.e(TAG, "Error injecting text via shell: ${e.message}", e)
             false
         }
     }
@@ -295,9 +361,49 @@ class InputAccessibilityService : AccessibilityService() {
                         injectKeyViaShell(keyCode)
                     } else true
                 }
-                // Arrow keys - use shell input keyevent
-                19, 20, 21, 22 -> { // DPAD UP, DOWN, LEFT, RIGHT
-                    injectKeyViaShell(keyCode)
+                // Arrow keys - use accessibility cursor movement actions
+                21 -> { // KEYCODE_DPAD_LEFT
+                    injectCursorMove(android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER, false)
+                }
+                22 -> { // KEYCODE_DPAD_RIGHT
+                    injectCursorMove(android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER, true)
+                }
+                19 -> { // KEYCODE_DPAD_UP
+                    injectCursorMove(android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE, false)
+                }
+                20 -> { // KEYCODE_DPAD_DOWN
+                    injectCursorMove(android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE, true)
+                }
+                // Page Up/Down
+                92 -> { // KEYCODE_PAGE_UP
+                    injectCursorMove(android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_PAGE, false)
+                }
+                93 -> { // KEYCODE_PAGE_DOWN
+                    injectCursorMove(android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_PAGE, true)
+                }
+                // Home/End
+                122 -> { // KEYCODE_MOVE_HOME - move to start of text
+                    val rootNode = this.rootInActiveWindow
+                    val focusedNode = rootNode?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+                    val result = focusedNode?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_SELECTION, android.os.Bundle().apply {
+                        putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                        putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, 0)
+                    }) ?: false
+                    focusedNode?.recycle()
+                    rootNode?.recycle()
+                    result
+                }
+                123 -> { // KEYCODE_MOVE_END - move to end of text
+                    val rootNode = this.rootInActiveWindow
+                    val focusedNode = rootNode?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+                    val textLength = focusedNode?.text?.length ?: 0
+                    val result = focusedNode?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_SELECTION, android.os.Bundle().apply {
+                        putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, textLength)
+                        putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, textLength)
+                    }) ?: false
+                    focusedNode?.recycle()
+                    rootNode?.recycle()
+                    result
                 }
                 else -> {
                     Log.d(TAG, "Using shell for key code: $keyCode")
@@ -307,6 +413,47 @@ class InputAccessibilityService : AccessibilityService() {
         } catch (e: Exception) {
             Log.e(TAG, "Error injecting key event", e)
             injectKeyViaShell(keyCode)
+        }
+    }
+    
+    /**
+     * Inject cursor movement using accessibility actions
+     */
+    private fun injectCursorMove(granularity: Int, forward: Boolean): Boolean {
+        return try {
+            val rootNode = this.rootInActiveWindow
+            val focusedNode = rootNode?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+            
+            val result = if (focusedNode != null) {
+                val action = if (forward) {
+                    android.view.accessibility.AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY
+                } else {
+                    android.view.accessibility.AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY
+                }
+                val arguments = android.os.Bundle().apply {
+                    putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT, granularity)
+                }
+                focusedNode.performAction(action, arguments)
+            } else {
+                Log.w(TAG, "No focused input for cursor move, trying shell fallback")
+                // Fallback to shell for non-text-field contexts (e.g., list navigation)
+                when (granularity) {
+                    android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER -> 
+                        injectKeyViaShell(if (forward) 22 else 21) // DPAD RIGHT/LEFT
+                    android.view.accessibility.AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE ->
+                        injectKeyViaShell(if (forward) 20 else 19) // DPAD DOWN/UP
+                    else -> false
+                }
+            }
+            
+            focusedNode?.recycle()
+            rootNode?.recycle()
+            
+            Log.d(TAG, "Cursor move (granularity=$granularity, forward=$forward): ${if (result) "succeeded" else "failed"}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error moving cursor", e)
+            false
         }
     }
     

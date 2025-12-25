@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.IncomingFileTransferCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.AboutDialog
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
@@ -588,6 +589,9 @@ fun AirSyncMainScreen(
                                 uiState = uiState,
                             )
                         }
+                        
+                        // Incoming File Transfer Card - shows when receiving files
+                        IncomingFileTransferCard()
 
                         RoundedCardContainer{
                             AnimatedVisibility(

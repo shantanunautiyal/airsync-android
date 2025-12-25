@@ -72,9 +72,13 @@ object WebSocketMessageHandler {
                 "markCallLogRead" -> handleMarkCallLogRead(context, data)
                 // Call Actions
                 "callAction" -> handleCallAction(context, data)
+                "initiateCall" -> handleInitiateCall(context, data)
                 // Health Data
                 "requestHealthSummary" -> handleRequestHealthSummary(context, data)
                 "requestHealthData" -> handleRequestHealthData(context, data)
+                // Call Audio
+                "callAudioControl" -> handleCallAudioControl(context, data)
+                "callMicAudio" -> handleCallMicAudio(context, data)
                 "mirrorRequest" -> {
                     // Extract mirror mode and package name
                     val mode = data?.optString("mode", "device") ?: "device"
@@ -155,15 +159,23 @@ object WebSocketMessageHandler {
             return
         }
 
+        Log.d(TAG, "📥 Received input event: $data")
+        
         val service = InputAccessibilityService.instance
         if (service == null) {
-            Log.e(TAG, "InputAccessibilityService not available")
-            sendInputEventResponse(data.optString("type", "unknown"), false, "Accessibility service not enabled")
+            Log.e(TAG, "❌ InputAccessibilityService not available!")
+            Log.e(TAG, "❌ Please enable AirSync Accessibility Service in Settings > Accessibility > AirSync")
+            sendInputEventResponse(data.optString("type", "unknown"), false, 
+                "Accessibility service not enabled. Go to Settings > Accessibility > AirSync to enable it.")
             return
         }
+        
+        Log.d(TAG, "✅ InputAccessibilityService is available")
 
         // Mac sends "action" field for input events
         val inputType = data.optString("action", data.optString("type", data.optString("inputType", "")))
+        Log.d(TAG, "📥 Input type: $inputType")
+        
         var success = false
         var message = ""
 
@@ -175,7 +187,7 @@ object WebSocketMessageHandler {
                     service.injectTap(x, y)
                     success = true
                     message = "Tap injected at ($x, $y)"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "✅ $message")
                 }
                 "longPress", "long_press" -> {
                     val x = data.optDouble("x").toFloat()
@@ -183,7 +195,7 @@ object WebSocketMessageHandler {
                     service.injectLongPress(x, y)
                     success = true
                     message = "Long press injected at ($x, $y)"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "✅ $message")
                 }
                 "swipe" -> {
                     // Mac sends x1, y1, x2, y2 - map to startX, startY, endX, endY
@@ -195,7 +207,7 @@ object WebSocketMessageHandler {
                     service.injectSwipe(startX, startY, endX, endY, duration)
                     success = true
                     message = "Swipe injected from ($startX, $startY) to ($endX, $endY)"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "✅ $message")
                 }
                 "scroll" -> {
                     val x = data.optDouble("x").toFloat()
@@ -205,67 +217,109 @@ object WebSocketMessageHandler {
                     service.injectScroll(x, y, deltaX, deltaY)
                     success = true
                     message = "Scroll injected at ($x, $y) with delta ($deltaX, $deltaY)"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "✅ $message")
                 }
                 "back" -> {
                     success = service.performBack()
                     message = if (success) "Back action performed" else "Back action failed"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                 }
                 "home" -> {
                     success = service.performHome()
                     message = if (success) "Home action performed" else "Home action failed"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                 }
                 "recents" -> {
                     success = service.performRecents()
                     message = if (success) "Recents action performed" else "Recents action failed"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                 }
                 "notifications" -> {
                     success = service.performNotifications()
                     message = if (success) "Notifications action performed" else "Notifications action failed"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                 }
                 "quickSettings" -> {
                     success = service.performQuickSettings()
                     message = if (success) "Quick settings action performed" else "Quick settings action failed"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                 }
                 "powerDialog" -> {
                     success = service.performPowerDialog()
                     message = if (success) "Power dialog action performed" else "Power dialog action failed"
-                    Log.d(TAG, message)
+                    Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                 }
                 "text" -> {
                     val text = data.optString("text", "")
+                    Log.d(TAG, "📝 Text input received: '$text' (length: ${text.length})")
                     if (text.isNotEmpty()) {
                         success = service.injectText(text)
-                        message = if (success) "Text injected: $text" else "Text injection failed"
-                        Log.d(TAG, message)
+                        message = if (success) "Text injected: $text" else "Text injection failed - check if a text field is focused"
+                        Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                     } else {
                         message = "Empty text provided"
-                        Log.w(TAG, message)
+                        Log.w(TAG, "⚠️ $message")
                     }
                 }
                 "key" -> {
                     val keyCode = data.optInt("keyCode", -1)
+                    val keyText = data.optString("text", "")
+                    Log.d(TAG, "⌨️ Key event received: keyCode=$keyCode, text='$keyText'")
                     if (keyCode != -1) {
                         success = service.injectKeyEvent(keyCode)
                         message = if (success) "Key event injected: $keyCode" else "Key event injection failed"
-                        Log.d(TAG, message)
+                        Log.d(TAG, "${if (success) "✅" else "❌"} $message")
                     } else {
                         message = "Invalid key code"
-                        Log.w(TAG, message)
+                        Log.w(TAG, "⚠️ $message")
+                    }
+                }
+                "keyWithMeta" -> {
+                    // Handle keyboard shortcuts like Ctrl+C, Ctrl+V from Mac
+                    val keyCode = data.optInt("keyCode", -1)
+                    val metaState = data.optInt("metaState", 0)
+                    Log.d(TAG, "⌨️ Key with meta received: keyCode=$keyCode, metaState=$metaState")
+                    if (keyCode != -1) {
+                        // Map Mac Cmd (META_CTRL) to Android clipboard actions
+                        success = when {
+                            metaState and 0x1000 != 0 -> { // META_CTRL_ON
+                                when (keyCode) {
+                                    31 -> { // KEYCODE_C - Copy
+                                        injectKeyWithMetaViaShell(keyCode, metaState)
+                                    }
+                                    50 -> { // KEYCODE_V - Paste
+                                        injectKeyWithMetaViaShell(keyCode, metaState)
+                                    }
+                                    52 -> { // KEYCODE_X - Cut
+                                        injectKeyWithMetaViaShell(keyCode, metaState)
+                                    }
+                                    29 -> { // KEYCODE_A - Select All
+                                        injectKeyWithMetaViaShell(keyCode, metaState)
+                                    }
+                                    54 -> { // KEYCODE_Z - Undo
+                                        injectKeyWithMetaViaShell(keyCode, metaState)
+                                    }
+                                    else -> {
+                                        injectKeyWithMetaViaShell(keyCode, metaState)
+                                    }
+                                }
+                            }
+                            else -> service.injectKeyEvent(keyCode)
+                        }
+                        message = if (success) "Key with meta injected: $keyCode (meta=$metaState)" else "Key with meta injection failed"
+                        Log.d(TAG, "${if (success) "✅" else "❌"} $message")
+                    } else {
+                        message = "Invalid key code"
+                        Log.w(TAG, "⚠️ $message")
                     }
                 }
                 else -> {
-                    Log.w(TAG, "Unknown input event type: $inputType")
+                    Log.w(TAG, "⚠️ Unknown input event type: $inputType")
                     message = "Unknown input type: $inputType"
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling input event: ${e.message}", e)
+            Log.e(TAG, "❌ Error handling input event: ${e.message}", e)
             message = "Error: ${e.message}"
         }
 
@@ -276,6 +330,39 @@ object WebSocketMessageHandler {
         CoroutineScope(Dispatchers.IO).launch {
             val response = JsonUtil.createInputEventResponse(inputType, success, message)
             WebSocketUtil.sendMessage(response)
+        }
+    }
+    
+    /**
+     * Inject key event with meta state via shell command
+     * This is needed for Ctrl+C, Ctrl+V, etc. shortcuts
+     */
+    private fun injectKeyWithMetaViaShell(keyCode: Int, metaState: Int): Boolean {
+        return try {
+            // Use 'input keyevent' with key code
+            // For Ctrl shortcuts, we need to use specific key combinations
+            val metaArgs = mutableListOf<String>()
+            
+            // Check for CTRL modifier (0x1000 = META_CTRL_ON)
+            if (metaState and 0x1000 != 0) {
+                metaArgs.add("--longpress")
+                metaArgs.add("113") // KEYCODE_CTRL_LEFT
+            }
+            
+            val command = if (metaArgs.isNotEmpty()) {
+                // Send Ctrl+key combination
+                "input keyevent ${metaArgs.joinToString(" ")} $keyCode"
+            } else {
+                "input keyevent $keyCode"
+            }
+            
+            Log.d(TAG, "⌨️ Executing shell command: $command")
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            val exitCode = process.waitFor()
+            exitCode == 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Error injecting key with meta via shell", e)
+            false
         }
     }
 
@@ -310,6 +397,37 @@ object WebSocketMessageHandler {
             Log.d(TAG, "Nav action '$action': ${if (success) "success" else "failed"}")
         } catch (e: Exception) {
             Log.e(TAG, "Error handling nav action: ${e.message}", e)
+        }
+    }
+
+    private fun handleCallAudioControl(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val action = data.optString("action")
+            Log.d(TAG, "Handling call audio control: $action")
+            
+            when (action) {
+                "startCallAudio" -> {
+                    CallAudioManager.startCallAudio(context)
+                }
+                "stopCallAudio" -> {
+                    CallAudioManager.stopCallAudio()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling call audio control: ${e.message}")
+        }
+    }
+
+    private fun handleCallMicAudio(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val audioBase64 = data.optString("audio")
+            if (audioBase64.isNotEmpty()) {
+                CallAudioManager.playReceivedAudio(audioBase64)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling call mic audio: ${e.message}")
         }
     }
 
@@ -695,7 +813,8 @@ object WebSocketMessageHandler {
                 return
             }
 
-            Log.d(TAG, "Received Mac device status: ${data.toString()}")
+            // Don't log full data - it may contain large base64 albumArt causing OOM
+            Log.d(TAG, "Received Mac device status (keys: ${data.keys().asSequence().toList()})")
 
             // Parse battery information
             val battery = data.optJSONObject("battery")
@@ -709,7 +828,9 @@ object WebSocketMessageHandler {
             val artist = music?.optString("artist", "") ?: ""
             val volume = music?.optInt("volume", 50) ?: 50
             val isMuted = music?.optBoolean("isMuted", false) ?: false
-            val albumArt = music?.optString("albumArt", "") ?: ""
+            // Limit albumArt size to prevent OOM - only use if reasonable size
+            val albumArtRaw = music?.optString("albumArt", "") ?: ""
+            val albumArt = if (albumArtRaw.length > 500_000) "" else albumArtRaw // Skip if > 500KB
             val likeStatus = music?.optString("likeStatus", "none") ?: "none"
 
             val isPaired = data.optBoolean("isPaired", true)
@@ -1093,6 +1214,13 @@ object WebSocketMessageHandler {
                 val response = JsonUtil.createSmsSendResponse(success, responseMessage)
                 WebSocketUtil.sendMessage(response)
                 Log.d(TAG, "SMS send result: $success")
+                
+                // Auto-sync SMS threads after sending
+                if (success) {
+                    kotlinx.coroutines.delay(1000) // Wait for message to be saved
+                    Log.d(TAG, "📱 Auto-syncing SMS threads after send...")
+                    SyncManager.syncDataToMac(context)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling send SMS", e)
                 val response = JsonUtil.createSmsSendResponse(false, "Error: ${e.message}")
@@ -1169,6 +1297,97 @@ object WebSocketMessageHandler {
     }
 
     // ========== Call Action Handlers ==========
+    
+    private fun handleInitiateCall(context: Context, data: JSONObject?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val phoneNumber = data?.optString("phoneNumber", "") ?: ""
+                if (phoneNumber.isEmpty()) {
+                    Log.e(TAG, "Phone number is empty for initiateCall")
+                    sendInitiateCallResponse(false, "Phone number is empty")
+                    return@launch
+                }
+                
+                Log.d(TAG, "📞 Initiating call to: $phoneNumber")
+                
+                // Must run on main thread for starting activities
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    try {
+                        // Check for CALL_PHONE permission
+                        val hasCallPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, 
+                            android.Manifest.permission.CALL_PHONE
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        
+                        Log.d(TAG, "📞 CALL_PHONE permission: $hasCallPermission")
+                        
+                        if (hasCallPermission) {
+                            // Use Intent to initiate call directly with ACTION_CALL
+                            val callIntent = android.content.Intent(android.content.Intent.ACTION_CALL).apply {
+                                this.data = android.net.Uri.parse("tel:$phoneNumber")
+                                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(callIntent)
+                            Log.d(TAG, "✅ Call initiated to: $phoneNumber using ACTION_CALL")
+                            sendInitiateCallResponse(true, "Call initiated to $phoneNumber")
+                        } else {
+                            // Try to request permission or use alternative method
+                            Log.w(TAG, "⚠️ CALL_PHONE permission not granted")
+                            
+                            // Try using TelecomManager to place call (Android M+)
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                                try {
+                                    val telecomManager = context.getSystemService(android.content.Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                                    if (telecomManager != null) {
+                                        val uri = android.net.Uri.fromParts("tel", phoneNumber, null)
+                                        val extras = android.os.Bundle()
+                                        telecomManager.placeCall(uri, extras)
+                                        Log.d(TAG, "✅ Call placed via TelecomManager to: $phoneNumber")
+                                        sendInitiateCallResponse(true, "Call placed to $phoneNumber")
+                                        return@withContext
+                                    }
+                                } catch (se: SecurityException) {
+                                    Log.w(TAG, "TelecomManager.placeCall requires CALL_PHONE permission", se)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "TelecomManager.placeCall failed", e)
+                                }
+                            }
+                            
+                            // Final fallback: Open dialer with number pre-filled
+                            val dialIntent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
+                                this.data = android.net.Uri.parse("tel:$phoneNumber")
+                                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(dialIntent)
+                            Log.d(TAG, "📱 Opened dialer for: $phoneNumber (CALL_PHONE permission required for direct calling)")
+                            sendInitiateCallResponse(false, "CALL_PHONE permission required. Opened dialer instead. Please grant permission in Settings > Apps > AirSync > Permissions > Phone")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error starting call activity", e)
+                        sendInitiateCallResponse(false, "Error: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initiating call", e)
+                sendInitiateCallResponse(false, "Error: ${e.message}")
+            }
+        }
+    }
+    
+    private fun sendInitiateCallResponse(success: Boolean, message: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val response = """
+            {
+                "type": "initiateCallResponse",
+                "data": {
+                    "success": $success,
+                    "message": "$message"
+                }
+            }
+            """.trimIndent()
+            WebSocketUtil.sendMessage(response)
+        }
+    }
 
     private fun handleCallAction(context: Context, data: JSONObject?) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -1181,18 +1400,30 @@ object WebSocketMessageHandler {
                 }
 
                 val action = data.optString("action")
+                Log.d(TAG, "📞 Received call action: $action")
+                
+                // Check permissions first
+                val hasAnswerPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        context, android.Manifest.permission.ANSWER_PHONE_CALLS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                } else true
+                
+                Log.d(TAG, "📞 ANSWER_PHONE_CALLS permission: $hasAnswerPermission")
                 
                 when (action) {
                     "answer" -> {
+                        Log.d(TAG, "📞 Attempting to answer call...")
                         val success = answerCall(context)
                         val response = JsonUtil.createCallActionResponse(action, success, 
-                            if (success) "Call answered" else "Failed to answer call - check permissions")
+                            if (success) "Call answered" else "Failed to answer call - ANSWER_PHONE_CALLS permission: $hasAnswerPermission")
                         WebSocketUtil.sendMessage(response)
                     }
-                    "reject", "hangup" -> {
+                    "reject", "hangup", "end" -> {
+                        Log.d(TAG, "📞 Attempting to end call...")
                         val success = endCall(context)
                         val response = JsonUtil.createCallActionResponse(action, success,
-                            if (success) "Call ended" else "Failed to end call - check permissions")
+                            if (success) "Call ended" else "Failed to end call - ANSWER_PHONE_CALLS permission: $hasAnswerPermission")
                         WebSocketUtil.sendMessage(response)
                     }
                     "mute" -> {
@@ -1220,13 +1451,13 @@ object WebSocketMessageHandler {
                         WebSocketUtil.sendMessage(response)
                     }
                     else -> {
-                        val response = JsonUtil.createCallActionResponse(action, false, "Unknown action")
+                        val response = JsonUtil.createCallActionResponse(action, false, "Unknown action: $action")
                         WebSocketUtil.sendMessage(response)
-                        Log.w(TAG, "Unknown call action: $action")
+                        Log.w(TAG, "❌ Unknown call action: $action")
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error handling call action", e)
+                Log.e(TAG, "❌ Error handling call action", e)
                 val response = JsonUtil.createCallActionResponse("unknown", false, "Error: ${e.message}")
                 WebSocketUtil.sendMessage(response)
             }
@@ -1235,26 +1466,106 @@ object WebSocketMessageHandler {
     
     @Suppress("DEPRECATION")
     private fun answerCall(context: Context): Boolean {
-        return try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        // Try TelecomManager first (Android O+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            try {
                 val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
                 if (telecomManager != null && 
                     androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ANSWER_PHONE_CALLS) 
                     == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     telecomManager.acceptRingingCall()
                     Log.d(TAG, "✅ Call answered via TelecomManager")
-                    true
+                    return true
                 } else {
-                    Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted")
-                    false
+                    Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted, trying notification action")
                 }
-            } else {
-                // For older Android versions, use ITelephony via reflection
-                answerCallLegacy(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "TelecomManager answer failed", e)
+            }
+        }
+        
+        // Try notification action method (works on Samsung and most devices)
+        try {
+            val result = answerCallViaNotificationAction(context)
+            if (result) {
+                Log.d(TAG, "✅ Call answered via notification action")
+                return true
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error answering call", e)
-            false
+            Log.e(TAG, "📞 Notification action answer call failed", e)
+        }
+        
+        // Try legacy ITelephony method
+        try {
+            val result = answerCallLegacy(context)
+            if (result) return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error answering call (legacy)", e)
+        }
+        
+        return false
+    }
+    
+    /**
+     * Answer call by triggering the notification action button (Answer/Accept)
+     * This works on Samsung and most Android devices that show call notifications
+     */
+    private fun answerCallViaNotificationAction(context: Context): Boolean {
+        try {
+            val service = MediaNotificationListener.getInstance()
+            if (service == null) {
+                Log.w(TAG, "📞 NotificationListenerService not available")
+                return false
+            }
+            
+            val notifications = try { service.activeNotifications } catch (_: Exception) { emptyArray() }
+            if (notifications.isEmpty()) {
+                Log.w(TAG, "📞 No active notifications found")
+                return false
+            }
+            
+            // Call-related packages to look for
+            val callPackages = setOf(
+                "com.samsung.android.incallui",  // Samsung
+                "com.android.incallui",          // Stock Android
+                "com.google.android.dialer",     // Google Dialer
+                "com.android.dialer",            // AOSP Dialer
+                "com.android.phone",             // Phone app
+                "com.samsung.android.dialer"     // Samsung Dialer
+            )
+            
+            // Action names that answer calls (case-insensitive matching)
+            val answerCallActions = listOf(
+                "answer", "accept", "pick up", "받기", "수락"  // Korean for Samsung
+            )
+            
+            for (sbn in notifications) {
+                if (sbn.packageName !in callPackages) continue
+                
+                val actions = sbn.notification.actions ?: continue
+                Log.d(TAG, "📞 Found call notification from ${sbn.packageName} with ${actions.size} actions")
+                
+                for (action in actions) {
+                    val actionTitle = action.title?.toString()?.lowercase() ?: continue
+                    Log.d(TAG, "📞 Checking action: '$actionTitle'")
+                    
+                    if (answerCallActions.any { actionTitle.contains(it) }) {
+                        try {
+                            action.actionIntent.send()
+                            Log.d(TAG, "✅ Triggered answer call action: '$actionTitle'")
+                            return true
+                        } catch (e: Exception) {
+                            Log.e(TAG, "📞 Failed to trigger action '$actionTitle'", e)
+                        }
+                    }
+                }
+            }
+            
+            Log.w(TAG, "📞 No answer call action found in notifications")
+            return false
+        } catch (e: Exception) {
+            Log.e(TAG, "📞 Error in answerCallViaNotificationAction", e)
+            return false
         }
     }
     
@@ -1279,27 +1590,66 @@ object WebSocketMessageHandler {
     
     @Suppress("DEPRECATION")
     private fun endCall(context: Context): Boolean {
-        return try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+        Log.d(TAG, "📞 Attempting to end call...")
+        
+        // Try TelecomManager first (Android P+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            try {
                 val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
-                if (telecomManager != null &&
-                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ANSWER_PHONE_CALLS)
-                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    val result = telecomManager.endCall()
-                    Log.d(TAG, "✅ Call ended via TelecomManager: $result")
-                    result
-                } else {
-                    Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted for ending call")
-                    false
+                if (telecomManager != null) {
+                    val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                        context, android.Manifest.permission.ANSWER_PHONE_CALLS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    
+                    Log.d(TAG, "📞 TelecomManager available, ANSWER_PHONE_CALLS permission: $hasPermission")
+                    
+                    if (hasPermission) {
+                        val result = telecomManager.endCall()
+                        Log.d(TAG, "📞 TelecomManager.endCall() result: $result")
+                        if (result) return true
+                    }
                 }
-            } else {
-                // For older Android versions, use ITelephony via reflection
-                endCallLegacy(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "📞 TelecomManager.endCall() failed", e)
+            }
+        }
+        
+        // Try notification action method (works on Samsung and most devices)
+        try {
+            val result = endCallViaNotificationAction(context)
+            if (result) {
+                Log.d(TAG, "✅ Call ended via notification action")
+                return true
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error ending call", e)
-            false
+            Log.e(TAG, "📞 Notification action end call failed", e)
         }
+        
+        // Try legacy ITelephony method
+        try {
+            val result = endCallLegacy(context)
+            if (result) {
+                Log.d(TAG, "✅ Call ended via ITelephony (legacy)")
+                return true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "📞 ITelephony.endCall() failed", e)
+        }
+        
+        // Try using accessibility service to press end call button
+        try {
+            val service = InputAccessibilityService.instance
+            if (service != null) {
+                // Try pressing the power button to end call (works on some devices)
+                val result = service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                Log.d(TAG, "📞 Accessibility back action result: $result")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "📞 Accessibility end call failed", e)
+        }
+        
+        Log.e(TAG, "❌ All end call methods failed")
+        return false
     }
     
     @Suppress("DEPRECATION")
@@ -1318,6 +1668,70 @@ object WebSocketMessageHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Error ending call (legacy)", e)
             false
+        }
+    }
+    
+    /**
+     * End call by triggering the notification action button (Hang Up/Decline/End)
+     * This works on Samsung and most Android devices that show call notifications
+     */
+    private fun endCallViaNotificationAction(context: Context): Boolean {
+        try {
+            val service = MediaNotificationListener.getInstance()
+            if (service == null) {
+                Log.w(TAG, "📞 NotificationListenerService not available")
+                return false
+            }
+            
+            val notifications = try { service.activeNotifications } catch (_: Exception) { emptyArray() }
+            if (notifications.isEmpty()) {
+                Log.w(TAG, "📞 No active notifications found")
+                return false
+            }
+            
+            // Call-related packages to look for
+            val callPackages = setOf(
+                "com.samsung.android.incallui",  // Samsung
+                "com.android.incallui",          // Stock Android
+                "com.google.android.dialer",     // Google Dialer
+                "com.android.dialer",            // AOSP Dialer
+                "com.android.phone",             // Phone app
+                "com.samsung.android.dialer"     // Samsung Dialer
+            )
+            
+            // Action names that end/decline calls (case-insensitive matching)
+            val endCallActions = listOf(
+                "hang up", "hangup", "end", "end call", "decline", "reject",
+                "disconnect", "끊기", "거절", "종료"  // Korean for Samsung
+            )
+            
+            for (sbn in notifications) {
+                if (sbn.packageName !in callPackages) continue
+                
+                val actions = sbn.notification.actions ?: continue
+                Log.d(TAG, "📞 Found call notification from ${sbn.packageName} with ${actions.size} actions")
+                
+                for (action in actions) {
+                    val actionTitle = action.title?.toString()?.lowercase() ?: continue
+                    Log.d(TAG, "📞 Checking action: '$actionTitle'")
+                    
+                    if (endCallActions.any { actionTitle.contains(it) }) {
+                        try {
+                            action.actionIntent.send()
+                            Log.d(TAG, "✅ Triggered end call action: '$actionTitle'")
+                            return true
+                        } catch (e: Exception) {
+                            Log.e(TAG, "📞 Failed to trigger action '$actionTitle'", e)
+                        }
+                    }
+                }
+            }
+            
+            Log.w(TAG, "📞 No end call action found in notifications")
+            return false
+        } catch (e: Exception) {
+            Log.e(TAG, "📞 Error in endCallViaNotificationAction", e)
+            return false
         }
     }
     

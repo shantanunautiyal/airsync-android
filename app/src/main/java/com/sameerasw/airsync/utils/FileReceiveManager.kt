@@ -8,6 +8,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -16,21 +18,47 @@ import java.security.MessageDigest
 object FileReceiveManager {
     private const val TAG = "FileReceiveManager"
     
-    // Store ongoing file transfers
-    private val activeTransfers = mutableMapOf<String, FileTransferState>()
+    // Store ongoing file transfers (lightweight - no chunk data stored)
+    private val activeTransfers = java.util.concurrent.ConcurrentHashMap<String, FileTransferState>()
+    
+    // Expose active transfers as StateFlow for UI
+    private val _activeTransfersFlow = MutableStateFlow<Map<String, FileTransferState>>(emptyMap())
+    val activeTransfersFlow: StateFlow<Map<String, FileTransferState>> = _activeTransfersFlow
     
     data class FileTransferState(
         val fileName: String,
         val fileSize: Long,
         val totalChunks: Int,
-        val receivedChunks: MutableList<ByteArray>,
+        @Volatile var receivedChunksCount: Int = 0, // Just count, don't store data
         val expectedChecksum: String?,
-        var bytesReceived: Long = 0
-    )
+        @Volatile var bytesReceived: Long = 0,
+        @Volatile var status: TransferStatus = TransferStatus.TRANSFERRING,
+        val startTime: Long = System.currentTimeMillis(),
+        @Volatile var endTime: Long? = null
+    ) {
+        val elapsedTimeMs: Long
+            get() = (endTime ?: System.currentTimeMillis()) - startTime
+        
+        val transferSpeed: Long // bytes per second
+            get() {
+                val elapsed = elapsedTimeMs
+                return if (elapsed > 0) (bytesReceived * 1000) / elapsed else 0
+            }
+    }
+    
+    enum class TransferStatus {
+        PENDING, TRANSFERRING, COMPLETED, FAILED, CANCELLED
+    }
+    
+    @Synchronized
+    private fun updateFlow() {
+        _activeTransfersFlow.value = activeTransfers.toMap()
+    }
     
     /**
      * Initialize a new file transfer
      */
+    @Synchronized
     fun initFileTransfer(
         transferId: String,
         fileName: String,
@@ -44,14 +72,17 @@ object FileReceiveManager {
             fileName = fileName,
             fileSize = fileSize,
             totalChunks = totalChunks,
-            receivedChunks = MutableList(totalChunks) { ByteArray(0) },
-            expectedChecksum = checksum
+            expectedChecksum = checksum,
+            status = TransferStatus.TRANSFERRING
         )
+        updateFlow()
     }
     
     /**
-     * Receive a file chunk
+     * Receive a file chunk - just update progress, don't store data
+     * FileReceiver handles actual data storage via streaming
      */
+    @Synchronized
     fun receiveChunk(
         transferId: String,
         chunkIndex: Int,
@@ -59,146 +90,121 @@ object FileReceiveManager {
     ): Boolean {
         val transfer = activeTransfers[transferId]
         if (transfer == null) {
-            Log.e(TAG, "No active transfer found for ID: $transferId")
+            Log.w(TAG, "No active transfer found for ID: $transferId")
+            return false
+        }
+        
+        // Check if transfer was cancelled
+        if (transfer.status == TransferStatus.CANCELLED) {
             return false
         }
         
         try {
-            // Decode base64 chunk - try multiple decoding strategies
-            val decodedChunk = try {
-                Base64.decode(chunkData, Base64.NO_WRAP)
-            } catch (e: Exception) {
-                Log.w(TAG, "NO_WRAP decode failed, trying DEFAULT: ${e.message}")
-                try {
-                    Base64.decode(chunkData, Base64.DEFAULT)
-                } catch (e2: Exception) {
-                    Log.e(TAG, "All decode strategies failed: ${e2.message}")
-                    throw e2
-                }
+            // Just calculate size from base64, don't decode and store
+            val estimatedSize = (chunkData.length * 3) / 4
+            
+            transfer.receivedChunksCount++
+            transfer.bytesReceived += estimatedSize
+            
+            // Log progress periodically
+            if (transfer.receivedChunksCount % 100 == 0) {
+                Log.d(TAG, "Progress: ${transfer.receivedChunksCount}/${transfer.totalChunks} for ${transfer.fileName}")
             }
             
-            // Store chunk
-            if (chunkIndex >= 0 && chunkIndex < transfer.totalChunks) {
-                // Check if chunk already received (duplicate)
-                if (transfer.receivedChunks[chunkIndex].isNotEmpty()) {
-                    Log.w(TAG, "Duplicate chunk $chunkIndex received, replacing")
-                    transfer.bytesReceived -= transfer.receivedChunks[chunkIndex].size
-                }
-                
-                transfer.receivedChunks[chunkIndex] = decodedChunk
-                transfer.bytesReceived += decodedChunk.size
-                
-                Log.d(TAG, "Received chunk $chunkIndex/${transfer.totalChunks} for ${transfer.fileName} (${decodedChunk.size} bytes, total: ${transfer.bytesReceived}/${transfer.fileSize})")
-                return true
-            } else {
-                Log.e(TAG, "Invalid chunk index: $chunkIndex (expected 0-${transfer.totalChunks - 1})")
-                return false
-            }
+            updateFlow()
+            return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error receiving chunk $chunkIndex: ${e.message}", e)
+            Log.e(TAG, "Error updating chunk progress: ${e.message}", e)
             return false
         }
     }
     
     /**
-     * Complete file transfer and save to disk
+     * Mark transfer as complete
      */
-    fun completeTransfer(
-        context: Context,
-        transferId: String
-    ): Result<Uri> {
+    @Synchronized
+    fun completeTransfer(transferId: String, success: Boolean) {
         val transfer = activeTransfers[transferId]
         if (transfer == null) {
-            return Result.failure(Exception("No active transfer found for ID: $transferId"))
+            Log.w(TAG, "No active transfer found for ID: $transferId")
+            return
         }
         
-        try {
-            // Check if all chunks received
-            val missingChunks = transfer.receivedChunks.withIndex()
-                .filter { it.value.isEmpty() }
-                .map { it.index }
-            
-            if (missingChunks.isNotEmpty()) {
-                Log.e(TAG, "Missing ${missingChunks.size} chunks: $missingChunks")
-                return Result.failure(Exception("Missing ${missingChunks.size} chunks: ${missingChunks.take(10)}..."))
-            }
-            
-            // Combine all chunks in order
-            Log.d(TAG, "Combining ${transfer.receivedChunks.size} chunks...")
-            val fileData = ByteArray(transfer.fileSize.toInt())
-            var offset = 0
-            
-            transfer.receivedChunks.forEachIndexed { index, chunk ->
-                if (chunk.isEmpty()) {
-                    Log.e(TAG, "Empty chunk at index $index during assembly!")
-                    return Result.failure(Exception("Empty chunk at index $index"))
-                }
-                
-                // Copy chunk data to correct position
-                System.arraycopy(chunk, 0, fileData, offset, chunk.size)
-                offset += chunk.size
-                
-                if (index % 100 == 0) {
-                    Log.d(TAG, "Assembled chunk $index/${transfer.receivedChunks.size} (offset: $offset)")
-                }
-            }
-            
-            // Verify final file size
-            if (offset.toLong() != transfer.fileSize) {
-                Log.e(TAG, "File size mismatch after assembly: expected ${transfer.fileSize}, got $offset")
-                return Result.failure(
-                    Exception("File size mismatch: expected ${transfer.fileSize}, got $offset")
-                )
-            }
-            
-            Log.d(TAG, "File assembled: ${fileData.size} bytes")
-            
-            // Verify checksum if provided
-            transfer.expectedChecksum?.let { expectedChecksum ->
-                Log.d(TAG, "Calculating checksum for verification...")
-                val actualChecksum = calculateChecksum(fileData)
-                
-                // Normalize checksums (remove any whitespace, convert to lowercase)
-                val normalizedExpected = expectedChecksum.trim().lowercase()
-                val normalizedActual = actualChecksum.trim().lowercase()
-                
-                if (normalizedActual != normalizedExpected) {
-                    Log.e(TAG, "=== CHECKSUM MISMATCH ===")
-                    Log.e(TAG, "Expected: $normalizedExpected")
-                    Log.e(TAG, "Actual:   $normalizedActual")
-                    Log.e(TAG, "File size: ${fileData.size} bytes")
-                    Log.e(TAG, "Chunks: ${transfer.receivedChunks.size}")
-                    Log.e(TAG, "First 100 bytes (hex): ${fileData.take(100).joinToString("") { "%02x".format(it) }}")
-                    
-                    return Result.failure(
-                        Exception("Checksum mismatch: expected $normalizedExpected, got $normalizedActual")
-                    )
-                }
-                Log.d(TAG, "✓ Checksum verified: $actualChecksum")
-            } ?: Log.w(TAG, "No checksum provided, skipping verification")
-            
-            // Save file
-            val uri = saveFile(context, transfer.fileName, fileData)
-            
-            // Clean up
-            activeTransfers.remove(transferId)
-            
-            Log.d(TAG, "✓ File transfer completed successfully: ${transfer.fileName}")
-            return Result.success(uri)
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error completing transfer: ${e.message}", e)
-            activeTransfers.remove(transferId)
-            return Result.failure(e)
-        }
+        transfer.endTime = System.currentTimeMillis()
+        transfer.status = if (success) TransferStatus.COMPLETED else TransferStatus.FAILED
+        
+        // Calculate and log transfer stats
+        val durationMs = transfer.elapsedTimeMs
+        val speedKBps = transfer.transferSpeed / 1024.0
+        val speedMBps = speedKBps / 1024.0
+        
+        Log.d(TAG, "✓ File transfer ${if (success) "completed" else "failed"}: ${transfer.fileName}")
+        Log.d(TAG, "📊 Transfer stats: ${formatFileSize(transfer.fileSize)} in ${formatDuration(durationMs)} (${String.format("%.2f", if (speedMBps > 1) speedMBps else speedKBps)} ${if (speedMBps > 1) "MB/s" else "KB/s"})")
+        
+        // Remove from active transfers after a delay to allow UI to show completion
+        updateFlow()
+        
+        // Schedule removal
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            // Need to synchronize removal too, but can't easily sync across lambda. 
+            // Better to add separate synchronized remove method or invoke via safe wrapper.
+            // For now, simple remove in synchronized block or just accessing map is mostly safe due to ConcurrentHashMap but updateFlow needs lock.
+            removeTransferSafely(transferId)
+        }, 3000)
+    }
+
+    @Synchronized
+    private fun removeTransferSafely(transferId: String) {
+        activeTransfers.remove(transferId)
+        updateFlow()
     }
     
     /**
      * Cancel an ongoing transfer
      */
+    @Synchronized
     fun cancelTransfer(transferId: String) {
+        val transfer = activeTransfers[transferId]
+        if (transfer != null) {
+            transfer.status = TransferStatus.CANCELLED
+            transfer.endTime = System.currentTimeMillis()
+            Log.d(TAG, "Transfer cancelled: $transferId (${transfer.fileName})")
+        }
         activeTransfers.remove(transferId)
-        Log.d(TAG, "Transfer cancelled: $transferId")
+        updateFlow()
+    }
+    
+    /**
+     * Cancel all ongoing transfers (called on disconnect)
+     */
+    @Synchronized
+    fun cancelAllTransfers(context: Context? = null) {
+        val transferIds = activeTransfers.keys.toList()
+        Log.d(TAG, "Cancelling ${transferIds.size} active transfers")
+        
+        transferIds.forEach { id ->
+            val transfer = activeTransfers[id]
+            if (transfer != null) {
+                transfer.status = TransferStatus.CANCELLED
+                transfer.endTime = System.currentTimeMillis()
+                
+                // Cancel notification
+                context?.let {
+                    NotificationUtil.cancelNotification(it, id.hashCode())
+                }
+            }
+        }
+        
+        activeTransfers.clear()
+        updateFlow()
+    }
+    
+    /**
+     * Check if a transfer is active
+     */
+    fun isTransferActive(transferId: String): Boolean {
+        val transfer = activeTransfers[transferId]
+        return transfer != null && transfer.status == TransferStatus.TRANSFERRING
     }
     
     /**
@@ -214,71 +220,35 @@ object FileReceiveManager {
     }
     
     /**
-     * Calculate SHA-256 checksum
+     * Get number of active transfers
      */
-    private fun calculateChecksum(data: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(data)
-        return hash.joinToString("") { "%02x".format(it) }
-    }
+    fun getActiveTransferCount(): Int = activeTransfers.count { it.value.status == TransferStatus.TRANSFERRING }
     
     /**
-     * Save file to Downloads directory
+     * Format file size for display
      */
-    private fun saveFile(context: Context, fileName: String, data: ByteArray): Uri {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Use MediaStore for Android 10+
-            val contentValues = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(MediaStore.Downloads.MIME_TYPE, getMimeType(fileName))
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
-            
-            val resolver = context.contentResolver
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                ?: throw Exception("Failed to create MediaStore entry")
-            
-            resolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(data)
-            } ?: throw Exception("Failed to open output stream")
-            
-            // Mark as not pending
-            contentValues.clear()
-            contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(uri, contentValues, null, null)
-            
-            uri
-        } else {
-            // Use direct file access for older Android versions
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) {
-                downloadsDir.mkdirs()
-            }
-            
-            val file = File(downloadsDir, fileName)
-            FileOutputStream(file).use { outputStream ->
-                outputStream.write(data)
-            }
-            
-            Uri.fromFile(file)
+    private fun formatFileSize(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+            bytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+            else -> String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
         }
     }
     
     /**
-     * Get MIME type from file name
+     * Format duration for display
      */
-    private fun getMimeType(fileName: String): String {
-        return when (fileName.substringAfterLast('.', "").lowercase()) {
-            "jpg", "jpeg" -> "image/jpeg"
-            "png" -> "image/png"
-            "gif" -> "image/gif"
-            "pdf" -> "application/pdf"
-            "txt" -> "text/plain"
-            "mp4" -> "video/mp4"
-            "mp3" -> "audio/mpeg"
-            "zip" -> "application/zip"
-            "apk" -> "application/vnd.android.package-archive"
-            else -> "application/octet-stream"
+    private fun formatDuration(ms: Long): String {
+        val seconds = ms / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        
+        return when {
+            hours > 0 -> String.format("%d:%02d:%02d", hours, minutes % 60, seconds % 60)
+            minutes > 0 -> String.format("%d:%02d", minutes, seconds % 60)
+            seconds > 0 -> String.format("%d.%ds", seconds, (ms % 1000) / 100)
+            else -> "${ms}ms"
         }
     }
 }

@@ -193,8 +193,8 @@ object NotificationUtil {
     /**
      * Update file transfer progress
      */
-    fun updateFileTransferProgress(context: Context, transferId: String, progress: Float) {
-        showFileTransferNotification(context, transferId, "", progress)
+    fun updateFileTransferProgress(context: Context, transferId: String, fileName: String, progress: Float) {
+        showFileTransferNotification(context, transferId, fileName, progress)
     }
 
     /**
@@ -255,6 +255,34 @@ object NotificationUtil {
             manager.notify(notifId + 1, builder.build())
         } catch (e: SecurityException) {
             android.util.Log.w("NotificationUtil", "Failed to show file transfer error notification: ${e.message}")
+        }
+    }
+    
+    /**
+     * Cancel a notification by ID
+     */
+    fun cancelNotification(context: Context, notifId: Int) {
+        try {
+            val manager = NotificationManagerCompat.from(context)
+            manager.cancel(notifId)
+        } catch (e: Exception) {
+            android.util.Log.w("NotificationUtil", "Failed to cancel notification: ${e.message}")
+        }
+    }
+    
+    /**
+     * Cancel all file transfer notifications
+     */
+    fun cancelAllFileTransferNotifications(context: Context) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.activeNotifications?.forEach { sbn ->
+                if (sbn.notification.channelId == FILE_CHANNEL_ID) {
+                    nm.cancel(sbn.id)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NotificationUtil", "Failed to cancel file transfer notifications: ${e.message}")
         }
     }
 }

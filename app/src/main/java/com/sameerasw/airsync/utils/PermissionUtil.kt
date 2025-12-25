@@ -245,6 +245,13 @@ object PermissionUtil {
             optional.add("Phone Access")
         }
 
+        // Answer phone calls permission (Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!isAnswerPhoneCallsPermissionGranted(context)) {
+                optional.add("Answer Calls")
+            }
+        }
+
         return optional
     }
 
@@ -413,7 +420,77 @@ object PermissionUtil {
             permissions.add(Manifest.permission.RECORD_AUDIO)
         }
 
+        // Bluetooth permissions (Android 12+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (!isBluetoothScanPermissionGranted(context)) {
+                permissions.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            if (!isBluetoothConnectPermissionGranted(context)) {
+                permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (!isBluetoothAdvertisePermissionGranted(context)) {
+                permissions.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            }
+        }
+
         return permissions
+    }
+
+    /**
+     * Check if BLUETOOTH_SCAN permission is granted (Android 12+)
+     */
+    fun isBluetoothScanPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_SCAN
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required on older versions
+        }
+    }
+
+    /**
+     * Check if BLUETOOTH_CONNECT permission is granted (Android 12+)
+     */
+    fun isBluetoothConnectPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required on older versions
+        }
+    }
+
+    /**
+     * Check if BLUETOOTH_ADVERTISE permission is granted (Android 12+)
+     */
+    fun isBluetoothAdvertisePermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Not required on older versions
+        }
+    }
+
+    /**
+     * Check if all Bluetooth/Nearby Devices permissions are granted
+     */
+    fun isNearbyDevicesPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            isBluetoothScanPermissionGranted(context) &&
+            isBluetoothConnectPermissionGranted(context) &&
+            isBluetoothAdvertisePermissionGranted(context)
+        } else {
+            // For older versions, check legacy Bluetooth permissions
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        }
     }
 
     /**
@@ -714,6 +791,46 @@ object PermissionUtil {
                 )
             )
         )
+
+        // Nearby Devices / Bluetooth permissions (Android 12+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            groups.add(
+                com.sameerasw.airsync.models.PermissionGroup(
+                    title = "Nearby Devices",
+                    description = "Permissions for Bluetooth connectivity",
+                    category = com.sameerasw.airsync.models.PermissionCategory.SPECIAL,
+                    permissions = listOf(
+                        com.sameerasw.airsync.models.PermissionInfo(
+                            permission = Manifest.permission.BLUETOOTH_SCAN,
+                            displayName = "Bluetooth Scan",
+                            description = "Discover nearby Bluetooth devices",
+                            category = com.sameerasw.airsync.models.PermissionCategory.SPECIAL,
+                            isGranted = isBluetoothScanPermissionGranted(context),
+                            isRequired = false,
+                            requiresSpecialHandling = false
+                        ),
+                        com.sameerasw.airsync.models.PermissionInfo(
+                            permission = Manifest.permission.BLUETOOTH_CONNECT,
+                            displayName = "Bluetooth Connect",
+                            description = "Connect to paired Bluetooth devices",
+                            category = com.sameerasw.airsync.models.PermissionCategory.SPECIAL,
+                            isGranted = isBluetoothConnectPermissionGranted(context),
+                            isRequired = false,
+                            requiresSpecialHandling = false
+                        ),
+                        com.sameerasw.airsync.models.PermissionInfo(
+                            permission = Manifest.permission.BLUETOOTH_ADVERTISE,
+                            displayName = "Bluetooth Advertise",
+                            description = "Make device visible to other devices",
+                            category = com.sameerasw.airsync.models.PermissionCategory.SPECIAL,
+                            isGranted = isBluetoothAdvertisePermissionGranted(context),
+                            isRequired = false,
+                            requiresSpecialHandling = false
+                        )
+                    )
+                )
+            )
+        }
 
         // Special permissions
         groups.add(
