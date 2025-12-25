@@ -21,6 +21,8 @@ import java.util.Set
 object FileReceiver {
     private const val CHANNEL_ID = "airsync_file_transfer"
 
+    private data class ChunkData(val index: Int, val content: String)
+
     private data class IncomingFileState(
         val name: String,
         val size: Int,
@@ -31,10 +33,12 @@ object FileReceiver {
         var channel: java.nio.channels.FileChannel? = null,
         var uri: Uri? = null,
         var lastNotificationUpdate: Long = 0,
-        val receivedChunks: MutableSet<Int> = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap())
+        val receivedChunks: MutableSet<Int> = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap()),
+        val chunkQueue: kotlinx.coroutines.channels.Channel<ChunkData> = kotlinx.coroutines.channels.Channel(kotlinx.coroutines.channels.Channel.UNLIMITED)
     )
 
     private val incoming = ConcurrentHashMap<String, IncomingFileState>()
+    private val scope = CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
     
     // Minimum interval between notification updates (ms)
     private const val NOTIFICATION_UPDATE_INTERVAL = 250L
@@ -52,7 +56,7 @@ object FileReceiver {
         val totalChunks = (size + CHUNK_SIZE - 1) / CHUNK_SIZE
         FileReceiveManager.initFileTransfer(id, name, size.toLong(), totalChunks, checksum)
         
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             try {
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, name)
@@ -73,7 +77,7 @@ object FileReceiver {
 
                 if (uri != null && pfd != null) {
                     val channel = java.io.FileOutputStream(pfd.fileDescriptor).channel
-                    incoming[id] = IncomingFileState(
+                    val state = IncomingFileState(
                         name = name, 
                         size = size, 
                         mime = mime, 
@@ -82,7 +86,11 @@ object FileReceiver {
                         channel = channel, 
                         uri = uri
                     )
+                    incoming[id] = state
                     NotificationUtil.showFileProgress(context, id.hashCode(), name, 0)
+                    
+                    // Start processing loop for this file
+                    processRequiredChunks(context, id, state)
                 } else {
                     pfd?.close()
                 }
@@ -92,59 +100,76 @@ object FileReceiver {
         }
     }
 
-    fun handleChunk(context: Context, id: String, index: Int, base64Chunk: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val state = incoming[id] ?: return@launch
-                
-                // Decode bytes
-                val bytes = android.util.Base64.decode(base64Chunk, android.util.Base64.NO_WRAP)
-                
-                // Write to specific offset thread-safely
-                // FileChannel.write(buffer, position) is thread-safe for the file position
-                val offset = index.toLong() * CHUNK_SIZE
-                val buffer = java.nio.ByteBuffer.wrap(bytes)
-                
-                // Synchronize to track received chunks correctly
-                var isNewChunk = false
-                synchronized(state) {
-                    if (!state.receivedChunks.contains(index)) {
-                        state.channel?.write(buffer, offset)
-                        state.receivedChunks.add(index)
-                        state.receivedBytes += bytes.size
-                        isNewChunk = true
-                    }
-                }
-                
-                if (isNewChunk) {
-                    // Update both notification and FileReceiveManager
-                    updateProgressNotification(context, id, state)
-                    FileReceiveManager.receiveChunk(id, index, base64Chunk)
-                }
-                
-                // Always send ack for this chunk (even if duplicate)
+    private fun processRequiredChunks(context: Context, id: String, state: IncomingFileState) {
+        scope.launch {
+            for (chunk in state.chunkQueue) {
                 try {
-                    val ack = FileTransferProtocol.buildChunkAck(id, index)
-                    WebSocketUtil.sendMessage(ack)
+                    // Check if already cancelled
+                    if (!incoming.containsKey(id)) break
+                    
+                    // Skip if already processed
+                    if (state.receivedChunks.contains(chunk.index)) {
+                        sendAck(id, chunk.index)
+                        continue
+                    }
+                    
+                    // Decode bytes
+                    val bytes = android.util.Base64.decode(chunk.content, android.util.Base64.NO_WRAP)
+                    
+                    // Write to specific offset
+                    val offset = chunk.index.toLong() * CHUNK_SIZE
+                    val buffer = java.nio.ByteBuffer.wrap(bytes)
+                    
+                    state.channel?.write(buffer, offset)
+                    state.receivedChunks.add(chunk.index)
+                    state.receivedBytes += bytes.size
+                    
+                    // Update progress
+                    updateProgressNotification(context, id, state)
+                    FileReceiveManager.receiveChunk(id, chunk.index, chunk.content)
+                    
+                    sendAck(id, chunk.index)
+                    
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
     }
 
+    private fun sendAck(id: String, index: Int) {
+        try {
+            val ack = FileTransferProtocol.buildChunkAck(id, index)
+            WebSocketUtil.sendMessage(ack)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun handleChunk(context: Context, id: String, index: Int, base64Chunk: String) {
+        val state = incoming[id]
+        if (state != null) {
+            // Non-blocking send to channel
+            state.chunkQueue.trySend(ChunkData(index, base64Chunk))
+        }
+    }
+
     fun handleComplete(context: Context, id: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             try {
                 val state = incoming[id] ?: return@launch
-                // Wait for all bytes to be received
+                
+                // Close channel to stop processing loop? 
+                // Wait, logic is: all chunks should be in queue or processed.
+                // We wait for receivedBytes to equal size.
+                
                 val start = System.currentTimeMillis()
                 val timeoutMs = 15_000L // 15s timeout
                 while (state.receivedBytes < state.size && System.currentTimeMillis() - start < timeoutMs) {
                     kotlinx.coroutines.delay(100)
                 }
+                
+                state.chunkQueue.close() // Close channel
 
                 // Force flush to disk
                 try {
@@ -223,9 +248,10 @@ object FileReceiver {
      * Cancel an ongoing transfer
      */
     fun cancelTransfer(context: Context, id: String) {
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             try {
                 val state = incoming[id] ?: return@launch
+                state.chunkQueue.close()
                 
                 // Close resources
                 try {
