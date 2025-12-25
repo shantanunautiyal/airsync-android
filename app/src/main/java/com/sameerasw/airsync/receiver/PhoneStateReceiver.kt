@@ -112,25 +112,25 @@ class PhoneStateReceiver : BroadcastReceiver() {
     }
 
     private fun sendCallNotification(context: Context, call: OngoingCall) {
+        // Only send call notifications when connected to Mac
+        if (!WebSocketUtil.isConnected()) {
+            Log.d(TAG, "Skipping call notification - not connected to Mac (state: ${call.state})")
+            return
+        }
+        
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Send to Mac via WebSocket
+                // Send to Mac via WebSocket - Mac will show the notification
                 val json = JsonUtil.createCallNotificationJson(call)
-                WebSocketUtil.sendMessage(json)
-                Log.d(TAG, "Call notification sent to Mac: ${call.state}")
-                
-                // Show live notification on Android
-                when (call.state) {
-                    CallState.RINGING, CallState.ACTIVE -> {
-                        LiveNotificationService.showCallNotification(context, call)
-                    }
-                    CallState.DISCONNECTED -> {
-                        LiveNotificationService.dismissCallNotification(context, call.id)
-                    }
-                    else -> {
-                        LiveNotificationService.updateCallNotification(context, call)
-                    }
+                val sent = WebSocketUtil.sendMessage(json)
+                if (sent) {
+                    Log.d(TAG, "Call notification sent to Mac: ${call.state}")
+                } else {
+                    Log.w(TAG, "Failed to send call notification to Mac")
                 }
+                
+                // Note: We don't show call notifications on Android
+                // The Mac app handles displaying call notifications to the user
             } catch (e: Exception) {
                 Log.e(TAG, "Error sending call notification", e)
             }
