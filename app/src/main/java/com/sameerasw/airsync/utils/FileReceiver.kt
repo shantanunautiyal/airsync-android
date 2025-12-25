@@ -25,7 +25,7 @@ object FileReceiver {
 
     private data class IncomingFileState(
         val name: String,
-        val size: Int,
+        val size: Long,
         val mime: String,
         var checksum: String? = null,
         var receivedBytes: Long = 0,
@@ -49,12 +49,12 @@ object FileReceiver {
         NotificationUtil.createFileChannel(context)
     }
 
-    fun handleInit(context: Context, id: String, name: String, size: Int, mime: String, checksum: String? = null) {
+    fun handleInit(context: Context, id: String, name: String, size: Long, mime: String, checksum: String? = null) {
         ensureChannel(context)
         
         // Also initialize FileReceiveManager for UI tracking
-        val totalChunks = (size + CHUNK_SIZE - 1) / CHUNK_SIZE
-        FileReceiveManager.initFileTransfer(id, name, size.toLong(), totalChunks, checksum)
+        val totalChunks = ((size + CHUNK_SIZE - 1) / CHUNK_SIZE).toInt()
+        FileReceiveManager.initFileTransfer(id, name, size, totalChunks, checksum)
         
         scope.launch {
             try {

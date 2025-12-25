@@ -438,7 +438,7 @@ object WebSocketMessageHandler {
             if (data == null) return
             val id = data.optString("id", java.util.UUID.randomUUID().toString())
             val name = data.optString("name")
-            val size = data.optInt("size", 0)
+            val size = data.optLong("size", 0L)
             val mime = data.optString("mime", "application/octet-stream")
             val checksumVal = data.optString("checksum", "")
 
