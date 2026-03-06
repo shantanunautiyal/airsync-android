@@ -196,135 +196,8 @@ object WebSocketUtil {
                 connectionStarted.set(false)
                 failedAttempts.set(0)
 
-                Log.d(TAG, "Connecting to $url")
-
-                val request = Request.Builder()
-                    .url(url)
-                    .build()
-
                 startMessageProcessor()
 
-                val listener = object : WebSocketListener() {
-                    override fun onOpen(webSocket: WebSocket, response: Response) {
-                        Log.d(TAG, "WebSocket connected to $url")
-                        // Transport is open now
-                        isSocketOpen.set(true)
-                        // Defer marking as connected until we get macInfo (handshake)
-                        isConnected.set(false)
-                        isConnecting.set(true)
-
-                        // Trigger initial sync so Mac responds
-                        try { SyncManager.performInitialSync(context) } catch (_: Exception) {}
-
-                        // Start handshake timeout
-                        handshakeTimeoutJob?.cancel()
-                        handshakeTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                delay(HANDSHAKE_TIMEOUT_MS)
-                                if (!handshakeCompleted.get()) {
-                                    Log.w(TAG, "Handshake timed out; treating as authentication failure")
-                                    isConnected.set(false)
-                                    isConnecting.set(false)
-                                    try { webSocket.close(4001, "Handshake timeout") } catch (_: Exception) {}
-                                    // Treat as manual disconnect if this was a manual attempt
-                                    if (manualAttempt) {
-                                        try {
-                                            val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
-                                            ds.setUserManuallyDisconnected(true)
-                                        } catch (_: Exception) {}
-                                    }
-                                    onConnectionStatusChanged?.invoke(false)
-                                    notifyConnectionStatusListeners(false)
-                                    onHandshakeTimeout?.invoke()
-                                    try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
-                                }
-                            } catch (_: Exception) {}
-                        }
-                    }
-
-                    override fun onMessage(webSocket: WebSocket, text: String) {
-                        Log.d(TAG, "Received: $text")
-
-                        val decryptedMessage = currentSymmetricKey?.let { key ->
-                            CryptoUtil.decryptMessage(text, key)
-                        } ?: text
-
-                        // On first macInfo message, complete handshake and now report connected
-                        if (!handshakeCompleted.get()) {
-                            val handshakeOk = try {
-                                val json = org.json.JSONObject(decryptedMessage)
-                                json.optString("type") == "macInfo"
-                            } catch (_: Exception) { false }
-                            if (handshakeOk) {
-                                handshakeCompleted.set(true)
-                                    try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
-                                isConnected.set(true)
-                                isConnecting.set(false)
-                                handshakeTimeoutJob?.cancel()
-                                // Clear manual-disconnect flag on successful connect so future non-manual disconnects can auto-reconnect
-                                try {
-                                    val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
-                                    kotlinx.coroutines.runBlocking { ds.setUserManuallyDisconnected(false) }
-                                } catch (_: Exception) { }
-                                try { SyncManager.startPeriodicSync(context) } catch (_: Exception) {}
-
-                                // Start AirSync service on successful connection
-                                try {
-                                    val ds = com.sameerasw.airsync.data.local.DataStoreManager(context)
-                                    val lastDevice = kotlinx.coroutines.runBlocking { ds.getLastConnectedDevice().first() }
-                                    com.sameerasw.airsync.service.AirSyncService.start(context, lastDevice?.name)
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Error starting AirSyncService on connection: ${e.message}")
-                                }
-
-                                onConnectionStatusChanged?.invoke(true)
-                                notifyConnectionStatusListeners(true)
-                                try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
-                            }
-                        }
-
-                        // Handle incoming commands
-                        WebSocketMessageHandler.handleIncomingMessage(context, decryptedMessage)
-
-                        // Update last sync time on successful response
-                        updateLastSyncTime(context)
-
-                        // Notify listeners
-                        onMessageReceived?.invoke(decryptedMessage)
-                    }
-
-                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                        Log.d(TAG, "WebSocket closing: $code / $reason")
-                        isConnected.set(false)
-                        isSocketOpen.set(false)
-                        isConnecting.set(false)
-                        handshakeCompleted.set(false)
-                        handshakeTimeoutJob?.cancel()
-
-                        // Cancel all ongoing file transfers
-                        try {
-                            FileReceiver.cancelAllTransfers(context)
-                            Log.d(TAG, "Cancelled all file transfers on connection close")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error cancelling file transfers: ${e.message}")
-                        }
-
-                        // Stop AirSync service on disconnect
-                        try {
-                            com.sameerasw.airsync.service.AirSyncService.stop(context)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error stopping AirSyncService on close: ${e.message}")
-                        }
-                        
-                        // Stop screen mirroring on disconnect
-                        try {
-                            MirrorRequestHelper.stopMirroring(context)
-                            Log.d(TAG, "Screen mirroring stopped on disconnect")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error stopping mirroring on close: ${e.message}")
-                        }
-
-                // Overall timeout for all parallel connection attempts
                 connectionAttemptJob = CoroutineScope(Dispatchers.IO).launch {
                     delay(15000) // 15 seconds global timeout
                     if (isConnecting.get() && !isSocketOpen.get()) {
@@ -336,51 +209,6 @@ object WebSocketUtil {
                         tryStartAutoReconnect(context)
                         try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
                     }
-
-                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                        Log.e(TAG, "WebSocket connection failed: ${t.message}")
-                        isConnected.set(false)
-                        isConnecting.set(false)
-                        isSocketOpen.set(false)
-                        handshakeCompleted.set(false)
-                        handshakeTimeoutJob?.cancel()
-
-                        // Cancel all ongoing file transfers
-                        try {
-                            FileReceiver.cancelAllTransfers(context)
-                            Log.d(TAG, "Cancelled all file transfers on connection failure")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error cancelling file transfers: ${e.message}")
-                        }
-
-                        // Stop AirSync service on failure
-                        try {
-                            AirSyncWidgetProvider.updateAllWidgets(context)
-                        } catch (_: Exception) {
-                        }
-                        
-                        // Stop screen mirroring on failure
-                        try {
-                            MirrorRequestHelper.stopMirroring(context)
-                            Log.d(TAG, "Screen mirroring stopped on connection failure")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error stopping mirroring on failure: ${e.message}")
-                        }
-
-                        // Update connection status
-                        onConnectionStatusChanged?.invoke(false)
-                        // Clear continue browsing notifs on failure
-                        try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
-                        // Ensure media player is removed when connection fails
-                        try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
-
-                        // Notify listeners about the connection status
-                        notifyConnectionStatusListeners(false)
-                        // Attempt auto-reconnect if allowed
-                        tryStartAutoReconnect(context)
-                        try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
-                    }
-                }
 
                 // Try each IP in parallel
                 ipList.forEach { ip ->
@@ -547,6 +375,10 @@ object WebSocketUtil {
                                     handshakeCompleted.set(false)
                                     handshakeTimeoutJob?.cancel()
                                     currentIpAddress = null
+                                    try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
+                                    try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
+                                    try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+                                    try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
                                     try {
                                         com.sameerasw.airsync.service.AirSyncService.startScanning(
                                             context
@@ -579,6 +411,10 @@ object WebSocketUtil {
                                     handshakeTimeoutJob?.cancel()
                                     connectionAttemptJob?.cancel()
                                     currentIpAddress = null
+                                    try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
+                                    try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
+                                    try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+                                    try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
                                     try {
                                         com.sameerasw.airsync.service.AirSyncService.startScanning(
                                             context
@@ -694,6 +530,10 @@ object WebSocketUtil {
         handshakeCompleted.set(false)
         handshakeTimeoutJob?.cancel()
         currentIpAddress = null
+        try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
+        try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
+        try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+        try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
 
         // Stop periodic sync when disconnecting
         SyncManager.stopPeriodicSync()
@@ -764,6 +604,10 @@ object WebSocketUtil {
         client?.dispatcher?.executorService?.shutdown()
         client = null
         currentIpAddress = null
+        try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
+        try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
+        try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
+        try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
         currentPort = null
         currentSymmetricKey = null
         onConnectionStatusChanged = null
