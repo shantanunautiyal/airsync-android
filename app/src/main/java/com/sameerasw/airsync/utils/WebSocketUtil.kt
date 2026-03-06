@@ -380,7 +380,7 @@ object WebSocketUtil {
                                     try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
                                     try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
                                     try {
-                                        com.sameerasw.airsync.service.AirSyncService.startScanning(
+                                        com.sameerasw.airsync.service.AirSyncService.stop(
                                             context
                                         )
                                     } catch (_: Exception) {
@@ -416,7 +416,7 @@ object WebSocketUtil {
                                     try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
                                     try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
                                     try {
-                                        com.sameerasw.airsync.service.AirSyncService.startScanning(
+                                        com.sameerasw.airsync.service.AirSyncService.stop(
                                             context
                                         )
                                     } catch (_: Exception) {
@@ -558,9 +558,9 @@ object WebSocketUtil {
         // Stop AirSync service on disconnect
         ctx?.let { c ->
             try {
-                com.sameerasw.airsync.service.AirSyncService.startScanning(c)
+                com.sameerasw.airsync.service.AirSyncService.stop(c)
             } catch (e: Exception) {
-                Log.e(TAG, "Error starting scanning on disconnect: ${e.message}")
+                Log.e(TAG, "Error stopping AirSyncService on disconnect: ${e.message}")
             }
         }
 
