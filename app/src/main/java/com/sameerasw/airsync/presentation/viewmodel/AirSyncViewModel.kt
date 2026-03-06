@@ -11,15 +11,20 @@ import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
+import com.sameerasw.airsync.smartspacer.AirSyncDeviceTarget
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.DiscoveredDevice
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
+import com.sameerasw.airsync.utils.UDPDiscoveryManager
 import com.sameerasw.airsync.utils.WebSocketUtil
-import com.sameerasw.airsync.service.WakeupService
-import com.sameerasw.airsync.smartspacer.AirSyncDeviceTarget
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class AirSyncViewModel(
@@ -43,6 +48,9 @@ class AirSyncViewModel(
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
 
+    // Discovered devices from UDP
+    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = UDPDiscoveryManager.discoveredDevices
+
     // Notes Role state
     private val _stylusMode = MutableStateFlow(false)
     val stylusMode: StateFlow<Boolean> = _stylusMode.asStateFlow()
@@ -61,10 +69,14 @@ class AirSyncViewModel(
     private var previousNetworkIp: String? = null
 
     private var appContext: Context? = null
+
     // Manual connect canceller reference (set in init) for unregistering
-    private val manualConnectCanceler: () -> Unit = { 
+    private val manualConnectCanceler: () -> Unit = {
         // Cancel any active auto-reconnect when user starts manual connection
-        try { WebSocketUtil.cancelAutoReconnect() } catch (_: Exception) {}
+        try {
+            WebSocketUtil.cancelAutoReconnect()
+        } catch (_: Exception) {
+        }
     }
 
     // Connection status listener for WebSocket updates
@@ -73,8 +85,14 @@ class AirSyncViewModel(
             _uiState.value = _uiState.value.copy(
                 isConnected = isConnected,
                 isConnecting = false,
-                response = if (isConnected) "Connected successfully!" else "Disconnected"
+                response = if (isConnected) "Connected successfully!" else "Disconnected",
+                activeIp = if (isConnected) WebSocketUtil.currentIpAddress else null
             )
+
+            if (isConnected) {
+                repository.setFirstMacConnectionTime(System.currentTimeMillis())
+                updateRatingPromptDisplay()
+            }
 
             // Notify Smartspacer of connection status change
             appContext?.let { context ->
@@ -92,7 +110,8 @@ class AirSyncViewModel(
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
         try {
             WebSocketUtil.registerManualConnectListener(manualConnectCanceler)
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
 
         // Observe Mac device status updates
         viewModelScope.launch {
@@ -112,14 +131,9 @@ class AirSyncViewModel(
         super.onCleared()
         // Unregister the connection status listener when ViewModel is cleared
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
-    try { WebSocketUtil.unregisterManualConnectListener(manualConnectCanceler) } catch (_: Exception) {}
-
-        // Clean up Mac media session
-        MacDeviceStatusManager.cleanup()
-        
-        // Stop WakeupService when ViewModel is cleared
-        appContext?.let { context ->
-            try { WakeupService.stopService(context) } catch (_: Exception) {}
+        try {
+            WebSocketUtil.unregisterManualConnectListener(manualConnectCanceler)
+        } catch (_: Exception) {
         }
     }
 
@@ -128,18 +142,28 @@ class AirSyncViewModel(
 
         // Observe both last connected device and network devices for real-time updates
         viewModelScope.launch {
-            dataStoreManager.getLastConnectedDevice().collect { device ->
-                Log.d("AirSyncViewModel", "Last connected device changed: ${device?.name}, isPlus: ${device?.isPlus}")
-                updateDisplayedDevice(context)
-            }
+            dataStoreManager.getLastConnectedDevice()
+                .distinctUntilChanged()
+                .collect { device ->
+                    Log.d(
+                        "AirSyncViewModel",
+                        "Last connected device changed: ${device?.name}, isPlus: ${device?.isPlus}"
+                    )
+                    updateDisplayedDevice(context)
+                }
         }
 
         viewModelScope.launch {
-            dataStoreManager.getAllNetworkDeviceConnections().collect { networkDevices ->
-                Log.d("AirSyncViewModel", "Network devices changed: ${networkDevices.size} devices")
-                _networkDevices.value = networkDevices
-                updateDisplayedDevice(context)
-            }
+            dataStoreManager.getAllNetworkDeviceConnections()
+                .distinctUntilChanged()
+                .collect { networkDevices ->
+                    Log.d(
+                        "AirSyncViewModel",
+                        "Network devices changed: ${networkDevices.size} devices"
+                    )
+                    _networkDevices.value = networkDevices
+                    updateDisplayedDevice(context)
+                }
         }
     }
 
@@ -154,8 +178,14 @@ class AirSyncViewModel(
             val storedDevice = repository.getLastConnectedDevice().first()
             val deviceToShow = networkAwareDevice ?: storedDevice
 
-            Log.d("AirSyncViewModel", "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}")
-            _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
+            // Only update if changed
+            if (_uiState.value.lastConnectedDevice != deviceToShow) {
+                Log.d(
+                    "AirSyncViewModel",
+                    "Updating displayed device: ${deviceToShow?.name}, isPlus: ${deviceToShow?.isPlus}, model: ${deviceToShow?.model}"
+                )
+                _uiState.value = _uiState.value.copy(lastConnectedDevice = deviceToShow)
+            }
         }
     }
 
@@ -183,8 +213,16 @@ class AirSyncViewModel(
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
-            val isSmartspacerShowWhenDisconnected = repository.getSmartspacerShowWhenDisconnected().first()
             val isMacMediaControlsEnabled = repository.getMacMediaControlsEnabled().first()
+            val isClipboardHistoryEnabled = repository.getClipboardHistoryEnabled().first()
+            repository.getDefaultTab().first()
+            val isEssentialsConnectionEnabled = repository.getEssentialsConnectionEnabled().first()
+            val isDeviceDiscoveryEnabled = repository.getDeviceDiscoveryEnabled().first()
+
+            // Rating tracking
+            repository.getFirstMacConnectionTime().first()
+            repository.getLastPromptDismissedVersion().first()
+            repository.hasRatedApp().first()
 
             // Get device info
             val deviceName = savedDeviceName.ifEmpty {
@@ -229,8 +267,13 @@ class AirSyncViewModel(
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
                 isSendNowPlayingEnabled = isSendNowPlayingEnabled,
                 isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
-                isMacMediaControlsEnabled = isMacMediaControlsEnabled
+                isMacMediaControlsEnabled = isMacMediaControlsEnabled,
+                isClipboardHistoryEnabled = isClipboardHistoryEnabled,
+                isEssentialsConnectionEnabled = isEssentialsConnectionEnabled,
+                isDeviceDiscoveryEnabled = isDeviceDiscoveryEnabled
             )
+
+            updateRatingPromptDisplay()
 
             // If we have PC name from QR code and not already connected, store it temporarily for the dialog
             if (pcName != null && showConnectionDialog && !currentlyConnected) {
@@ -247,14 +290,12 @@ class AirSyncViewModel(
             }
 
 
-
             // Start observing device changes for real-time updates
             startObservingDeviceChanges(context)
-            
-            // Start WakeupService if we have WiFi connectivity
-            if (localIp != "Unknown" && localIp != "No Wi-Fi") {
-                try { WakeupService.startService(context) } catch (_: Exception) {}
-            }
+
+            // Start AirSync Service in scanning mode (which handles UDP Discovery and WakeupService)
+            com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+            isNetworkMonitoringActive = true
         }
     }
 
@@ -310,7 +351,7 @@ class AirSyncViewModel(
         if (ctx != null) {
             // Send updated device info immediately so desktop sees the new name
             try {
-                com.sameerasw.airsync.utils.SyncManager.sendDeviceInfoNow(ctx, name)
+                SyncManager.sendDeviceInfoNow(ctx, name)
             } catch (_: Exception) {
                 // ignore
             }
@@ -336,8 +377,13 @@ class AirSyncViewModel(
     fun setConnectionStatus(isConnected: Boolean, isConnecting: Boolean = false) {
         _uiState.value = _uiState.value.copy(
             isConnected = isConnected,
-            isConnecting = isConnecting
+            isConnecting = isConnecting,
+            connectingDeviceId = if (!isConnecting) null else _uiState.value.connectingDeviceId
         )
+    }
+
+    fun setConnectingDeviceId(id: String?) {
+        _uiState.value = _uiState.value.copy(connectingDeviceId = id)
     }
 
     fun refreshPermissions(context: Context) {
@@ -349,7 +395,11 @@ class AirSyncViewModel(
         )
     }
 
-    fun saveLastConnectedDevice(pcName: String? = null, isPlus: Boolean = false, symmetricKey: String? = null) {
+    fun saveLastConnectedDevice(
+        pcName: String? = null,
+        isPlus: Boolean = false,
+        symmetricKey: String? = null
+    ) {
         viewModelScope.launch {
             val deviceName = pcName ?: "My Mac"
             val ourIp = _deviceInfo.value.localIp
@@ -357,7 +407,14 @@ class AirSyncViewModel(
             val port = _uiState.value.port
 
             // Save using network-aware storage
-            repository.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus, symmetricKey)
+            repository.saveNetworkDeviceConnection(
+                deviceName,
+                ourIp,
+                clientIp,
+                port,
+                isPlus,
+                symmetricKey
+            )
 
             // Also save to legacy storage for backwards compatibility
             val connectedDevice = ConnectedDevice(
@@ -430,10 +487,36 @@ class AirSyncViewModel(
         }
     }
 
+    fun setClipboardHistoryEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isClipboardHistoryEnabled = enabled)
+        viewModelScope.launch {
+            repository.setClipboardHistoryEnabled(enabled)
+            if (!enabled) {
+                clearClipboardHistory()
+            }
+        }
+    }
+
     fun setAutoReconnectEnabled(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
         viewModelScope.launch {
             repository.setAutoReconnectEnabled(enabled)
+        }
+    }
+
+    fun setDeviceDiscoveryEnabled(context: Context, enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isDeviceDiscoveryEnabled = enabled)
+        viewModelScope.launch {
+            repository.setDeviceDiscoveryEnabled(enabled)
+            if (enabled) {
+                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+            } else {
+                // When disabling discovery, we should stop discovery broadcasts
+                // If a connection exists, the service continues but discovery stops.
+                // If no connection, the service should still run for WakeupService but maybe without scanning?
+                // For now, let's just trigger a service update that checks the new flag.
+                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+            }
         }
     }
 
@@ -456,7 +539,8 @@ class AirSyncViewModel(
 
     // Auth failure dialog controls
     fun showAuthFailure(message: String) {
-        _uiState.value = _uiState.value.copy(showAuthFailureDialog = true, authFailureMessage = message)
+        _uiState.value =
+            _uiState.value.copy(showAuthFailureDialog = true, authFailureMessage = message)
     }
 
     fun dismissAuthFailure() {
@@ -473,12 +557,15 @@ class AirSyncViewModel(
     suspend fun setUserManuallyDisconnectedAwait(disconnected: Boolean) {
         repository.setUserManuallyDisconnected(disconnected)
     }
+
     private fun hasNetworkAwareMappingForLastDevice(): ConnectedDevice? {
         val ourIp = _deviceInfo.value.localIp
         val last = _uiState.value.lastConnectedDevice ?: return null
         if (ourIp.isEmpty() || ourIp == "Unknown" || ourIp == "No Wi-Fi") return null
         // Find matching device by name with mapping for our IP
-        val networkDevice = _networkDevices.value.firstOrNull { it.deviceName == last.name && it.getClientIpForNetwork(ourIp) != null }
+        val networkDevice = _networkDevices.value.firstOrNull {
+            it.deviceName == last.name && it.getClientIpForNetwork(ourIp) != null
+        }
         return networkDevice?.toConnectedDevice(ourIp)
     }
 
@@ -508,7 +595,10 @@ class AirSyncViewModel(
                         loadNetworkDevicesForNetworkChange()
 
                         // Cancel any ongoing auto-reconnect loop; we'll restart with the new network context if needed
-                        try { WebSocketUtil.cancelAutoReconnect() } catch (_: Exception) {}
+                        try {
+                            WebSocketUtil.cancelAutoReconnect()
+                        } catch (_: Exception) {
+                        }
 
                         val manual = repository.getUserManuallyDisconnected().first()
                         val autoOn = repository.getAutoReconnectEnabled().first()
@@ -518,14 +608,24 @@ class AirSyncViewModel(
 
                         if (currentIp == "No Wi-Fi" || currentIp == "Unknown") {
                             // No usable Wi‑Fi: ensure we stop any active connection and do not attempt reconnect
-                            try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
-                            // Stop wake-up service when no WiFi
-                            try { WakeupService.stopService(context) } catch (_: Exception) {}
-                            _uiState.value = _uiState.value.copy(isConnected = false, isConnecting = false)
+                            try {
+                                WebSocketUtil.disconnect(context)
+                            } catch (_: Exception) {
+                            }
+                            // Stop service when no WiFi
+                            try {
+                                com.sameerasw.airsync.service.AirSyncService.stop(context)
+                            } catch (_: Exception) {
+                            }
+                            _uiState.value =
+                                _uiState.value.copy(isConnected = false, isConnecting = false)
                             return@collect
                         } else {
-                            // Start wake-up service when WiFi is available
-                            try { WakeupService.startService(context) } catch (_: Exception) {}
+                            // Ensure service is running when WiFi is available
+                            try {
+                                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+                            } catch (_: Exception) {
+                            }
                         }
 
                         if (target != null) {
@@ -537,7 +637,10 @@ class AirSyncViewModel(
 
                             // If connected/connecting to old network, disconnect first to force a clean switch
                             if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
-                                try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                                try {
+                                    WebSocketUtil.disconnect(context)
+                                } catch (_: Exception) {
+                                }
                             }
 
                             // Auto-connect if auto-reconnect is enabled and the user hasn't manually disconnected.
@@ -567,17 +670,24 @@ class AirSyncViewModel(
                                                             isPlus = target.isPlus,
                                                             symmetricKey = target.symmetricKey
                                                         )
-                                                    } catch (_: Exception) {}
+                                                    } catch (_: Exception) {
+                                                    }
                                                 } else if (autoOn && !manual) {
                                                     // If the immediate connect failed, restart the auto-reconnect loop for this network
-                                                    try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                                    try {
+                                                        WebSocketUtil.requestAutoReconnect(context)
+                                                    } catch (_: Exception) {
+                                                    }
                                                 }
                                             }
                                         }
                                     )
                                 } catch (_: Exception) {
                                     // Fall back to auto-reconnect loop
-                                    try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                    try {
+                                        WebSocketUtil.requestAutoReconnect(context)
+                                    } catch (_: Exception) {
+                                    }
                                 }
                             } else {
                                 // User has disabled auto connect, just update the displayed device/IP
@@ -586,10 +696,16 @@ class AirSyncViewModel(
                         } else {
                             // No mapping for this network: disconnect if connected and, if allowed, start generic auto-reconnect
                             if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
-                                try { WebSocketUtil.disconnect(context) } catch (_: Exception) {}
+                                try {
+                                    WebSocketUtil.disconnect(context)
+                                } catch (_: Exception) {
+                                }
                             }
                             if (autoOn && !manual) {
-                                try { WebSocketUtil.requestAutoReconnect(context) } catch (_: Exception) {}
+                                try {
+                                    WebSocketUtil.requestAutoReconnect(context)
+                                } catch (_: Exception) {
+                                }
                             }
                         }
                     }
@@ -613,7 +729,10 @@ class AirSyncViewModel(
             repository.setSendNowPlayingEnabled(enabled)
             appContext?.let { ctx ->
                 // Update media listener immediate behavior and sync status
-                com.sameerasw.airsync.service.MediaNotificationListener.setNowPlayingEnabled(ctx, enabled)
+                com.sameerasw.airsync.service.MediaNotificationListener.setNowPlayingEnabled(
+                    ctx,
+                    enabled
+                )
             }
         }
     }
@@ -675,6 +794,8 @@ class AirSyncViewModel(
 
     // Clipboard history management
     fun addClipboardEntry(text: String, isFromPc: Boolean) {
+        if (!_uiState.value.isClipboardHistoryEnabled) return
+
         val entry = com.sameerasw.airsync.domain.model.ClipboardEntry(
             id = java.util.UUID.randomUUID().toString(),
             text = text,
@@ -710,6 +831,110 @@ class AirSyncViewModel(
 
     fun setIsNotesRoleHeld(held: Boolean) {
         _isNotesRoleHeld.value = held
+    }
+
+    fun setDefaultTab(tab: String) {
+        _uiState.value = _uiState.value.copy(defaultTab = tab)
+        viewModelScope.launch {
+            repository.setDefaultTab(tab)
+        }
+    }
+
+    fun setEssentialsConnectionEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isEssentialsConnectionEnabled = enabled)
+        viewModelScope.launch {
+            repository.setEssentialsConnectionEnabled(enabled)
+            // wait for next up[date to sync
+            if (enabled) {
+                // later: Trigger broadcast update immediately
+            }
+        }
+    }
+
+    private fun updateRatingPromptDisplay() {
+        viewModelScope.launch {
+            val isConnected = WebSocketUtil.isConnected()
+            val hasRated = repository.hasRatedApp().first()
+            if (hasRated) {
+                _uiState.value = _uiState.value.copy(shouldShowRatingPrompt = false)
+                return@launch
+            }
+
+            val firstConnectionTime = repository.getFirstMacConnectionTime().first()
+            if (firstConnectionTime == 0L) {
+                _uiState.value = _uiState.value.copy(shouldShowRatingPrompt = false)
+                return@launch
+            }
+
+            // Must have passed 24 hours
+            val oneDayInMillis = 24 * 60 * 60 * 1000L
+            val isEnoughTimePassed =
+                System.currentTimeMillis() - firstConnectionTime >= oneDayInMillis
+
+            if (!isEnoughTimePassed) {
+                _uiState.value = _uiState.value.copy(shouldShowRatingPrompt = false)
+                return@launch
+            }
+
+            // Check if dismissed for current version
+            val lastDismissedVersion = repository.getLastPromptDismissedVersion().first()
+            val currentVersion = getAppVersionCode()
+
+            val isDismissedForCurrentVersion = lastDismissedVersion == currentVersion
+
+            _uiState.value = _uiState.value.copy(
+                shouldShowRatingPrompt = isConnected && !isDismissedForCurrentVersion
+            )
+        }
+    }
+
+    private fun getAppVersionCode(): Int {
+        return try {
+            val context = appContext ?: return -1
+            val packageInfo =
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    context.packageManager.getPackageInfo(
+                        context.packageName,
+                        android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.packageManager.getPackageInfo(context.packageName, 0)
+                }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode
+            }
+        } catch (_: Exception) {
+            -1
+        }
+    }
+
+    fun setRatingCardDismissed() {
+        viewModelScope.launch {
+            val currentVersion = getAppVersionCode()
+            repository.setLastPromptDismissedVersion(currentVersion)
+            updateRatingPromptDisplay()
+        }
+    }
+
+    fun setAppRated() {
+        viewModelScope.launch {
+            repository.setHasRatedApp(true)
+            updateRatingPromptDisplay()
+        }
+    }
+
+    fun resetOnboarding() {
+        viewModelScope.launch {
+            repository.setFirstRun(true)
+            repository.setFirstMacConnectionTime(0L)
+            repository.setLastPromptDismissedVersion(-1)
+            repository.setHasRatedApp(false)
+            updateRatingPromptDisplay()
+        }
     }
 
 }

@@ -10,13 +10,18 @@ import java.util.concurrent.ConcurrentHashMap
 
 object NotificationDismissalUtil {
     private const val TAG = "NotificationDismissalUtil"
-    
+
     // Store active notifications with their IDs for dismissal or actions
     private val activeNotifications = ConcurrentHashMap<String, StatusBarNotification>()
+
     // Reverse map from system notification key to our generated ID
     private val keyToId = ConcurrentHashMap<String, String>()
+
     // IDs suppressed from Android->Mac dismissal sync (because dismissal originated from Mac)
     private val suppressedIds = ConcurrentHashMap.newKeySet<String>()
+
+    // Test notification IDs for mock dismissal support
+    private val testNotificationIds = ConcurrentHashMap.newKeySet<String>()
 
     /**
      * Generate a unique notification ID
@@ -24,7 +29,7 @@ object NotificationDismissalUtil {
     fun generateNotificationId(packageName: String, title: String, timestamp: Long): String {
         return "${packageName}_${title.hashCode()}_$timestamp"
     }
-    
+
     /**
      * Store a notification for dismissal
      */
@@ -33,9 +38,10 @@ object NotificationDismissalUtil {
         // Keep reverse lookup so we can map sbn.key -> id on removal
         try {
             keyToId[notification.key] = id
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+        }
         Log.d(TAG, "Stored notification with ID: $id")
-        
+
         // Clean up old notifications
         if (activeNotifications.size > 200) {
             val oldestKeys = activeNotifications.keys.take(activeNotifications.size - 200)
@@ -46,7 +52,15 @@ object NotificationDismissalUtil {
             }
         }
     }
-    
+
+    /**
+     * Store a test notification ID for mock dismissal
+     */
+    fun storeTestNotificationId(id: String) {
+        testNotificationIds.add(id)
+        Log.d(TAG, "Stored test notification ID: $id")
+    }
+
     /**
      * Dismiss a notification by its ID
      */
@@ -68,6 +82,11 @@ object NotificationDismissalUtil {
                     Log.w(TAG, "Notification listener service not available")
                     false
                 }
+            } else if (testNotificationIds.contains(notificationId)) {
+                // Handle test notification dismissal as a success (mock)
+                testNotificationIds.remove(notificationId)
+                Log.d(TAG, "Mock dismissed test notification: $notificationId")
+                true
             } else {
                 Log.w(TAG, "Notification with ID $notificationId not found")
                 false
@@ -81,7 +100,11 @@ object NotificationDismissalUtil {
     /**
      * Perform an action on the notification by title. If replyText is provided and the action supports inline reply, send it.
      */
-    fun performNotificationAction(notificationId: String, actionName: String, replyText: String? = null): Boolean {
+    fun performNotificationAction(
+        notificationId: String,
+        actionName: String,
+        replyText: String? = null
+    ): Boolean {
         return try {
             val service = getNotificationListenerService()
             if (service == null) {
@@ -100,7 +123,9 @@ object NotificationDismissalUtil {
                 return false
             }
 
-            val target = actions.firstOrNull { it.title?.toString()?.equals(actionName, ignoreCase = true) == true }
+            val target = actions.firstOrNull {
+                it.title?.toString()?.equals(actionName, ignoreCase = true) == true
+            }
             if (target == null) {
                 Log.w(TAG, "Action '$actionName' not found on notification $notificationId")
                 return false
@@ -149,7 +174,11 @@ object NotificationDismissalUtil {
     /**
      * Lookup generated ID by a system notification key.
      */
-    fun getIdBySystemKey(systemKey: String): String? = try { keyToId[systemKey] } catch (_: Exception) { null }
+    fun getIdBySystemKey(systemKey: String): String? = try {
+        keyToId[systemKey]
+    } catch (_: Exception) {
+        null
+    }
 
     /**
      * Lookup generated ID by StatusBarNotification
@@ -174,6 +203,7 @@ object NotificationDismissalUtil {
         activeNotifications.remove(id)?.let { sbn ->
             keyToId.remove(sbn.key)
         }
+        testNotificationIds.remove(id)
     }
 
     /**

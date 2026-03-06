@@ -13,16 +13,19 @@ object ClipboardUtil {
      */
     fun getClipboardText(context: Context): String? {
         return try {
-            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipboardManager =
+                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clipData = clipboardManager.primaryClip
 
             if (clipData != null && clipData.itemCount > 0) {
                 val item = clipData.getItemAt(0)
-                item.text?.toString()
+                // Use coerceToText to handle non-text items if needed, or stick to text
+                item.text?.toString() ?: item.coerceToText(context)?.toString()
             } else {
                 null
             }
         } catch (e: Exception) {
+            // Keep error logging for exceptions
             Log.e(TAG, "Error getting clipboard text: ${e.message}")
             null
         }
@@ -33,7 +36,8 @@ object ClipboardUtil {
      */
     fun setClipboardText(context: Context, text: String): Boolean {
         return try {
-            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipboardManager =
+                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clipData = ClipData.newPlainText("AirSync", text)
             clipboardManager.setPrimaryClip(clipData)
             Log.d(TAG, "Text set to clipboard: ${text.take(50)}...")
@@ -52,7 +56,8 @@ object ClipboardUtil {
         context: Context,
         onClipboardChanged: (String) -> Unit
     ): ClipboardManager.OnPrimaryClipChangedListener {
-        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipboardManager =
+            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
         val listener = ClipboardManager.OnPrimaryClipChangedListener {
             try {
@@ -79,11 +84,30 @@ object ClipboardUtil {
         listener: ClipboardManager.OnPrimaryClipChangedListener
     ) {
         try {
-            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipboardManager =
+                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboardManager.removePrimaryClipChangedListener(listener)
             Log.d(TAG, "Clipboard listener unregistered")
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering clipboard listener: ${e.message}")
+        }
+    }
+
+    /**
+     * Set a content URI to clipboard (useful for images)
+     */
+    fun copyUriToClipboard(context: Context, uri: android.net.Uri): Boolean {
+        return try {
+            val clipboardManager =
+                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData =
+                ClipData.newUri(context.contentResolver, "AirSync Image", uri)
+            clipboardManager.setPrimaryClip(clipData)
+            Log.d(TAG, "URI set to clipboard: $uri")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting clipboard URI: ${e.message}")
+            false
         }
     }
 }

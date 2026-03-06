@@ -14,11 +14,11 @@ import com.kieronquinn.app.smartspacer.sdk.utils.TargetTemplate
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.data.local.DataStoreManager
-import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.utils.DeviceIconResolver
 import com.sameerasw.airsync.utils.DevicePreviewResolver
-import kotlinx.coroutines.runBlocking
+import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class AirSyncDeviceTarget : SmartspacerTargetProvider() {
 
@@ -138,6 +138,18 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
+            isConnected && !macStatus.title.isNullOrBlank() -> {
+                // Show media info only if no battery
+                if (!macStatus.artist.isNullOrBlank()) {
+                    "${macStatus.title} — ${macStatus.artist}"
+                } else {
+                    macStatus.title
+                }
+            }
+
+            isConnected -> "Connected"
+            deviceModel != null -> "Disconnected • $deviceModel"
+            else -> "Disconnected • Tap to reconnect"
         }
     }
 

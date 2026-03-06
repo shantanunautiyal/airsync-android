@@ -5,31 +5,36 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
-import com.sameerasw.airsync.data.local.DataStoreManager
-import com.sameerasw.airsync.utils.DeviceInfoUtil
-import com.sameerasw.airsync.utils.WebSocketUtil
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
+import com.sameerasw.airsync.utils.WakeupHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.*
-import java.net.*
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.ServerSocket
+import java.net.Socket
 
 /**
- * Service that runs a lightweight HTTP server and UDP listener
- * to receive wake-up requests from Mac clients for initiating reconnection
+ * Service that runs a lightweight HTTP server
+ * to receive wake-up requests from Mac clients for initiating reconnection.
+ * UDP wake-up requests are now handled by UDPDiscoveryManager to avoid port conflicts.
  */
 class WakeupService : Service() {
     companion object {
         private const val TAG = "WakeupService"
         private const val HTTP_PORT = 8888 // HTTP server port
-        private const val UDP_PORT = 8889   // UDP listener port
         private const val WAKEUP_ENDPOINT = "/wakeup"
-        
+
         fun startService(context: Context) {
             val intent = Intent(context, WakeupService::class.java)
             context.startService(intent)
         }
-        
+
         fun stopService(context: Context) {
             val intent = Intent(context, WakeupService::class.java)
             context.stopService(intent)
@@ -37,7 +42,6 @@ class WakeupService : Service() {
     }
 
     private var httpServerSocket: ServerSocket? = null
-    private var udpSocket: DatagramSocket? = null
     private var serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isRunning = false
 
@@ -66,14 +70,11 @@ class WakeupService : Service() {
         serviceScope.launch {
             try {
                 isRunning = true
-                
+
                 // Start HTTP server
                 startHttpServer()
-                
-                // Start UDP listener
-                startUdpListener()
-                
-                Log.i(TAG, "Wake-up listeners started (HTTP: $HTTP_PORT, UDP: $UDP_PORT)")
+
+                Log.i(TAG, "Wake-up HTTP listener started on port $HTTP_PORT")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start wake-up listeners", e)
             }
@@ -82,7 +83,7 @@ class WakeupService : Service() {
 
     private fun stopWakeupListeners() {
         isRunning = false
-        
+
         // Stop HTTP server
         try {
             httpServerSocket?.close()
@@ -90,23 +91,15 @@ class WakeupService : Service() {
             Log.w(TAG, "Error closing HTTP server socket", e)
         }
         httpServerSocket = null
-        
-        // Stop UDP listener
-        try {
-            udpSocket?.close()
-        } catch (e: Exception) {
-            Log.w(TAG, "Error closing UDP socket", e)
-        }
-        udpSocket = null
-        
-        Log.i(TAG, "Wake-up listeners stopped")
+
+        Log.i(TAG, "Wake-up HTTP server stopped")
     }
 
     private suspend fun startHttpServer() {
         withContext(Dispatchers.IO) {
             try {
                 httpServerSocket = ServerSocket(HTTP_PORT)
-                
+
                 serviceScope.launch {
                     while (isRunning && httpServerSocket?.isClosed == false) {
                         try {
@@ -124,7 +117,7 @@ class WakeupService : Service() {
                         }
                     }
                 }
-                
+
                 Log.d(TAG, "HTTP server started on port $HTTP_PORT")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start HTTP server", e)
@@ -175,16 +168,19 @@ class WakeupService : Service() {
                         // Parse the wake-up request
                         try {
                             val jsonRequest = JSONObject(body)
-                            
+
                             // Handle nested JSON structure from Mac
                             val macIp: String
                             val macPort: Int
                             val macName: String
-                            
+
                             if (jsonRequest.has("data")) {
                                 // Mac sends nested format: {"type": "wakeUpRequest", "data": {...}}
                                 val data = jsonRequest.getJSONObject("data")
-                                macIp = data.optString("macIP", "") // Note: Mac uses "macIP" not "macIp"
+                                macIp = data.optString(
+                                    "macIP",
+                                    ""
+                                ) // Note: Mac uses "macIP" not "macIp"
                                 macPort = data.optInt("macPort", 6996)
                                 macName = data.optString("macName", "Mac")
                             } else {
@@ -195,11 +191,17 @@ class WakeupService : Service() {
                             }
 
                             // Send success response
-                            val response = """{"status": "success", "message": "Wake-up request received"}"""
+                            val response =
+                                """{"status": "success", "message": "Wake-up request received"}"""
                             sendHttpResponse(output, 200, "OK", response)
 
-                            // Process the wake-up request
-                            processWakeupRequest(macIp, macPort, macName)
+                            // Process the wake-up request using centralized handler
+                            WakeupHandler.processWakeupRequest(
+                                this@WakeupService,
+                                macIp,
+                                macPort,
+                                macName
+                            )
                         } catch (e: Exception) {
                             Log.e(TAG, "Error parsing wake-up request", e)
                             val response = """{"status": "error", "message": "Invalid JSON"}"""
@@ -210,7 +212,8 @@ class WakeupService : Service() {
                         sendCorsResponse(output)
                     } else {
                         // Method not allowed or path not found
-                        val response = """{"status": "error", "message": "Method not allowed or path not found"}"""
+                        val response =
+                            """{"status": "error", "message": "Method not allowed or path not found"}"""
                         sendHttpResponse(output, 405, "Method Not Allowed", response)
                     }
                 }
@@ -220,7 +223,12 @@ class WakeupService : Service() {
         }
     }
 
-    private fun sendHttpResponse(output: PrintWriter, statusCode: Int, statusText: String, body: String) {
+    private fun sendHttpResponse(
+        output: PrintWriter,
+        statusCode: Int,
+        statusText: String,
+        body: String
+    ) {
         output.println("HTTP/1.1 $statusCode $statusText")
         output.println("Content-Type: application/json")
         output.println("Access-Control-Allow-Origin: *")

@@ -1,8 +1,22 @@
 package com.sameerasw.airsync.presentation.ui.screens
 
+import android.content.ClipDescription
+import android.util.Log
+import android.view.DragEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -10,25 +24,36 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import android.content.ClipDescription
-import android.view.DragEvent
-import android.util.Log
 import com.sameerasw.airsync.domain.model.ClipboardEntry
 import com.sameerasw.airsync.utils.HapticUtil
-import java.text.SimpleDateFormat
-import java.util.*
 import kotlinx.coroutines.Job
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ClipboardScreen(
@@ -36,6 +61,8 @@ fun ClipboardScreen(
     isConnected: Boolean,
     onSendText: (String) -> Unit,
     onClearHistory: () -> Unit,
+    isHistoryEnabled: Boolean,
+    onHistoryToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -91,8 +118,7 @@ fun ClipboardScreen(
 
     Column(
         modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
@@ -103,25 +129,30 @@ fun ClipboardScreen(
                     DragEvent.ACTION_DRAG_STARTED -> {
                         // Check if the dragged data is text
                         event.clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
-                        event.clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)
+                                event.clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)
                     }
+
                     DragEvent.ACTION_DRAG_ENTERED -> {
                         isDraggingOver = true
                         true
                     }
+
                     DragEvent.ACTION_DRAG_LOCATION -> true
                     DragEvent.ACTION_DRAG_EXITED -> {
                         isDraggingOver = false
                         true
                     }
+
                     DragEvent.ACTION_DROP -> {
                         isDraggingOver = false
                         handleDroppedContent(event)
                     }
+
                     DragEvent.ACTION_DRAG_ENDED -> {
                         isDraggingOver = false
                         true
                     }
+
                     else -> false
                 }
             }
@@ -178,11 +209,68 @@ fun ClipboardScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Nothing shared yet",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Surface(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .widthIn(max = 280.dp),
+                            shape = RoundedCornerShape(32.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            tonalElevation = 2.dp
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    start = 8.dp,
+                                    end = 8.dp,
+                                    top = 16.dp,
+                                    bottom = 8.dp
+                                ),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Nothing shared yet",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Surface(
+                                    onClick = { onHistoryToggle(!isHistoryEnabled) },
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainer
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "History",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        Switch(
+                                            checked = isHistoryEnabled,
+                                            onCheckedChange = { onHistoryToggle(it) },
+                                            colors = SwitchDefaults.colors(
+                                                checkedTrackColor = MaterialTheme.colorScheme.primary
+                                            )
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = if (isHistoryEnabled) "Clipboard will clear after the session" else "Clipboard won't be stored",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             } else {
@@ -215,7 +303,7 @@ fun ClipboardScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
+                shape = RoundedCornerShape(36.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer
             ) {
                 Row(
@@ -251,9 +339,6 @@ fun ClipboardScreen(
                             if (inputText.isNotBlank()) {
                                 onSendText(inputText)
                                 inputText = ""
-                            } else {
-                                // Clear history when input is empty
-                                onClearHistory()
                             }
                         },
                         modifier = Modifier
@@ -262,19 +347,15 @@ fun ClipboardScreen(
                                 color = MaterialTheme.colorScheme.background,
                                 shape = CircleShape
                             ),
-                        enabled = inputText.isNotBlank() || clipboardHistory.isNotEmpty()
+                        enabled = inputText.isNotBlank()
                     ) {
                         Icon(
-                            imageVector = if (inputText.isNotBlank()) {
-                                Icons.AutoMirrored.Rounded.Send
-                            } else {
-                                Icons.Rounded.Delete
-                            },
-                            contentDescription = if (inputText.isNotBlank()) "Send" else "Clear history",
+                            imageVector = Icons.AutoMirrored.Rounded.Send,
+                            contentDescription = "Send",
                             tint = if (inputText.isNotBlank()) {
                                 MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.error
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                             }
                         )
                     }

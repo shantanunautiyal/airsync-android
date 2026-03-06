@@ -1,8 +1,11 @@
 package com.sameerasw.airsync.utils
 
+import FileBrowserUtil
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.widget.Toast
+import com.sameerasw.airsync.BuildConfig
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
 import com.sameerasw.airsync.domain.model.MirroringOptions
@@ -16,6 +19,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+/**
+ * Central handler for all incoming WebSocket messages from the Mac server.
+ * Dispatches messages to specific handler methods based on the 'type' field.
+ */
 object WebSocketMessageHandler {
     private const val TAG = "WebSocketMessageHandler"
 
@@ -27,11 +34,32 @@ object WebSocketMessageHandler {
 
     fun setOnClipboardEntryCallback(callback: ((text: String) -> Unit)?) {
         onClipboardEntryReceived = callback
-        Log.d(TAG, "Clipboard entry callback ${if (callback != null) "registered" else "unregistered"}")
+        Log.d(
+            TAG,
+            "Clipboard entry callback ${if (callback != null) "registered" else "unregistered"}"
+        )
+    }
+
+    // Callback for volume updates (0-100)
+    private var onMacVolumeReceived: ((Int) -> Unit)? = null
+
+    fun setOnMacVolumeCallback(callback: ((Int) -> Unit)?) {
+        onMacVolumeReceived = callback
+    }
+
+    // Callback for modifier status updates
+    private var onModifierStatusReceived: ((JSONObject) -> Unit)? = null
+
+    fun setOnModifierStatusCallback(callback: ((JSONObject) -> Unit)?) {
+        onModifierStatusReceived = callback
     }
 
     /**
-     * Handle incoming WebSocket messages from Mac
+     * Handle incoming WebSocket messages from Mac.
+     * Parses the JSON payload and routes to the appropriate private handler method.
+     *
+     * @param context Application context for performing actions.
+     * @param message Raw JSON message string.
      */
     fun handleIncomingMessage(context: Context, message: String) {
         try {
@@ -39,7 +67,9 @@ object WebSocketMessageHandler {
             val type = json.optString("type")
             val data = json.optJSONObject("data")
 
-            Log.d(TAG, "Handling message type: $type")
+            if (type != "ping") {
+                Log.d(TAG, "Handling message type: $type")
+            }
 
             when (type) {
                 "clipboardUpdate" -> handleClipboardUpdate(context, data)
@@ -54,6 +84,8 @@ object WebSocketMessageHandler {
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
+                "macVolume" -> handleMacVolume(data)
+                "modifierStatus" -> handleModifierStatus(data)
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
                 "macInfo" -> handleMacInfo(context, data)
@@ -143,6 +175,12 @@ object WebSocketMessageHandler {
                     Log.d(TAG, "🛑 Stop mirroring request from Mac")
                     MirrorRequestHelper.stopMirroring(context)
                 }
+                "refreshAdbPorts" -> handleRefreshAdbPorts(context)
+                "fileChunkAck" -> handleFileChunkAck(data)
+                "transferVerified" -> handleTransferVerified(data)
+                "fileTransferCancel" -> handleFileTransferCancel(context, data)
+                "browseLs" -> handleBrowseLs(context, data)
+                "filePull" -> handleFilePull(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -433,6 +471,12 @@ object WebSocketMessageHandler {
 
 
 
+    // MARK: - File Transfer Handlers
+
+    /**
+     * Initializes an incoming file transfer session.
+     * Prepares the `FileReceiver` to accept chunks.
+     */
     private fun handleFileTransferInit(context: Context, data: JSONObject?) {
         try {
             if (data == null) return
@@ -440,22 +484,37 @@ object WebSocketMessageHandler {
             val name = data.optString("name")
             val size = data.optLong("size", 0L)
             val mime = data.optString("mime", "application/octet-stream")
+            val chunkSize = data.optInt("chunkSize", 64 * 1024)
             val checksumVal = data.optString("checksum", "")
+            val isClipboard = data.optBoolean("isClipboard", false)
 
-            FileReceiver.handleInit(context, id, name, size, mime, if (checksumVal.isBlank()) null else checksumVal)
+            FileReceiver.handleInit(
+                context,
+                id,
+                name,
+                size,
+                mime,
+                chunkSize,
+                if (checksumVal.isBlank()) null else checksumVal,
+                isClipboard
+            )
             Log.d(TAG, "Started incoming file transfer: $name ($size bytes)")
         } catch (e: Exception) {
             Log.e(TAG, "Error in file init: ${e.message}")
         }
     }
 
+    /**
+     * Processes a single chunk of file data.
+     * Delegates to `FileReceiver` for writing.
+     */
     private fun handleFileChunk(context: Context, data: JSONObject?) {
         try {
             if (data == null) return
             val id = data.optString("id", "default")
             val index = data.optInt("index", 0)
             val chunk = data.optString("chunk", "")
-                if (chunk.isNotEmpty()) {
+            if (chunk.isNotEmpty()) {
                 FileReceiver.handleChunk(context, id, index, chunk)
             }
         } catch (e: Exception) {
@@ -463,6 +522,10 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Finalizes the incoming file transfer.
+     * Triggers completion notifications and cleanup.
+     */
     private fun handleFileTransferComplete(context: Context, data: JSONObject?) {
         try {
             if (data == null) return
@@ -473,6 +536,12 @@ object WebSocketMessageHandler {
         }
     }
 
+    // MARK: - Clipboard & Control Handlers
+
+    /**
+     * Updates the system clipboard with text from the Mac.
+     * Uses `ClipboardSyncManager` to avoid feedback loops by tracking origin.
+     */
     private fun handleClipboardUpdate(context: Context, data: JSONObject?) {
         try {
             if (data == null) {
@@ -498,6 +567,10 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Handles volume control commands (set, increase, decrease, mute).
+     * Sends a response back to the Mac indicating success or failure.
+     */
     private fun handleVolumeControl(context: Context, data: JSONObject?) {
         try {
             if (data == null) {
@@ -506,13 +579,16 @@ object WebSocketMessageHandler {
                 return
             }
 
-            val action = data.optString("action")
-            when (action) {
+            when (val action = data.optString("action")) {
                 "setVolume" -> {
                     val volume = data.optInt("volume", -1)
                     if (volume in 0..100) {
                         val success = VolumeControlUtil.setVolume(context, volume)
-                        sendVolumeControlResponse(action, success, if (success) "Volume set to $volume%" else "Failed to set volume")
+                        sendVolumeControlResponse(
+                            action,
+                            success,
+                            if (success) "Volume set to $volume%" else "Failed to set volume"
+                        )
 
                         // Send updated device status after volume change
                         if (success) {
@@ -522,32 +598,48 @@ object WebSocketMessageHandler {
                         sendVolumeControlResponse(action, false, "Invalid volume value: $volume")
                     }
                 }
+
                 "increaseVolume" -> {
                     val increment = data.optInt("increment", 10)
                     val success = VolumeControlUtil.increaseVolume(context, increment)
-                    sendVolumeControlResponse(action, success, if (success) "Volume increased by $increment%" else "Failed to increase volume")
+                    sendVolumeControlResponse(
+                        action,
+                        success,
+                        if (success) "Volume increased by $increment%" else "Failed to increase volume"
+                    )
 
                     if (success) {
                         SyncManager.onVolumeChanged(context)
                     }
                 }
+
                 "decreaseVolume" -> {
                     val decrement = data.optInt("decrement", 10)
                     val success = VolumeControlUtil.decreaseVolume(context, decrement)
-                    sendVolumeControlResponse(action, success, if (success) "Volume decreased by $decrement%" else "Failed to decrease volume")
+                    sendVolumeControlResponse(
+                        action,
+                        success,
+                        if (success) "Volume decreased by $decrement%" else "Failed to decrease volume"
+                    )
 
                     if (success) {
                         SyncManager.onVolumeChanged(context)
                     }
                 }
+
                 "toggleMute" -> {
                     val success = VolumeControlUtil.toggleMute(context)
-                    sendVolumeControlResponse(action, success, if (success) "Mute toggled" else "Failed to toggle mute")
+                    sendVolumeControlResponse(
+                        action,
+                        success,
+                        if (success) "Mute toggled" else "Failed to toggle mute"
+                    )
 
                     if (success) {
                         SyncManager.onVolumeChanged(context)
                     }
                 }
+
                 else -> {
                     Log.w(TAG, "Unknown volume control action: $action")
                     sendVolumeControlResponse(action, false, "Unknown action")
@@ -559,6 +651,10 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Handles media control commands (play/pause, next, previous, like).
+     * Sends a response back to Mac and updates local media state after a short delay.
+     */
     private fun handleMediaControl(context: Context, data: JSONObject?) {
         try {
             if (data == null) {
@@ -576,26 +672,33 @@ object WebSocketMessageHandler {
                     success = MediaControlUtil.playPause(context)
                     message = if (success) "Play/pause toggled" else "Failed to toggle play/pause"
                 }
+
                 "play" -> {
                     success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback started" else "Failed to start playback"
                 }
+
                 "pause" -> {
                     success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback paused" else "Failed to pause playback"
                 }
+
                 "next" -> {
                     // Suppress automatic media updates before executing skip command
                     SyncManager.suppressMediaUpdatesForSkip()
                     success = MediaControlUtil.skipNext(context)
-                    message = if (success) "Skipped to next track" else "Failed to skip to next track"
+                    message =
+                        if (success) "Skipped to next track" else "Failed to skip to next track"
                 }
+
                 "previous" -> {
                     // Suppress automatic media updates before executing skip command
                     SyncManager.suppressMediaUpdatesForSkip()
                     success = MediaControlUtil.skipPrevious(context)
-                    message = if (success) "Skipped to previous track" else "Failed to skip to previous track"
+                    message =
+                        if (success) "Skipped to previous track" else "Failed to skip to previous track"
                 }
+
                 "stop" -> {
                     success = MediaControlUtil.stop(context)
                     message = if (success) "Playback stopped" else "Failed to stop playback"
@@ -605,14 +708,17 @@ object WebSocketMessageHandler {
                     success = MediaControlUtil.toggleLike(context)
                     message = if (success) "Like toggled" else "Failed to toggle like"
                 }
+
                 "like" -> {
                     success = MediaControlUtil.like(context)
                     message = if (success) "Liked" else "Failed to like"
                 }
+
                 "unlike" -> {
                     success = MediaControlUtil.unlike(context)
                     message = if (success) "Unliked" else "Failed to unlike"
                 }
+
                 else -> {
                     Log.w(TAG, "Unknown media control action: $action")
                     message = "Unknown action: $action"
@@ -718,6 +824,9 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Attempts to dismiss a notification on the Android device by ID.
+     */
     private fun handleNotificationDismissal(data: JSONObject?) {
         try {
             if (data == null) {
@@ -728,12 +837,17 @@ object WebSocketMessageHandler {
 
             val notificationId = data.optString("id")
             if (notificationId.isEmpty()) {
-                sendNotificationDismissalResponse(notificationId, false, "No notification ID provided")
+                sendNotificationDismissalResponse(
+                    notificationId,
+                    false,
+                    "No notification ID provided"
+                )
                 return
             }
 
             val success = NotificationDismissalUtil.dismissNotification(notificationId)
-            val message = if (success) "Notification dismissed" else "Failed to dismiss notification or notification not found"
+            val message =
+                if (success) "Notification dismissed" else "Failed to dismiss notification or notification not found"
 
             sendNotificationDismissalResponse(notificationId, success, message)
         } catch (e: Exception) {
@@ -742,6 +856,10 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Executes an action on a notification (e.g., Reply, Archive).
+     * Supports both action buttons and direct replies.
+     */
     private fun handleNotificationAction(data: JSONObject?) {
         try {
             if (data == null) {
@@ -752,20 +870,34 @@ object WebSocketMessageHandler {
 
             val notificationId = data.optString("id")
             if (notificationId.isEmpty()) {
-                sendNotificationActionResponse(notificationId, "", false, "No notification ID provided")
+                sendNotificationActionResponse(
+                    notificationId,
+                    "",
+                    false,
+                    "No notification ID provided"
+                )
                 return
             }
 
             // We accept either "name" or legacy "action" for action name
             val actionName = data.optString("name", data.optString("action", "")).ifEmpty { "" }
-            val replyText = data.optString("text", "")
+            val replyText = data.optString("text")
 
             if (actionName.isEmpty()) {
-                sendNotificationActionResponse(notificationId, actionName, false, "No action name provided")
+                sendNotificationActionResponse(
+                    notificationId,
+                    actionName,
+                    false,
+                    "No action name provided"
+                )
                 return
             }
 
-            val success = NotificationDismissalUtil.performNotificationAction(notificationId, actionName, replyText)
+            val success = NotificationDismissalUtil.performNotificationAction(
+                notificationId,
+                actionName,
+                replyText
+            )
             val message = if (success) {
                 if (replyText.isNotEmpty()) "Reply sent" else "Action invoked"
             } else {
@@ -781,7 +913,8 @@ object WebSocketMessageHandler {
 
     private fun handlePing(context: Context) {
         try {
-            // Respond to ping with current device status
+            // Respond to ping with current device status to keep connection alive
+            // We must force sync here because the server expects a response to every ping
             SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
         } catch (e: Exception) {
             Log.e(TAG, "Error handling ping: ${e.message}")
@@ -796,7 +929,8 @@ object WebSocketMessageHandler {
                 try {
                     val dataStoreManager = DataStoreManager(context)
                     dataStoreManager.setUserManuallyDisconnected(true)
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                }
             }
             // Immediately disconnect the WebSocket
             WebSocketUtil.disconnect()
@@ -806,6 +940,10 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Processes status updates received from the Mac (battery, music, etc.).
+     * Updates local storage and triggers widget refresh if needed.
+     */
     private fun handleMacDeviceStatus(context: Context, data: JSONObject?) {
         try {
             if (data == null) {
@@ -815,6 +953,7 @@ object WebSocketMessageHandler {
 
             // Don't log full data - it may contain large base64 albumArt causing OOM
             Log.d(TAG, "Received Mac device status (keys: ${data.keys().asSequence().toList()})")
+            Log.d(TAG, "Received Mac device status: $data")
 
             // Parse battery information
             val battery = data.optJSONObject("battery")
@@ -831,6 +970,10 @@ object WebSocketMessageHandler {
             // Limit albumArt size to prevent OOM - only use if reasonable size
             val albumArtRaw = music?.optString("albumArt", "") ?: ""
             val albumArt = if (albumArtRaw.length > 500_000) "" else albumArtRaw // Skip if > 500KB
+
+            val albumArt =
+                if (music?.has("albumArt") == true) music.optString("albumArt", "") else null
+
             val likeStatus = music?.optString("likeStatus", "none") ?: "none"
 
             val isPaired = data.optBoolean("isPaired", true)
@@ -872,7 +1015,8 @@ object WebSocketMessageHandler {
                         com.sameerasw.airsync.widget.AirSyncWidgetProvider.updateAllWidgets(context)
                         ds.setMacWidgetRefreshedAt(now)
                     }
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                }
             }
 
             Log.d(TAG, "Mac device status updated successfully")
@@ -881,6 +1025,10 @@ object WebSocketMessageHandler {
         }
     }
 
+    /**
+     * Handles the 'macInfo' handshake/update message containing Mac specs and installed apps.
+     * Updates device info in the database and synchronizes app icons if needed.
+     */
     private fun handleMacInfo(context: Context, data: JSONObject?) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -891,9 +1039,25 @@ object WebSocketMessageHandler {
 
                 val macName = data.optString("name", "")
                 val isPlus = data.optBoolean("isPlusSubscription", false)
-                
-                Log.d(TAG, "Processing macInfo - name: '$macName', isPlus: $isPlus")
-                
+                val macVersion = data.optString("version", "2.0.0")
+
+                Log.d(
+                    TAG,
+                    "Processing macInfo - name: '$macName', isPlus: $isPlus, version: '$macVersion'"
+                )
+
+                // Version compatibility check
+                val minVersion = BuildConfig.MIN_MAC_APP_VERSION
+                if (isVersionOutdated(macVersion, minVersion)) {
+                    launch(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            "Mac app is outdated ($macVersion < $minVersion). Please update the mac app and reconnect.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
                 val savedAppPackagesJson = data.optJSONArray("savedAppPackages")
                 val savedPackages = mutableSetOf<String>()
                 if (savedAppPackagesJson != null) {
@@ -912,11 +1076,16 @@ object WebSocketMessageHandler {
                         val model = data.optString("model", "").ifBlank { null }
                         val deviceType = when {
                             data.has("type") -> data.optString("type", "").ifBlank { null }
-                            data.has("deviceType") -> data.optString("deviceType", "").ifBlank { null }
+                            data.has("deviceType") -> data.optString("deviceType", "")
+                                .ifBlank { null }
+
                             else -> null
                         }
 
-                        Log.d(TAG, "Updating device: name='${if (macName.isNotBlank()) macName else last.name}', isPlus=$isPlus, model='$model', type='$deviceType'")
+                        Log.d(
+                            TAG,
+                            "Updating device: name='${if (macName.isNotBlank()) macName else last.name}', isPlus=$isPlus, model='$model', type='$deviceType'"
+                        )
 
                         ds.saveLastConnectedDevice(
                             last.copy(
@@ -927,9 +1096,9 @@ object WebSocketMessageHandler {
                                 deviceType = deviceType
                             )
                         )
-                        
+
                         Log.d(TAG, "Device info updated successfully in storage")
-                        
+
                         // Also update the network-aware device storage if possible
                         try {
                             val ourIp = DeviceInfoUtil.getWifiIpAddress(context) ?: ""
@@ -951,13 +1120,19 @@ object WebSocketMessageHandler {
                                 Log.d(TAG, "Network device info also updated successfully")
                             }
                         } catch (e: Exception) {
-                            Log.w(TAG, "Unable to update network device info from macInfo: ${e.message}")
+                            Log.w(
+                                TAG,
+                                "Unable to update network device info from macInfo: ${e.message}"
+                            )
                         }
-                        
+
                         // Force update the last connected timestamp for network device as well
                         try {
                             if (macName.isNotBlank()) {
-                                ds.updateNetworkDeviceLastConnected(macName, System.currentTimeMillis())
+                                ds.updateNetworkDeviceLastConnected(
+                                    macName,
+                                    System.currentTimeMillis()
+                                )
                                 Log.d(TAG, "Network device timestamp updated")
                             }
                         } catch (e: Exception) {
@@ -982,13 +1157,17 @@ object WebSocketMessageHandler {
 
                 if (savedSet.isEmpty()) {
                     // Mac has none; send full current Android list
-                    Log.d(TAG, "macInfo: Mac has no saved packages; syncing full list of ${androidPackages.size} apps")
+                    Log.d(
+                        TAG,
+                        "macInfo: Mac has no saved packages; syncing full list of ${androidPackages.size} apps"
+                    )
                     SyncManager.sendOptimizedAppIcons(context, androidPackages)
                     return@launch
                 }
 
                 val newOnAndroid = androidSet - savedSet // apps present on Android but not on Mac
-                val missingOnAndroid = savedSet - androidSet // apps present on Mac but uninstalled on Android
+                val missingOnAndroid =
+                    savedSet - androidSet // apps present on Mac but uninstalled on Android
 
                 if (newOnAndroid.isNotEmpty() || missingOnAndroid.isNotEmpty()) {
                     Log.d(
@@ -996,9 +1175,14 @@ object WebSocketMessageHandler {
                         "macInfo: App list changed (new=${newOnAndroid.size}, missing=${missingOnAndroid.size}); syncing full list of ${androidPackages.size} apps"
                     )
                     // Send the full current Android list so desktop can add new and remove missing
-                    SyncManager.sendOptimizedAppIcons(context, androidPackages)
+                    SyncManager.sendOptimizedAppIcons(context, androidPackages, fetchIcons = true)
                 } else {
-                    Log.d(TAG, "macInfo: No app list changes; skipping icon extraction")
+                    Log.d(
+                        TAG,
+                        "macInfo: No app list changes; skipping icon extraction but syncing metadata"
+                    )
+                    // Sync metadata (enabled/disabled states) without re-sending heavy icon data
+                    SyncManager.sendOptimizedAppIcons(context, androidPackages, fetchIcons = false)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling macInfo: ${e.message}")
@@ -1032,9 +1216,15 @@ object WebSocketMessageHandler {
         }
     }
 
-    private fun sendNotificationActionResponse(id: String, actionName: String, success: Boolean, message: String) {
+    private fun sendNotificationActionResponse(
+        id: String,
+        actionName: String,
+        success: Boolean,
+        message: String
+    ) {
         CoroutineScope(Dispatchers.IO).launch {
-            val response = JsonUtil.createNotificationActionResponse(id, actionName, success, message)
+            val response =
+                JsonUtil.createNotificationActionResponse(id, actionName, success, message)
             WebSocketUtil.sendMessage(response)
         }
     }
@@ -1077,7 +1267,10 @@ object WebSocketMessageHandler {
                     // Save updated apps
                     repository.saveNotificationApps(currentApps)
 
-                    Log.d(TAG, "Successfully updated notification state for $packageName to $newState")
+                    Log.d(
+                        TAG,
+                        "Successfully updated notification state for $packageName to $newState"
+                    )
 
                     // Send confirmation response back
                     val responseMessage = JsonUtil.createToggleAppNotificationResponse(
@@ -1119,23 +1312,30 @@ object WebSocketMessageHandler {
             try {
                 if (data == null) {
                     Log.e(TAG, "toggleNowPlaying data is null")
-                    val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "No data provided")
+                    val resp =
+                        JsonUtil.createToggleNowPlayingResponse(false, null, "No data provided")
                     WebSocketUtil.sendMessage(resp)
                     return@launch
                 }
                 // Accept either boolean or string "true"/"false"
                 val hasBoolean = data.has("state") && (data.opt("state") is Boolean)
-                val newState = if (hasBoolean) data.optBoolean("state") else data.optString("state").toBoolean()
+                val newState = if (hasBoolean) data.optBoolean("state") else data.optString("state")
+                    .toBoolean()
 
                 val ds = DataStoreManager(context)
                 ds.setSendNowPlayingEnabled(newState)
                 MediaNotificationListener.setNowPlayingEnabled(context, newState)
 
-                val resp = JsonUtil.createToggleNowPlayingResponse(true, newState, "Now playing set to $newState")
+                val resp = JsonUtil.createToggleNowPlayingResponse(
+                    true,
+                    newState,
+                    "Now playing set to $newState"
+                )
                 WebSocketUtil.sendMessage(resp)
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling toggleNowPlaying: ${e.message}")
-                val resp = JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
+                val resp =
+                    JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
                 WebSocketUtil.sendMessage(resp)
             }
         }
@@ -1147,8 +1347,7 @@ object WebSocketMessageHandler {
         }
     }
 
-    // ========== SMS and Messaging Handlers ==========
-
+    // ========== SMS and Messaging Handlers ===
     private fun handleRequestSmsThreads(context: Context, data: JSONObject?) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -1887,6 +2086,118 @@ object WebSocketMessageHandler {
             val response = JsonUtil.createMacMediaControlResponse(action, success, message)
             WebSocketUtil.sendMessage(response)
             Log.d(TAG, "Sent Mac media control response: action=$action, success=$success")
+        }
+    }
+
+    private fun handleMacVolume(data: JSONObject?) {
+        try {
+            if (data == null) return
+            val volume = data.optInt("volume", -1)
+            if (volume >= 0) {
+                Log.d(TAG, "Received Mac volume update: $volume")
+                onMacVolumeReceived?.invoke(volume)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling macVolume: ${e.message}")
+        }
+    }
+
+    private fun handleModifierStatus(data: JSONObject?) {
+        try {
+            if (data == null) return
+            Log.d(TAG, "Received modifier status update: $data")
+            onModifierStatusReceived?.invoke(data)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling modifierStatus: ${e.message}")
+        }
+    }
+
+    private fun handleFileChunkAck(data: JSONObject?) {
+        try {
+            if (data == null) return
+            val id = data.optString("id")
+            val index = data.optInt("index")
+            FileSender.handleAck(id, index)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling fileChunkAck: ${e.message}")
+        }
+    }
+
+    private fun handleTransferVerified(data: JSONObject?) {
+        try {
+            if (data == null) return
+            val id = data.optString("id")
+            val verified = data.optBoolean("verified")
+            FileSender.handleVerified(id, verified)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling transferVerified: ${e.message}")
+        }
+    }
+
+    private fun handleFileTransferCancel(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val id = data.optString("id")
+            if (id.isNotEmpty()) {
+                Log.d(TAG, "Received transfer cancel request for $id")
+                // Try cancelling both directions
+                FileReceiver.cancelTransfer(context, id)
+                FileSender.cancelTransfer(id)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling fileTransferCancel: ${e.message}")
+        }
+    }
+
+    private fun handleBrowseLs(context: Context, data: JSONObject?) {
+        try {
+            val path = data?.optString("path")
+            val showHidden = data?.optBoolean("showHidden", false) ?: false
+            Log.d(TAG, "Browse request for path: $path, showHidden: $showHidden")
+            val response = FileBrowserUtil.listDirectory(path, showHidden)
+            WebSocketUtil.sendMessage(response)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling browseLs: ${e.message}")
+        }
+    }
+
+    private fun handleFilePull(context: Context, data: JSONObject?) {
+        try {
+            val path = data?.optString("path")
+            if (path.isNullOrEmpty()) return
+            Log.d(TAG, "File pull request for path: $path")
+            val file = java.io.File(path)
+            if (file.exists() && file.isFile) {
+                FileSender.sendFile(context, android.net.Uri.fromFile(file))
+            } else {
+                Log.e(TAG, "File pull failed: File does not exist or is not a file: $path")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling filePull: ${e.message}")
+        }
+    }
+
+    private fun handleRefreshAdbPorts(context: Context) {
+        Log.d(TAG, "Request to refresh ADB ports received")
+        SyncManager.sendDeviceInfoNow(context)
+    }
+
+    private fun isVersionOutdated(current: String, min: String): Boolean {
+        return try {
+            val currentParts = current.split(".").map { it.toInt() }
+            val minParts = min.split(".").map { it.toInt() }
+
+            val maxLen = maxOf(currentParts.size, minParts.size)
+            for (i in 0 until maxLen) {
+                val currentPart = if (i < currentParts.size) currentParts[i] else 0
+                val minPart = if (i < minParts.size) minParts[i] else 0
+
+                if (currentPart < minPart) return true
+                if (currentPart > minPart) return false
+            }
+            false
+        } catch (e: Exception) {
+            false
         }
     }
 }

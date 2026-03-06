@@ -7,4 +7,25 @@
     <string name="widget_under_development">Widget under development</string>
     <string name="accessibility_service_description">This service allows AirSync to remotely control your device from your computer. It is used for the remote input and screen mirroring features.</string>
     <string name="start_mirroring">Start Mirroring</string>
+    <string name="connect_to_essentials">Connect to Essentials</string>
+    <string name="connect_to_essentials_summary">Share battery and status with Essentials app</string>
+    <string name="download_essentials">Download Essentials App</string>
+    <string name="download_essentials_summary">Required for battery widget integration</string>
+    <string name="searching_for_devices">Searching for devices…</string>
+    <string name="connected_to_device">Connected to %1$s</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="device_discovery">Device discovery</string>
+    <string name="device_discovery_description">Allow other devices to find this phone in the background</string>
+    <string name="rating_prompt">Psst... You\'ve been syncing with your mac for a while now, Do you like the app? Rate and give your feedback. ♥</string>
+    <string name="rate_now">Rate Now</string>
+    <string name="maybe_later">Maybe Later</string>
+    <string name="no_device_connected">No device connected</string>
+    <string name="sync_clipboard">Sync Clipboard</string>
+    <string name="image_copied_to_clipboard">Image copied to clipboard</string>
+    <string name="file_received_from_clipboard">File received from clipboard</string>
+    <string name="sending">Sending Clipboard…</string>
+    <string name="clipboard_sent">Clipboard Sent</string>
+    <string name="failed_to_send_clipboard">Failed to Send Clipboard</string>
+    <string name="your_mac">Your Mac</string>
+    <string name="disconnected">Disconnected</string>
 </resources>

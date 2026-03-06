@@ -4,11 +4,13 @@ object FileTransferProtocol {
     fun buildInit(
         id: String,
         name: String,
-        size: Int,
+        size: Long,
         mime: String,
+        chunkSize: Int,
         checksum: String?
     ): String {
-        val checksumLine = if (checksum.isNullOrBlank()) "" else "\n            ,\"checksum\": \"$checksum\""
+        val checksumLine =
+            if (checksum.isNullOrBlank()) "" else "\n            ,\"checksum\": \"$checksum\""
         return """
         {
             "type": "fileTransferInit",
@@ -16,7 +18,8 @@ object FileTransferProtocol {
                 "id": "$id",
                 "name": "$name",
                 "size": $size,
-                "mime": "$mime"$checksumLine
+                "mime": "$mime",
+                "chunkSize": $chunkSize$checksumLine
             }
         }
         """.trimIndent()
@@ -33,8 +36,9 @@ object FileTransferProtocol {
         }
     """.trimIndent()
 
-    fun buildComplete(id: String, name: String, size: Int, checksum: String?): String {
-        val checksumLine = if (checksum.isNullOrBlank()) "" else "\n                ,\"checksum\": \"$checksum\""
+    fun buildComplete(id: String, name: String, size: Long, checksum: String?): String {
+        val checksumLine =
+            if (checksum.isNullOrBlank()) "" else "\n                ,\"checksum\": \"$checksum\""
         return """
         {
             "type": "fileTransferComplete",
@@ -58,6 +62,13 @@ object FileTransferProtocol {
         {
             "type": "transferVerified",
             "data": { "id": "$id", "verified": $verified }
+        }
+    """.trimIndent()
+
+    fun buildCancel(id: String): String = """
+        {
+            "type": "fileTransferCancel",
+            "data": { "id": "$id" }
         }
     """.trimIndent()
 }

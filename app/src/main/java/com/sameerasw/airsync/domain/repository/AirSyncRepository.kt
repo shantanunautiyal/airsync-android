@@ -1,8 +1,8 @@
 package com.sameerasw.airsync.domain.repository
 
 import com.sameerasw.airsync.domain.model.ConnectedDevice
-import com.sameerasw.airsync.domain.model.NotificationApp
 import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
+import com.sameerasw.airsync.domain.model.NotificationApp
 import kotlinx.coroutines.flow.Flow
 
 interface AirSyncRepository {
@@ -31,7 +31,17 @@ interface AirSyncRepository {
     fun getLastConnectedDevice(): Flow<ConnectedDevice?>
 
     // Network-aware device connections
-    suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?, model: String? = null, deviceType: String? = null)
+    suspend fun saveNetworkDeviceConnection(
+        deviceName: String,
+        ourIp: String,
+        clientIp: String,
+        port: String,
+        isPlus: Boolean,
+        symmetricKey: String?,
+        model: String? = null,
+        deviceType: String? = null
+    )
+
     fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?>
     fun getAllNetworkDeviceConnections(): Flow<List<NetworkDeviceConnection>>
     suspend fun updateNetworkDeviceLastConnected(deviceName: String, timestamp: Long)
@@ -47,6 +57,9 @@ interface AirSyncRepository {
     // Clipboard sync settings
     suspend fun setClipboardSyncEnabled(enabled: Boolean)
     fun getClipboardSyncEnabled(): Flow<Boolean>
+
+    suspend fun setClipboardHistoryEnabled(enabled: Boolean)
+    fun getClipboardHistoryEnabled(): Flow<Boolean>
 
     // Auto reconnect settings
     suspend fun setAutoReconnectEnabled(enabled: Boolean)
@@ -75,4 +88,28 @@ interface AirSyncRepository {
     // Mac Media controls
     suspend fun setMacMediaControlsEnabled(enabled: Boolean)
     fun getMacMediaControlsEnabled(): Flow<Boolean>
+
+    // Default tab settings
+    suspend fun setDefaultTab(tab: String)
+    fun getDefaultTab(): Flow<String>
+
+    // Essentials Bridge
+    suspend fun setEssentialsConnectionEnabled(enabled: Boolean)
+    fun getEssentialsConnectionEnabled(): Flow<Boolean>
+
+    // Expanded Networking
+    suspend fun setExpandNetworkingEnabled(enabled: Boolean)
+    fun getExpandNetworkingEnabled(): Flow<Boolean>
+
+    // Device discovery
+    suspend fun setDeviceDiscoveryEnabled(enabled: Boolean)
+    fun getDeviceDiscoveryEnabled(): Flow<Boolean>
+
+    // Rating card refined logic
+    suspend fun setFirstMacConnectionTime(time: Long)
+    fun getFirstMacConnectionTime(): Flow<Long>
+    suspend fun setLastPromptDismissedVersion(version: Int)
+    fun getLastPromptDismissedVersion(): Flow<Int>
+    suspend fun setHasRatedApp(hasRated: Boolean)
+    fun hasRatedApp(): Flow<Boolean>
 }

@@ -76,8 +76,26 @@ class AirSyncRepositoryImpl(
     }
 
     // Network-aware device connections
-    override suspend fun saveNetworkDeviceConnection(deviceName: String, ourIp: String, clientIp: String, port: String, isPlus: Boolean, symmetricKey: String?, model: String?, deviceType: String?) {
-        dataStoreManager.saveNetworkDeviceConnection(deviceName, ourIp, clientIp, port, isPlus, symmetricKey, model, deviceType)
+    override suspend fun saveNetworkDeviceConnection(
+        deviceName: String,
+        ourIp: String,
+        clientIp: String,
+        port: String,
+        isPlus: Boolean,
+        symmetricKey: String?,
+        model: String?,
+        deviceType: String?
+    ) {
+        dataStoreManager.saveNetworkDeviceConnection(
+            deviceName,
+            ourIp,
+            clientIp,
+            port,
+            isPlus,
+            symmetricKey,
+            model,
+            deviceType
+        )
     }
 
     override fun getNetworkDeviceConnection(deviceName: String): Flow<NetworkDeviceConnection?> {
@@ -114,6 +132,14 @@ class AirSyncRepositoryImpl(
 
     override fun getClipboardSyncEnabled(): Flow<Boolean> {
         return dataStoreManager.getClipboardSyncEnabled()
+    }
+
+    override suspend fun setClipboardHistoryEnabled(enabled: Boolean) {
+        dataStoreManager.setClipboardHistoryEnabled(enabled)
+    }
+
+    override fun getClipboardHistoryEnabled(): Flow<Boolean> {
+        return dataStoreManager.getClipboardHistoryEnabled()
     }
 
     override suspend fun setAutoReconnectEnabled(enabled: Boolean) {
@@ -172,5 +198,61 @@ class AirSyncRepositoryImpl(
 
     override fun getMacMediaControlsEnabled(): Flow<Boolean> {
         return dataStoreManager.getMacMediaControlsEnabled()
+    }
+
+    override suspend fun setDefaultTab(tab: String) {
+        dataStoreManager.setDefaultTab(tab)
+    }
+
+    override fun getDefaultTab(): Flow<String> {
+        return dataStoreManager.getDefaultTab()
+    }
+
+    override suspend fun setEssentialsConnectionEnabled(enabled: Boolean) {
+        dataStoreManager.setEssentialsConnectionEnabled(enabled)
+    }
+
+    override fun getEssentialsConnectionEnabled(): Flow<Boolean> {
+        return dataStoreManager.getEssentialsConnectionEnabled()
+    }
+
+    override suspend fun setExpandNetworkingEnabled(enabled: Boolean) {
+        dataStoreManager.setExpandNetworkingEnabled(enabled)
+    }
+
+    override fun getExpandNetworkingEnabled(): Flow<Boolean> {
+        return dataStoreManager.getExpandNetworkingEnabled()
+    }
+
+    override suspend fun setDeviceDiscoveryEnabled(enabled: Boolean) {
+        dataStoreManager.setDeviceDiscoveryEnabled(enabled)
+    }
+
+    override fun getDeviceDiscoveryEnabled(): Flow<Boolean> {
+        return dataStoreManager.getDeviceDiscoveryEnabled()
+    }
+
+    override suspend fun setFirstMacConnectionTime(time: Long) {
+        dataStoreManager.setFirstMacConnectionTime(time)
+    }
+
+    override fun getFirstMacConnectionTime(): Flow<Long> {
+        return dataStoreManager.getFirstMacConnectionTime()
+    }
+
+    override suspend fun setLastPromptDismissedVersion(version: Int) {
+        dataStoreManager.setLastPromptDismissedVersion(version)
+    }
+
+    override fun getLastPromptDismissedVersion(): Flow<Int> {
+        return dataStoreManager.getLastPromptDismissedVersion()
+    }
+
+    override suspend fun setHasRatedApp(hasRated: Boolean) {
+        dataStoreManager.setHasRatedApp(hasRated)
+    }
+
+    override fun hasRatedApp(): Flow<Boolean> {
+        return dataStoreManager.hasRatedApp()
     }
 }

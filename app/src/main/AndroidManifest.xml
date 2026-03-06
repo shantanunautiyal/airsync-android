@@ -21,11 +21,13 @@
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
 
     <!-- Permission for downloading updates -->
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
@@ -115,6 +117,7 @@
     <uses-permission android:name="android.permission.health.READ_HYDRATION" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+    <uses-permission android:name="com.sameerasw.permission.ESSENTIALS_AIRSYNC_BRIDGE" />
 
     <application
         android:allowBackup="true"
@@ -133,9 +136,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.AirSync.Splash"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true">
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
             <!-- Main launcher intent filter -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -210,6 +211,14 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:noHistory="true" />
 
+        <activity
+            android:name=".presentation.ui.activities.ClipboardActionActivity"
+            android:theme="@style/Theme.AirSync.Transparent"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
+
         <service
             android:name=".service.MediaNotificationListener"
             android:exported="false"
@@ -253,6 +262,18 @@
             android:exported="true"
             android:icon="@drawable/ic_laptop_24"
             android:label="@string/qs_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Clipboard Quick Settings Tile Service -->
+        <service
+            android:name=".service.ClipboardTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_clipboard_24"
+            android:label="Send Clipboard"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -384,7 +405,19 @@
                 <action android:name="com.kieronquinn.app.smartspacer.REQUEST_TARGET_UPDATE" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".utils.EssentialsRequestReceiver"
+            android:exported="true"
+            android:permission="com.sameerasw.permission.ESSENTIALS_AIRSYNC_BRIDGE">
+            <intent-filter>
+                <action android:name="com.sameerasw.airsync.action.REQUEST_MAC_BATTERY" />
+            </intent-filter>
+        </receiver>
+
+
     </application>
+
 
     <queries>
         <!-- To see launchable apps -->
@@ -393,6 +426,7 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <package android:name="com.google.ar.lens" />
+        <package android:name="com.sameerasw.essentials" />
         
         <!-- Health Connect queries -->
         <package android:name="com.google.android.apps.healthdata" />
