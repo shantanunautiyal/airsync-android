@@ -18,5 +18,9 @@ data class MacMusicInfo(
     val volume: Int,
     val isMuted: Boolean,
     val albumArt: String,
-    val likeStatus: String
+    val likeStatus: String,
+    val elapsedTime: Long = 0L,
+    val duration: Long = 0L,
+    val timestamp: String? = null,
+    val playbackRate: Double = 1.0
 )

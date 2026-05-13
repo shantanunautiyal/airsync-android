@@ -450,6 +450,10 @@ object WebSocketMessageHandler {
                 if (music?.has("albumArt") == true) music.optString("albumArt", "") else null
 
             val likeStatus = music?.optString("likeStatus", "none") ?: "none"
+            val elapsedTime = ((music?.optDouble("elapsedTime", 0.0) ?: 0.0) * 1000).toLong()
+            val duration = ((music?.optDouble("duration", 0.0) ?: 0.0) * 1000).toLong()
+            val timestamp = music?.optString("timestamp")
+            val playbackRate = music?.optDouble("playbackRate", 1.0) ?: 1.0
 
             val isPaired = data.optBoolean("isPaired", true)
 
@@ -473,7 +477,11 @@ object WebSocketMessageHandler {
                 volume = volume,
                 isMuted = isMuted,
                 albumArt = albumArt,
-                likeStatus = likeStatus
+                likeStatus = likeStatus,
+                elapsedTime = elapsedTime,
+                duration = duration,
+                timestamp = timestamp,
+                playbackRate = playbackRate
             )
 
             // Persist a lightweight snapshot for widget consumption and throttle widget refresh

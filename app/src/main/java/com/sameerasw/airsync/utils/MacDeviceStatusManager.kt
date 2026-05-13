@@ -38,7 +38,11 @@ object MacDeviceStatusManager {
         volume: Int,
         isMuted: Boolean,
         albumArt: String?,
-        likeStatus: String
+        likeStatus: String,
+        elapsedTime: Long = 0L,
+        duration: Long = 0L,
+        timestamp: String? = null,
+        playbackRate: Double = 1.0
     ) {
         try {
             val effectiveAlbumArt = albumArt ?: _macDeviceStatus.value?.music?.albumArt ?: ""
@@ -51,7 +55,11 @@ object MacDeviceStatusManager {
                 volume = volume,
                 isMuted = isMuted,
                 albumArt = effectiveAlbumArt,
-                likeStatus = likeStatus
+                likeStatus = likeStatus,
+                elapsedTime = elapsedTime,
+                duration = duration,
+                timestamp = timestamp,
+                playbackRate = playbackRate
             )
 
             val status = MacDeviceStatus(
@@ -77,7 +85,17 @@ object MacDeviceStatusManager {
                 val isEssentialsEnabled = ds.getEssentialsConnectionEnabled().first()
 
                 if (isConnected && isMediaControlsEnabled && (title.isNotEmpty() || artist.isNotEmpty() || isPlaying)) {
-                    MacMediaPlayerService.startMacMedia(context, title, artist, isPlaying, bitmap)
+                    MacMediaPlayerService.startMacMedia(
+                        context,
+                        title,
+                        artist,
+                        isPlaying,
+                        bitmap,
+                        elapsedTime,
+                        duration,
+                        timestamp,
+                        playbackRate
+                    )
                     Log.d(TAG, "Started/Updated Mac media player service")
                 } else {
                     MacMediaPlayerService.stopMacMedia(context)
