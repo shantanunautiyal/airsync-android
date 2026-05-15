@@ -110,17 +110,32 @@ object SyncManager {
                     shouldSync = true // First time
                 }
 
-                if (shouldSync && WebSocketUtil.isConnected()) {
-                    val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
-                    val success = WebSocketUtil.sendMessage(statusJson)
+                if (shouldSync) {
+                    if (WebSocketUtil.isConnected()) {
+                        val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
+                        val success = WebSocketUtil.sendMessage(statusJson)
 
-                    if (success) {
-                        // Log.d(TAG, "Device status synced successfully")
+                        if (success) {
+                            // Log.d(TAG, "Device status synced successfully")
+                            lastAudioInfo = currentAudio
+                            lastBatteryInfo = currentBattery
+                            lastVolume = currentAudio.volume
+                        } else {
+                            Log.w(TAG, "Failed to sync device status")
+                        }
+                    }
+
+                    // Always sync via BLE if possible
+                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
+                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendMediaState(currentAudio)
+                    
+                    // Also update cache if BLE is used, to avoid redundant BLE sends
+                    // (Actually we already updated it above if WS succeeded, 
+                    // but if WS failed and BLE succeeded, we should still update it)
+                    if (!WebSocketUtil.isConnected()) {
                         lastAudioInfo = currentAudio
                         lastBatteryInfo = currentBattery
                         lastVolume = currentAudio.volume
-                    } else {
-                        Log.w(TAG, "Failed to sync device status")
                     }
                 }
 
@@ -189,17 +204,22 @@ object SyncManager {
                 Log.d(TAG, "Discovered ADB ports: $adbPorts")
 
                 val deviceId = DeviceInfoUtil.getDeviceId(context)
+                val symmetricKey = dataStoreManager.getLastConnectedDevice().first()?.symmetricKey ?: ""
+                val bleAuthToken = com.sameerasw.airsync.data.ble.BleTransportBridge.deriveAuthToken(symmetricKey)
+
                 val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(
-                    deviceId,
-                    deviceName,
-                    localIp,
-                    port,
-                    version,
-                    adbPorts,
-                    WebSocketUtil.currentIpAddress
+                    id = deviceId,
+                    name = deviceName,
+                    ipAddress = localIp,
+                    port = port,
+                    version = version,
+                    wallpaperBase64 = null,
+                    adbPorts = adbPorts,
+                    bleAuthToken = bleAuthToken,
+                    targetIpAddress = WebSocketUtil.currentIpAddress
                 )
                 if (WebSocketUtil.sendMessage(liteDeviceInfoJson)) {
-                    Log.d(TAG, "Lite device info sent to trigger macInfo")
+                    Log.d(TAG, "Lite device info sent to trigger macInfo (BLE token included)")
                 } else {
                     Log.e(TAG, "Failed to send lite device info")
                 }
@@ -220,14 +240,15 @@ object SyncManager {
                         }
                         val currentAdbPorts = discoveredServices.map { it.port.toString() }
                         val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(
-                            deviceId,
-                            deviceName,
-                            localIp,
-                            port,
-                            version,
-                            wallpaperBase64,
-                            currentAdbPorts,
-                            WebSocketUtil.currentIpAddress
+                            id = deviceId,
+                            name = deviceName,
+                            ipAddress = localIp,
+                            port = port,
+                            version = version,
+                            wallpaperBase64 = wallpaperBase64,
+                            adbPorts = currentAdbPorts,
+                            bleAuthToken = bleAuthToken,
+                            targetIpAddress = WebSocketUtil.currentIpAddress
                         )
                         if (WebSocketUtil.sendMessage(fullDeviceInfoJson)) {
                             Log.d(

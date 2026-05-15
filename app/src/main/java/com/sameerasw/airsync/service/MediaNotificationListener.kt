@@ -499,41 +499,38 @@ class MediaNotificationListener : NotificationListenerService() {
             )
         }
 
-        // Send dismissal update to Mac for real removals
+        // Sync dismissal to Mac
         serviceScope.launch {
             try {
-                val id = NotificationDismissalUtil.getIdForSbn(sbn)
-                if (id.isNullOrEmpty()) {
-                    // Skip if we cannot map to a known id
-                    return@launch
-                }
+                val id = NotificationDismissalUtil.getIdForSbn(sbn) ?: sbn.key
+                
                 // If this dismissal was initiated by our own dismiss request, skip echo
                 val wasSuppressed = NotificationDismissalUtil.consumeSuppressed(id)
                 if (wasSuppressed) {
-                    // Clean local caches and ignore
+                    Log.d(TAG, "Dismissal for $id was suppressed (originated from Mac)")
                     NotificationDismissalUtil.removeFromCaches(id)
                     return@launch
                 }
 
-                // Build and send update
-                if (WebSocketUtil.isConnected()) {
-                    val update = JsonUtil.toSingleLine(
-                        JsonUtil.createNotificationUpdateJson(
-                            id,
-                            dismissed = true,
-                            action = "dismiss"
-                        )
+                // Build and send update via WebSocket
+                val updateJson = JsonUtil.toSingleLine(
+                    JsonUtil.createNotificationUpdateJson(
+                        id,
+                        dismissed = true,
+                        action = "dismiss"
                     )
-                    val sent = WebSocketUtil.sendMessage(update)
-                    Log.d(TAG, "Sent notificationUpdate for $id: $sent")
-                } else {
-                    Log.d(TAG, "WebSocket not connected; skipping notificationUpdate for $id")
-                }
+                )
+                WebSocketUtil.sendMessage(updateJson)
+                
+                // Also sync via BLE
+                com.sameerasw.airsync.data.ble.BleTransportBridge.sendNotificationDismissal(id)
+                
+                Log.d(TAG, "Sent notification removal sync for $id (WS and BLE)")
 
                 // Remove from caches since it's gone now
                 NotificationDismissalUtil.removeFromCaches(id)
             } catch (e: Exception) {
-                Log.e(TAG, "Error sending notificationUpdate: ${e.message}")
+                Log.e(TAG, "Error syncing notification removal: ${e.message}")
             }
         }
     }
@@ -667,8 +664,15 @@ class MediaNotificationListener : NotificationListenerService() {
                             Log.e(TAG, "Failed to send notification via WebSocket")
                         }
                     } else {
-                        Log.d(TAG, "WebSocket not connected, skipping notification sync")
+                        Log.d(TAG, "WebSocket not connected, skipping notification sync via WS")
                     }
+
+                    // Always attempt BLE sync if any device is connected
+                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendNotification(
+                        pkg = sbn.packageName,
+                        title = title,
+                        text = body
+                    )
                 } else {
                     Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
                 }

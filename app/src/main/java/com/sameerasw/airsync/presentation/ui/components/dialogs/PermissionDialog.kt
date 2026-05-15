@@ -35,7 +35,8 @@ enum class PermissionType {
     WALLPAPER_ACCESS,
     CALL_LOG,
     CONTACTS,
-    PHONE
+    PHONE,
+    BLUETOOTH
 }
 
 data class PermissionInfo(
@@ -210,6 +211,14 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
             description = "AirSync needs to detect your phone's state to notify you of incoming calls in real-time.",
             whyNeeded = "This permission allows AirSync to detect when your phone is ringing, when you answer, or when a call ends, so it can display a live call status on your Mac. \n\nAirSync NEVER accesses your call audio or records conversations. This is used solely to facilitate the remote call notification feature as a device companion.",
             buttonText = "Grant Phone Access"
+        )
+ 
+        PermissionType.BLUETOOTH -> PermissionInfo(
+            title = "Bluetooth Access",
+            icon = R.drawable.rounded_sync_desktop_24,
+            description = "AirSync uses Bluetooth Low Energy (BLE) as a secondary transport to sync notifications and media controls with your Mac when Wi-Fi is unavailable.",
+            whyNeeded = "To discover and connect to your Mac via Bluetooth, Android requires Bluetooth permissions (Scan, Connect, and Advertise). \n\nThis enables a low-power background connection that keeps your devices synced even when they aren't on the same Wi-Fi network. AirSync only uses Bluetooth to communicate with your authorized Mac devices.",
+            buttonText = "Grant Bluetooth Access"
         )
     }
 }

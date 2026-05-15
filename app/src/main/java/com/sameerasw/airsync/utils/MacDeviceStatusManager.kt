@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.data.ble.BleGattServer
 import com.sameerasw.airsync.domain.model.MacBattery
 import com.sameerasw.airsync.domain.model.MacDeviceStatus
 import com.sameerasw.airsync.domain.model.MacMusicInfo
@@ -27,8 +28,83 @@ object MacDeviceStatusManager {
     private val _albumArt = MutableStateFlow<Bitmap?>(null)
     val albumArt: StateFlow<Bitmap?> = _albumArt.asStateFlow()
 
+    fun updateBatteryStatus(context: Context, level: Int, isCharging: Boolean) {
+        val current = _macDeviceStatus.value
+        updateStatus(
+            context = context,
+            name = current?.name ?: "Unknown",
+            batteryLevel = level,
+            isCharging = isCharging,
+            isPaired = current?.isPaired ?: true,
+            isPlaying = current?.music?.isPlaying ?: false,
+            title = current?.music?.title ?: "",
+            artist = current?.music?.artist ?: "",
+            volume = current?.music?.volume ?: 0,
+            isMuted = current?.music?.isMuted ?: false,
+            albumArt = null, // keep current
+            likeStatus = current?.music?.likeStatus ?: "none",
+            elapsedTime = current?.music?.elapsedTime ?: 0L,
+            duration = current?.music?.duration ?: 0L,
+            timestamp = current?.music?.timestamp,
+            playbackRate = current?.music?.playbackRate ?: 1.0
+        )
+    }
+
+    fun updateMacStatus(context: Context, name: String) {
+        val current = _macDeviceStatus.value
+        updateStatus(
+            context = context,
+            name = name,
+            batteryLevel = current?.battery?.level ?: -1,
+            isCharging = current?.battery?.isCharging ?: false,
+            isPaired = current?.isPaired ?: true,
+            isPlaying = current?.music?.isPlaying ?: false,
+            title = current?.music?.title ?: "",
+            artist = current?.music?.artist ?: "",
+            volume = current?.music?.volume ?: 0,
+            isMuted = current?.music?.isMuted ?: false,
+            albumArt = null, // keep current
+            likeStatus = current?.music?.likeStatus ?: "none",
+            elapsedTime = current?.music?.elapsedTime ?: 0L,
+            duration = current?.music?.duration ?: 0L,
+            timestamp = current?.music?.timestamp,
+            playbackRate = current?.music?.playbackRate ?: 1.0
+        )
+    }
+
+    fun updateMusicStatus(
+        context: Context,
+        isPlaying: Boolean,
+        title: String,
+        artist: String,
+        volume: Int,
+        isMuted: Boolean,
+        likeStatus: String
+    ) {
+        val current = _macDeviceStatus.value
+        updateStatus(
+            context = context,
+            name = current?.name ?: "Unknown",
+            batteryLevel = current?.battery?.level ?: -1,
+            isCharging = current?.battery?.isCharging ?: false,
+            isPaired = current?.isPaired ?: true,
+            isPlaying = isPlaying,
+            title = title,
+            artist = artist,
+            volume = volume,
+            isMuted = isMuted,
+            albumArt = null, // keep current
+            likeStatus = likeStatus,
+            elapsedTime = current?.music?.elapsedTime ?: 0L,
+            duration = current?.music?.duration ?: 0L,
+            timestamp = current?.music?.timestamp,
+            playbackRate = current?.music?.playbackRate ?: 1.0
+        )
+    }
+
     fun updateStatus(
         context: Context,
+        name: String,
         batteryLevel: Int,
         isCharging: Boolean,
         isPaired: Boolean,
@@ -63,6 +139,7 @@ object MacDeviceStatusManager {
             )
 
             val status = MacDeviceStatus(
+                name = name,
                 battery = macBattery,
                 isPaired = isPaired,
                 music = macMusicInfo
@@ -81,7 +158,7 @@ object MacDeviceStatusManager {
             CoroutineScope(Dispatchers.IO).launch {
                 val ds = DataStoreManager(context)
                 val isMediaControlsEnabled = ds.getMacMediaControlsEnabled().first()
-                val isConnected = WebSocketUtil.isConnected()
+                val isConnected = WebSocketUtil.isConnected() || WebSocketUtil.isConnecting() || BleGattServer.isAnyAuthenticated()
                 val isEssentialsEnabled = ds.getEssentialsConnectionEnabled().first()
 
                 if (isConnected && isMediaControlsEnabled && (title.isNotEmpty() || artist.isNotEmpty() || isPlaying)) {
@@ -193,7 +270,7 @@ object MacDeviceStatusManager {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Check current state
-                val isConnected = WebSocketUtil.isConnected()
+                val isConnected = WebSocketUtil.isConnected() || BleGattServer.isAnyAuthenticated()
                 val currentStatus = _macDeviceStatus.value
 
                 if (isConnected && currentStatus != null) {

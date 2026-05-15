@@ -94,24 +94,27 @@ class AirSyncViewModel(
     }
 
     // Connection status listener for WebSocket updates
-    private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
+    private val connectionStatusListener: (Boolean) -> Unit = { isWsConnected ->
         viewModelScope.launch {
+            val isBleConnected = _uiState.value.bleConnectionState == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
+            val isGlobalConnected = isWsConnected || isBleConnected
+
             _uiState.value = _uiState.value.copy(
-                isConnected = isConnected,
+                isConnected = isGlobalConnected,
                 isConnecting = false,
-                response = if (isConnected) "Connected successfully!" else "Disconnected",
-                activeIp = if (isConnected) WebSocketUtil.currentIpAddress else null,
-                macDeviceStatus = if (isConnected) _uiState.value.macDeviceStatus else null
+                response = if (isGlobalConnected) "Connected successfully!" else "Disconnected",
+                activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null,
+                macDeviceStatus = if (isGlobalConnected) _uiState.value.macDeviceStatus else null
             )
 
-            if (isConnected) {
+            if (isGlobalConnected) {
                 repository.setFirstMacConnectionTime(System.currentTimeMillis())
                 updateRatingPromptDisplay()
             }
 
             // Update dynamic shortcuts
             appContext?.let { ctx ->
-                ShortcutUtil.refreshShortcuts(ctx, isConnected)
+                ShortcutUtil.refreshShortcuts(ctx, isGlobalConnected)
             }
 
             // Notify Smartspacer of connection status change
@@ -178,6 +181,28 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.isQuickShareEnabled().collect { enabled ->
                 _uiState.value = _uiState.value.copy(isQuickShareEnabled = enabled)
+            }
+        }
+
+        // Observe BLE connection status
+        viewModelScope.launch {
+            com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.connectionState?.collect { state ->
+                Log.d("AirSyncViewModel", "BLE connection state changed: $state")
+                val isBleAuthenticated = state == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
+                val isWsConnected = WebSocketUtil.isConnected()
+                
+                _uiState.value = _uiState.value.copy(
+                    bleConnectionState = state,
+                    isConnected = isWsConnected || isBleAuthenticated
+                )
+                
+                if (isBleAuthenticated && !isWsConnected) {
+                    // Refresh shortcuts and other side effects if this is the only connection
+                    appContext?.let { ctx ->
+                        ShortcutUtil.refreshShortcuts(ctx, true)
+                    }
+                    updateRatingPromptDisplay()
+                }
             }
         }
     }

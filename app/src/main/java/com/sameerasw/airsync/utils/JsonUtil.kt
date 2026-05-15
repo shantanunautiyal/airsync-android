@@ -61,6 +61,7 @@ object JsonUtil {
         version: String,
         wallpaperBase64: String?,
         adbPorts: List<String>,
+        bleAuthToken: String? = null,
         targetIpAddress: String? = null
     ): String {
         val wallpaperJson = if (wallpaperBase64 != null) {
@@ -68,10 +69,15 @@ object JsonUtil {
         } else {
             ""
         }
+        val bleTokenJson = if (bleAuthToken != null) {
+            ""","bleAuthToken":"$bleAuthToken""""
+        } else {
+            ""
+        }
         val portsJson = adbPorts.joinToString(",") { "\"$it\"" }
         val targetIpJson =
             if (targetIpAddress != null) """, "targetIpAddress": "$targetIpAddress" """ else ""
-        return """{"type":"device","data":{"id":"$id","name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version","adbPorts":[$portsJson]$wallpaperJson$targetIpJson}}"""
+        return """{"type":"device","data":{"id":"$id","name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version","adbPorts":[$portsJson]$wallpaperJson$bleTokenJson$targetIpJson}}"""
     }
 
     /**

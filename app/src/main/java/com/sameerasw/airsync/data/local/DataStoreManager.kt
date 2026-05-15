@@ -98,6 +98,9 @@ class DataStoreManager(private val context: Context) {
 
         private val REMOTE_FLIPPED = booleanPreferencesKey("remote_flipped")
 
+        private val BLE_SYNC_ENABLED = booleanPreferencesKey("ble_sync_enabled")
+        private val BLE_AUTO_CONNECT_ENABLED = booleanPreferencesKey("ble_auto_connect_enabled")
+
         private const val NETWORK_DEVICES_PREFIX = "network_device_"
         private const val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
 
@@ -1010,4 +1013,16 @@ class DataStoreManager(private val context: Context) {
             prefs[ESSENTIALS_CONNECTION_ENABLED] ?: false
         }
     }
+
+    suspend fun setBleSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[BLE_SYNC_ENABLED] = enabled }
+    }
+
+    fun getBleSyncEnabled(): Flow<Boolean> = context.dataStore.data.map { it[BLE_SYNC_ENABLED] ?: false }
+
+    suspend fun setBleAutoConnectEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[BLE_AUTO_CONNECT_ENABLED] = enabled }
+    }
+
+    fun getBleAutoConnectEnabled(): Flow<Boolean> = context.dataStore.data.map { it[BLE_AUTO_CONNECT_ENABLED] ?: true }
 }

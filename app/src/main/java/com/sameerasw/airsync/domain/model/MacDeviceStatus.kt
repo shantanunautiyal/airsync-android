@@ -1,6 +1,7 @@
 package com.sameerasw.airsync.domain.model
 
 data class MacDeviceStatus(
+    val name: String = "Unknown",
     val battery: MacBattery,
     val isPaired: Boolean,
     val music: MacMusicInfo
