@@ -270,7 +270,14 @@ fun SettingsView(
                     title = "Quick Share",
                     subtitle = "Allow receiving files from nearby devices"
                 )
+            }
+        }
 
+
+        // Integration Section
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SettingsCategoryTitle("Bluetooth")
+            RoundedCardContainer {
                 BleSyncCard(viewModel = viewModel)
             }
         }

@@ -29,13 +29,12 @@ fun BleSyncCard(viewModel: com.sameerasw.airsync.presentation.viewmodel.AirSyncV
     val bleState = uiState.bleConnectionState
     
     val statusText = when (bleState) {
-        BleGattServer.BleConnectionState.DISCONNECTED -> "Secondary transport for notifications"
-        BleGattServer.BleConnectionState.ADVERTISING -> "Advertising (Waiting for Mac...)"
-        BleGattServer.BleConnectionState.CONNECTED -> "Connected (Authenticating...)"
-        BleGattServer.BleConnectionState.AUTHENTICATED -> "Connected & Authenticated"
+        BleGattServer.BleConnectionState.DISCONNECTED -> "For nearby connection"
+        BleGattServer.BleConnectionState.ADVERTISING -> "Scanning"
+        BleGattServer.BleConnectionState.CONNECTED -> "Authenticating"
+        BleGattServer.BleConnectionState.AUTHENTICATED -> "Connected"
     }
 
-    RoundedCardContainer {
         IconToggleItem(
             iconRes = R.drawable.rounded_bluetooth_24,
             title = "Bluetooth LE Sync",
@@ -56,5 +55,4 @@ fun BleSyncCard(viewModel: com.sameerasw.airsync.presentation.viewmodel.AirSyncV
             },
             enabled = bleEnabled
         )
-    }
 }
