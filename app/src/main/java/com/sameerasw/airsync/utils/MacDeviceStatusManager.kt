@@ -79,7 +79,8 @@ object MacDeviceStatusManager {
         artist: String,
         volume: Int,
         isMuted: Boolean,
-        likeStatus: String
+        likeStatus: String,
+        albumArt: String? = null
     ) {
         val current = _macDeviceStatus.value
         updateStatus(
@@ -93,7 +94,7 @@ object MacDeviceStatusManager {
             artist = artist,
             volume = volume,
             isMuted = isMuted,
-            albumArt = null, // keep current
+            albumArt = albumArt,
             likeStatus = likeStatus,
             elapsedTime = current?.music?.elapsedTime ?: 0L,
             duration = current?.music?.duration ?: 0L,

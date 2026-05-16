@@ -131,6 +131,18 @@ class MediaNotificationListener : NotificationListenerService() {
                             Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
                         }
 
+                        val albumArtLiteBase64 = albumArtBitmap?.let {
+                            try {
+                                val outputStream = ByteArrayOutputStream()
+                                // Scale down to 80x80 and lower quality for BLE
+                                val scaled = Bitmap.createScaledBitmap(it, 80, 80, true)
+                                scaled.compress(Bitmap.CompressFormat.JPEG, 30, outputStream)
+                                Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+
 
                         // Log.d(TAG, "Media session - Title: $title, Artist: $artist, Playing: $isPlaying, State: ${playbackState?.state}")
 
@@ -153,6 +165,7 @@ class MediaNotificationListener : NotificationListenerService() {
                                 title = title,
                                 artist = artist,
                                 albumArt = albumArtBase64,
+                                albumArtLite = albumArtLiteBase64,
                                 likeStatus = likeStatus
                             )
                         }

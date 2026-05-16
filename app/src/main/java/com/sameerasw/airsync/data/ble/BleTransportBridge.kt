@@ -45,7 +45,8 @@ object BleTransportBridge {
             audio.artist,
             audio.volume.toString(),
             if (audio.isMuted) "1" else "0",
-            audio.likeStatus
+            audio.likeStatus,
+            audio.albumArtLite ?: ""
         ).joinToString(BleConstants.DELIMITER)
         
         gattServer?.sendChunkedNotification(BleConstants.CHAR_MEDIA_STATE, payload)

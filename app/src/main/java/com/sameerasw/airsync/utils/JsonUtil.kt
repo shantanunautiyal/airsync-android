@@ -156,10 +156,12 @@ object JsonUtil {
         volume: Int,
         isMuted: Boolean,
         albumArt: String?,
+        albumArtLite: String? = null,
         likeStatus: String
     ): String {
         val albumArtJson = if (albumArt != null) ",\"albumArt\":\"$albumArt\"" else ""
-        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson,"likeStatus":"$likeStatus"}}}"""
+        val albumArtLiteJson = if (albumArtLite != null) ",\"albumArtLite\":\"$albumArtLite\"" else ""
+        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson$albumArtLiteJson,"likeStatus":"$likeStatus"}}}"""
     }
 
     /**

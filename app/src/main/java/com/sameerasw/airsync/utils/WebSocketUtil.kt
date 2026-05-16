@@ -618,7 +618,8 @@ object WebSocketUtil {
                             artist = music.optString("artist"),
                             volume = music.optInt("volume"),
                             isMuted = music.optBoolean("isMuted"),
-                            likeStatus = music.optString("likeStatus")
+                            likeStatus = music.optString("likeStatus"),
+                            albumArtLite = music.optString("albumArtLite")
                         )
                         BleTransportBridge.sendMediaState(audio)
                     }

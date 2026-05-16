@@ -383,10 +383,11 @@ class BleGattServer(private val context: Context) {
             val volume = parts[3].toIntOrNull() ?: 0
             val isMuted = parts[4] == "1"
             val likeStatus = parts[5]
+            val albumArt = if (parts.size >= 7) parts[6] else null
             
             Log.d(TAG, "Received Mac media state via BLE: $title by $artist (Playing: $isPlaying)")
             MacDeviceStatusManager.updateMusicStatus(
-                context, isPlaying, title, artist, volume, isMuted, likeStatus
+                context, isPlaying, title, artist, volume, isMuted, likeStatus, albumArt
             )
         }
     }
