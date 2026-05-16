@@ -28,8 +28,8 @@ object BleTransportBridge {
 
     // --- Outbound (Android -> Mac) ---
 
-    fun sendNotification(pkg: String, title: String, text: String) {
-        val payload = listOf(pkg, title, text).joinToString(BleConstants.DELIMITER)
+    fun sendNotification(pkg: String, appName: String, title: String, text: String) {
+        val payload = listOf(pkg, appName, title, text).joinToString(BleConstants.DELIMITER)
         gattServer?.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_DATA, payload)
     }
 

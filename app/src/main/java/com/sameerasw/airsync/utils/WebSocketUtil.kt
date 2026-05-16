@@ -598,9 +598,10 @@ object WebSocketUtil {
                 }
                 "notification" -> {
                     val pkg = data.optString("package")
+                    val appName = data.optString("app")
                     val title = data.optString("title")
                     val body = data.optString("body")
-                    BleTransportBridge.sendNotification(pkg, title, body)
+                    BleTransportBridge.sendNotification(pkg, appName, title, body)
                     return true
                 }
                 "status" -> {
