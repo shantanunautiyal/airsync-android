@@ -42,6 +42,12 @@ object SyncManager {
 
             while (isActive && isSyncing.get()) {
                 try {
+                    // Heartbeat: Always sync battery over BLE if authenticated to keep Mac connection alive
+                    if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
+                        val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
+                        com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
+                    }
+
                     // Check if WebSocket is connected and sync is enabled
                     if (WebSocketUtil.isConnected()) {
                         val dataStoreManager = DataStoreManager(context)
@@ -126,9 +132,10 @@ object SyncManager {
                     }
                 }
 
-                // Heartbeat: Always sync via BLE if possible (even if no change, to reset Mac watchdog)
-                com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
-                com.sameerasw.airsync.data.ble.BleTransportBridge.sendMediaState(currentAudio)
+                // Media state still needs to be sent if it changed
+                if (shouldSync) {
+                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendMediaState(currentAudio)
+                }
 
                 if (shouldSync && !WebSocketUtil.isConnected()) {
                     lastAudioInfo = currentAudio

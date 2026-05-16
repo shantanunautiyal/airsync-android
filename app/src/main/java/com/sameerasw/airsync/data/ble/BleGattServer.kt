@@ -47,6 +47,7 @@ class BleGattServer(private val context: Context) {
     var isAuthenticated = false
         private set
     private var negotiatedMtu = 23
+    private var heartbeatJob: Job? = null
 
     enum class BleConnectionState {
         DISCONNECTED, ADVERTISING, CONNECTED, AUTHENTICATED
@@ -81,6 +82,7 @@ class BleGattServer(private val context: Context) {
      */
     fun stop() {
         stopAdvertising()
+        stopHeartbeat()
         gattServer?.clearServices()
         gattServer?.close()
         gattServer = null
@@ -214,6 +216,7 @@ class BleGattServer(private val context: Context) {
                 Log.d(TAG, "Device disconnected: ${device.address}")
                 connectedDevices.remove(device)
                 if (connectedDevices.isEmpty()) {
+                    stopHeartbeat()
                     _connectionState.value = if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
                     isAuthenticated = false
                 }
@@ -319,6 +322,7 @@ class BleGattServer(private val context: Context) {
                     _connectionState.value = BleConnectionState.AUTHENTICATED
                     sendNotification(BleConstants.CHAR_AUTH_RESULT, byteArrayOf(BleConstants.AUTH_SUCCESS))
                     BleTransportBridge.sendDeviceName()
+                    startHeartbeat()
                 } else {
                     Log.w(TAG, "BLE Auth Failed! Token mismatch.")
                     sendNotification(BleConstants.CHAR_AUTH_RESULT, byteArrayOf(BleConstants.AUTH_FAILED))
@@ -328,6 +332,24 @@ class BleGattServer(private val context: Context) {
                 sendNotification(BleConstants.CHAR_AUTH_RESULT, byteArrayOf(BleConstants.AUTH_FAILED))
             }
         }
+    }
+
+    private fun startHeartbeat() {
+        stopHeartbeat()
+        heartbeatJob = scope.launch {
+            while (isActive && isAuthenticated) {
+                delay(5000)
+                if (connectedDevices.isNotEmpty()) {
+                    val level = com.sameerasw.airsync.utils.DeviceInfoUtil.getBatteryInfo(context).level
+                    sendNotification(BleConstants.CHAR_BATTERY_LEVEL, byteArrayOf(level.toByte()))
+                }
+            }
+        }
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
     }
 
     private fun handleNotificationDismiss(id: String) {
