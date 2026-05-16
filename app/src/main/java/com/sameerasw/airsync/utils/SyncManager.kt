@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object SyncManager {
     private const val TAG = "SyncManager"
-    private const val BATTERY_SYNC_INTERVAL = 20_000L // 20 seconds
+    private const val BATTERY_SYNC_INTERVAL = 10_000L // 10 seconds
     private const val MAX_DAILY_ICON_SYNCS = 3
 
     private var syncJob: Job? = null
@@ -124,19 +124,16 @@ object SyncManager {
                             Log.w(TAG, "Failed to sync device status")
                         }
                     }
+                }
 
-                    // Always sync via BLE if possible
-                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
-                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendMediaState(currentAudio)
-                    
-                    // Also update cache if BLE is used, to avoid redundant BLE sends
-                    // (Actually we already updated it above if WS succeeded, 
-                    // but if WS failed and BLE succeeded, we should still update it)
-                    if (!WebSocketUtil.isConnected()) {
-                        lastAudioInfo = currentAudio
-                        lastBatteryInfo = currentBattery
-                        lastVolume = currentAudio.volume
-                    }
+                // Heartbeat: Always sync via BLE if possible (even if no change, to reset Mac watchdog)
+                com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
+                com.sameerasw.airsync.data.ble.BleTransportBridge.sendMediaState(currentAudio)
+
+                if (shouldSync && !WebSocketUtil.isConnected()) {
+                    lastAudioInfo = currentAudio
+                    lastBatteryInfo = currentBattery
+                    lastVolume = currentAudio.volume
                 }
 
             } catch (e: Exception) {
