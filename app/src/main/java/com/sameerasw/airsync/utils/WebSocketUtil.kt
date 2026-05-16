@@ -3,6 +3,8 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.ble.BleConstants
+import com.sameerasw.airsync.data.ble.BleTransportBridge
+import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.widget.AirSyncWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -594,13 +596,32 @@ object WebSocketUtil {
                     ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
                     return true
                 }
+                "notification" -> {
+                    val pkg = data.optString("package")
+                    val title = data.optString("title")
+                    val body = data.optString("body")
+                    BleTransportBridge.sendNotification(pkg, title, body)
+                    return true
+                }
                 "status" -> {
                     val battery = data.optJSONObject("battery")
                     if (battery != null) {
                         val level = battery.optInt("level")
                         ble.sendNotification(BleConstants.CHAR_BATTERY_LEVEL, byteArrayOf(level.toByte()))
-                        return true
                     }
+                    val music = data.optJSONObject("music")
+                    if (music != null) {
+                        val audio = AudioInfo(
+                            isPlaying = music.optBoolean("isPlaying"),
+                            title = music.optString("title"),
+                            artist = music.optString("artist"),
+                            volume = music.optInt("volume"),
+                            isMuted = music.optBoolean("isMuted"),
+                            likeStatus = music.optString("likeStatus")
+                        )
+                        BleTransportBridge.sendMediaState(audio)
+                    }
+                    return true
                 }
             }
         } catch (e: Exception) {

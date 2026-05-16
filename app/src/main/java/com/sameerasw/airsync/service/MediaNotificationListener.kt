@@ -522,10 +522,7 @@ class MediaNotificationListener : NotificationListenerService() {
                 )
                 WebSocketUtil.sendMessage(updateJson)
                 
-                // Also sync via BLE
-                com.sameerasw.airsync.data.ble.BleTransportBridge.sendNotificationDismissal(id)
-                
-                Log.d(TAG, "Sent notification removal sync for $id (WS and BLE)")
+                Log.d(TAG, "Sent notification removal sync for $id")
 
                 // Remove from caches since it's gone now
                 NotificationDismissalUtil.removeFromCaches(id)
@@ -652,27 +649,16 @@ class MediaNotificationListener : NotificationListenerService() {
 
                     Log.d(TAG, "Preparing to send notification: $notificationJson")
 
-                    if (WebSocketUtil.isConnected()) {
-                        Log.d(TAG, "Sending notification via WebSocket")
-                        val success = WebSocketUtil.sendMessage(notificationJson)
-                        if (success) {
-                            Log.d(
-                                TAG,
-                                "Notification sent successfully via existing WebSocket connection"
-                            )
-                        } else {
-                            Log.e(TAG, "Failed to send notification via WebSocket")
-                        }
+                    Log.d(TAG, "Sending notification via WS/BLE")
+                    val success = WebSocketUtil.sendMessage(notificationJson)
+                    if (success) {
+                        Log.d(
+                            TAG,
+                            "Notification sent successfully"
+                        )
                     } else {
-                        Log.d(TAG, "WebSocket not connected, skipping notification sync via WS")
+                        Log.e(TAG, "Failed to send notification")
                     }
-
-                    // Always attempt BLE sync if any device is connected
-                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendNotification(
-                        pkg = sbn.packageName,
-                        title = title,
-                        text = body
-                    )
                 } else {
                     Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
                 }

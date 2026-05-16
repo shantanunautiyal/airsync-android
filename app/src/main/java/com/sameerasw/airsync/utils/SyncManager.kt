@@ -42,14 +42,14 @@ object SyncManager {
 
             while (isActive && isSyncing.get()) {
                 try {
-                    // Heartbeat: Always sync battery over BLE if authenticated to keep Mac connection alive
-                    if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
+                    // Heartbeat: Sync battery over BLE if authenticated and WS not connected to keep Mac connection alive
+                    if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && !WebSocketUtil.isConnected()) {
                         val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
                         com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
                     }
 
-                    // Check if WebSocket is connected and sync is enabled
-                    if (WebSocketUtil.isConnected()) {
+                    // Check if sync is needed (either via WebSocket or BLE)
+                    if (WebSocketUtil.isConnected() || com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
                         val dataStoreManager = DataStoreManager(context)
                         val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
 
@@ -117,30 +117,17 @@ object SyncManager {
                 }
 
                 if (shouldSync) {
-                    if (WebSocketUtil.isConnected()) {
-                        val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
-                        val success = WebSocketUtil.sendMessage(statusJson)
+                    val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
+                    // sendMessage handles both WebSocket and BLE fallback internally
+                    val success = WebSocketUtil.sendMessage(statusJson)
 
-                        if (success) {
-                            // Log.d(TAG, "Device status synced successfully")
-                            lastAudioInfo = currentAudio
-                            lastBatteryInfo = currentBattery
-                            lastVolume = currentAudio.volume
-                        } else {
-                            Log.w(TAG, "Failed to sync device status")
-                        }
+                    if (success) {
+                        lastAudioInfo = currentAudio
+                        lastBatteryInfo = currentBattery
+                        lastVolume = currentAudio.volume
+                    } else {
+                        Log.w(TAG, "Failed to sync device status (WS/BLE)")
                     }
-                }
-
-                // Media state still needs to be sent if it changed
-                if (shouldSync) {
-                    com.sameerasw.airsync.data.ble.BleTransportBridge.sendMediaState(currentAudio)
-                }
-
-                if (shouldSync && !WebSocketUtil.isConnected()) {
-                    lastAudioInfo = currentAudio
-                    lastBatteryInfo = currentBattery
-                    lastVolume = currentAudio.volume
                 }
 
             } catch (e: Exception) {

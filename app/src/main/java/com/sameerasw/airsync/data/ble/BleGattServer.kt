@@ -360,7 +360,7 @@ class BleGattServer(private val context: Context) {
     private fun handleMacBattery(value: ByteArray) {
         if (!isAuthenticated) return
         val payload = String(value, Charsets.UTF_8)
-        val parts = payload.split("|")
+        val parts = payload.split(BleConstants.DELIMITER)
         if (parts.size >= 2) {
             val level = parts[0].toIntOrNull() ?: -1
             val isCharging = parts[1] == "1"
@@ -375,7 +375,7 @@ class BleGattServer(private val context: Context) {
 
     private fun handleMacMediaState(payload: String) {
         if (!isAuthenticated) return
-        val parts = payload.split("|")
+        val parts = payload.split(BleConstants.DELIMITER)
         if (parts.size >= 6) {
             val isPlaying = parts[0] == "1"
             val title = parts[1]
