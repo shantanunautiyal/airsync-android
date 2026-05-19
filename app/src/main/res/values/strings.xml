@@ -81,4 +81,12 @@
     <string name="sentry_mode_auto">Auto</string>
     <string name="label_app_icon_credits">App icon credits: @Syntrop2k2 on Telegram</string>
     <string name="url_syntrop_telegram">https://t.me/Syntrop2k2</string>
+
+    <!-- Bluetooth & Reconnection Settings -->
+    <string name="bluetooth_settings_card_title">Reconnect</string>
+    <string name="bluetooth_settings_card_desc">Configure auto reconnect</string>
+    <string name="setting_auto_reconnect_title">Auto re-connect</string>
+    <string name="setting_auto_reconnect_desc">Attempted when disconnected unexpectedly</string>
+    <string name="setting_nearby_connection_title">Switch to Nearby</string>
+    <string name="setting_nearby_connection_desc">Use Bluetooth LE if connection lost</string>
 </resources>

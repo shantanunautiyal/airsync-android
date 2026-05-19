@@ -2,18 +2,24 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.util.Log
+import com.sameerasw.airsync.data.ble.BleConstants
+import com.sameerasw.airsync.data.ble.BleTransportBridge
+import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.widget.AirSyncWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -31,6 +37,11 @@ object WebSocketUtil {
     private var currentSymmetricKey: javax.crypto.SecretKey? = null
     private val isConnected = AtomicBoolean(false)
     private val isConnecting = AtomicBoolean(false)
+
+    private fun updateConnectedStatus(status: Boolean) {
+        isConnected.set(status)
+        _connectionStateFlow.value = status
+    }
 
     // Transport state: true after OkHttp onOpen, false after closing/failure/disconnect
     private val isSocketOpen = AtomicBoolean(false)
@@ -56,6 +67,9 @@ object WebSocketUtil {
 
     // Global connection status listeners for UI updates
     private val connectionStatusListeners = mutableSetOf<(Boolean) -> Unit>()
+
+    private val _connectionStateFlow = MutableStateFlow(false)
+    val connectionState = _connectionStateFlow.asStateFlow()
 
     private fun createClient(): OkHttpClient {
         return OkHttpClient.Builder()
@@ -229,7 +243,7 @@ object WebSocketUtil {
                                 WebSocketUtil.webSocket = webSocket
                                 currentIpAddress = ip // Store the successful IP
                                 isSocketOpen.set(true)
-                                isConnected.set(false)
+                                updateConnectedStatus(false)
                                 isConnecting.set(true)
 
                                 try {
@@ -243,7 +257,7 @@ object WebSocketUtil {
                                         delay(HANDSHAKE_TIMEOUT_MS)
                                         if (!handshakeCompleted.get()) {
                                             Log.w(TAG, "Handshake timed out")
-                                            isConnected.set(false)
+                                            updateConnectedStatus(false)
                                             isConnecting.set(false)
                                             try {
                                                 webSocket.close(4001, "Handshake timeout")
@@ -293,7 +307,7 @@ object WebSocketUtil {
                                             AirSyncWidgetProvider.updateAllWidgets(context)
                                         } catch (_: Exception) {
                                         }
-                                        isConnected.set(true)
+                                        updateConnectedStatus(true)
                                         isConnecting.set(false)
                                         handshakeTimeoutJob?.cancel()
                                         try {
@@ -364,7 +378,7 @@ object WebSocketUtil {
                                             }
                                         }
                                     }
-                                    isConnected.set(false)
+                                    updateConnectedStatus(false)
                                     isSocketOpen.set(false)
                                     isConnecting.set(false)
                                     handshakeCompleted.set(false)
@@ -419,7 +433,7 @@ object WebSocketUtil {
                                             }
                                         }
                                     }
-                                    isConnected.set(false)
+                                    updateConnectedStatus(false)
                                     isConnecting.set(false)
                                     isSocketOpen.set(false)
                                     handshakeCompleted.set(false)
@@ -511,17 +525,111 @@ object WebSocketUtil {
      */
     fun sendMessage(message: String): Boolean {
         // Allow sending as soon as the socket is open (even before handshake completes)
-        return if (isSocketOpen.get() && webSocket != null) {
-            Log.d(TAG, "Sending message: $message")
+        if (isSocketOpen.get() && webSocket != null) {
+            Log.d(TAG, "Sending message via WebSocket: $message")
             val messageToSend = currentSymmetricKey?.let { key ->
                 CryptoUtil.encryptMessage(message, key)
             } ?: message
 
-            webSocket!!.send(messageToSend)
+            return webSocket!!.send(messageToSend)
         } else {
-            Log.w(TAG, "WebSocket not connected, cannot send message")
-            false
+            // Fallback to BLE if authenticated
+            val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
+            if (ble != null && ble.isAuthenticated) {
+                Log.d(TAG, "WebSocket not connected, falling back to BLE: $message")
+                return sendOverBLE(message)
+            }
+            
+            Log.w(TAG, "Neither WebSocket nor BLE connected, cannot send message")
+            return false
         }
+    }
+
+    private fun sendOverBLE(message: String): Boolean {
+        val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager() ?: return false
+        try {
+            val json = JSONObject(message)
+            val type = json.optString("type")
+            val data = json.optJSONObject("data") ?: JSONObject()
+
+            when (type) {
+                "notificationAction" -> {
+                    val pkg = data.optString("package")
+                    val actionId = data.optString("actionId")
+                    val payload = "$pkg|$actionId"
+                    ble.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_ACTION, payload)
+                    return true
+                }
+                "mediaControl" -> {
+                    val action = data.optString("action")
+                    // Protocol: type|action
+                    val payload = "media|$action"
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
+                    return true
+                }
+                "volumeControl" -> {
+                    val action = data.optString("action")
+                    // Protocol: type|action
+                    val payload = "volume|$action"
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
+                    return true
+                }
+                "clipboard", "clipboardUpdate" -> {
+                    val content = data.optString("text", data.optString("content"))
+                    ble.sendChunkedNotification(BleConstants.CHAR_CLIPBOARD_DATA_NOTIFY, content)
+                    return true
+                }
+                "dismissNotification" -> {
+                    val id = data.optString("id")
+                    ble.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_DISMISS_NOTIFY, id)
+                    return true
+                }
+                "remoteControl" -> {
+                    val action = data.optString("action")
+                    // Filter out high-frequency cursor controls over BLE
+                    if (action == "mouse_move" || action == "mouse_click" || action == "mouse_scroll") {
+                        return false
+                    }
+                    // Include value if present (e.g. vol_set needs level)
+                    val value = if (data.has("value")) data.opt("value")?.toString() else null
+                    val payload = if (value != null) "remote|$action|$value" else "remote|$action"
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
+                    return true
+                }
+                "notification" -> {
+                    val pkg = data.optString("package")
+                    val appName = data.optString("app")
+                    val title = data.optString("title")
+                    val body = data.optString("body")
+                    BleTransportBridge.sendNotification(pkg, appName, title, body)
+                    return true
+                }
+                "status" -> {
+                    val battery = data.optJSONObject("battery")
+                    if (battery != null) {
+                        val level = battery.optInt("level")
+                        ble.sendNotification(BleConstants.CHAR_BATTERY_LEVEL, byteArrayOf(level.toByte()))
+                    }
+                    val music = data.optJSONObject("music")
+                    if (music != null) {
+                        val audio = AudioInfo(
+                            isPlaying = music.optBoolean("isPlaying"),
+                            title = music.optString("title"),
+                            artist = music.optString("artist"),
+                            volume = music.optInt("volume"),
+                            isMuted = music.optBoolean("isMuted"),
+                            likeStatus = music.optString("likeStatus"),
+                            albumArtLite = music.optString("albumArtLite")
+                        )
+                        BleTransportBridge.sendMediaState(audio)
+                    }
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending over BLE fallback: ${e.message}")
+        }
+        return false
     }
 
     /**
@@ -530,7 +638,7 @@ object WebSocketUtil {
      */
     fun disconnect(context: Context? = null) {
         Log.d(TAG, "Disconnecting WebSocket")
-        isConnected.set(false)
+        updateConnectedStatus(false)
         isConnecting.set(false)
         isSocketOpen.set(false)
         handshakeCompleted.set(false)
@@ -612,7 +720,7 @@ object WebSocketUtil {
     }
 
     fun isConnected(): Boolean {
-        return isConnected.get()
+        return isConnected.get() || com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()
     }
 
     fun isConnecting(): Boolean {

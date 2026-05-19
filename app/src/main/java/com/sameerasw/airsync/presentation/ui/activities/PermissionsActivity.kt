@@ -51,6 +51,10 @@ class PermissionsActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { refreshUI() }
 
+    private val bluetoothPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { refreshUI() }
+
     private var refreshCounter by mutableStateOf(0)
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -120,6 +124,9 @@ class PermissionsActivity : ComponentActivity() {
                         onRequestPhonePermission = {
                             requestPhonePermission()
                         },
+                        onRequestBluetoothPermission = {
+                            requestBluetoothPermission()
+                        },
                         refreshTrigger = refreshCounter
                     )
                 }
@@ -154,6 +161,20 @@ class PermissionsActivity : ComponentActivity() {
     private fun requestPhonePermission() {
         if (!PermissionUtil.isPhoneStatePermissionGranted(this)) {
             phonePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
+        }
+    }
+ 
+    private fun requestBluetoothPermission() {
+        if (!PermissionUtil.isBluetoothPermissionsGranted(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                bluetoothPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_ADVERTISE
+                    )
+                )
+            }
         }
     }
 

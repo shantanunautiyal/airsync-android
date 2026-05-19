@@ -43,6 +43,7 @@ fun PermissionsScreen(
     onRequestCallLogPermission: (() -> Unit)? = null,
     onRequestContactsPermission: (() -> Unit)? = null,
     onRequestPhonePermission: (() -> Unit)? = null,
+    onRequestBluetoothPermission: (() -> Unit)? = null,
     refreshTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -219,6 +220,15 @@ fun PermissionsScreen(
                                         isCritical = false
                                     )
                                 }
+ 
+                                "Bluetooth Access" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Enables background BLE sync",
+                                        onExplainClick = { showDialog = PermissionType.BLUETOOTH },
+                                        isCritical = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -262,6 +272,10 @@ fun PermissionsScreen(
 
                     PermissionType.PHONE -> {
                         onRequestPhonePermission?.invoke()
+                    }
+ 
+                    PermissionType.BLUETOOTH -> {
+                        onRequestBluetoothPermission?.invoke()
                     }
                 }
             }

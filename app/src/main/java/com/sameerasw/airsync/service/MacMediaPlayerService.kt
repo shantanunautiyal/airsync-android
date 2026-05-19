@@ -107,7 +107,19 @@ class MacMediaPlayerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        val action = intent?.action
+        Log.d(TAG, "onStartCommand: action=$action")
+
+        if (action == ACTION_STOP_MAC_MEDIA || action == null) {
+            if (mediaSession == null) {
+                val notification = createMediaNotification("", "", false)
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            stopMacMediaSession()
+            return START_NOT_STICKY
+        }
+
+        when (action) {
             ACTION_START_MAC_MEDIA -> {
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
                 val artist = intent.getStringExtra(EXTRA_ARTIST) ?: ""
@@ -130,10 +142,6 @@ class MacMediaPlayerService : Service() {
                 val playbackRate = intent.getDoubleExtra(EXTRA_PLAYBACK_RATE, 1.0)
                 
                 updateMacMediaSession(title, artist, isPlaying, elapsedTime, duration, timestamp, playbackRate)
-            }
-
-            ACTION_STOP_MAC_MEDIA -> {
-                stopMacMediaSession()
             }
             // Handle media control actions from notification buttons
             "MAC_MEDIA_play" -> {

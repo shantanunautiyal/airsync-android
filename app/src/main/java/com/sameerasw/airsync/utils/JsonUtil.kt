@@ -61,6 +61,7 @@ object JsonUtil {
         version: String,
         wallpaperBase64: String?,
         adbPorts: List<String>,
+        bleAuthToken: String? = null,
         targetIpAddress: String? = null
     ): String {
         val wallpaperJson = if (wallpaperBase64 != null) {
@@ -68,10 +69,15 @@ object JsonUtil {
         } else {
             ""
         }
+        val bleTokenJson = if (bleAuthToken != null) {
+            ""","bleAuthToken":"$bleAuthToken""""
+        } else {
+            ""
+        }
         val portsJson = adbPorts.joinToString(",") { "\"$it\"" }
         val targetIpJson =
             if (targetIpAddress != null) """, "targetIpAddress": "$targetIpAddress" """ else ""
-        return """{"type":"device","data":{"id":"$id","name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version","adbPorts":[$portsJson]$wallpaperJson$targetIpJson}}"""
+        return """{"type":"device","data":{"id":"$id","name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version","adbPorts":[$portsJson]$wallpaperJson$bleTokenJson$targetIpJson}}"""
     }
 
     /**
@@ -150,10 +156,12 @@ object JsonUtil {
         volume: Int,
         isMuted: Boolean,
         albumArt: String?,
+        albumArtLite: String? = null,
         likeStatus: String
     ): String {
         val albumArtJson = if (albumArt != null) ",\"albumArt\":\"$albumArt\"" else ""
-        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson,"likeStatus":"$likeStatus"}}}"""
+        val albumArtLiteJson = if (albumArtLite != null) ",\"albumArtLite\":\"$albumArtLite\"" else ""
+        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson$albumArtLiteJson,"likeStatus":"$likeStatus"}}}"""
     }
 
     /**

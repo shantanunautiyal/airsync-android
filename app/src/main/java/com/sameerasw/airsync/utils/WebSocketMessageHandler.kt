@@ -468,6 +468,7 @@ object WebSocketMessageHandler {
             // Update the Mac device status manager with all media info
             MacDeviceStatusManager.updateStatus(
                 context = context,
+                name = data.optString("name", MacDeviceStatusManager.macDeviceStatus.value?.name ?: "Unknown"),
                 batteryLevel = batteryLevel,
                 isCharging = isCharging,
                 isPaired = isPaired,

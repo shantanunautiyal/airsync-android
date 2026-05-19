@@ -187,6 +187,10 @@ object PermissionUtil {
             missing.add("Phone Access")
         }
 
+        if (!isBluetoothPermissionsGranted(context)) {
+            missing.add("Bluetooth Access")
+        }
+
         return missing
     }
 
@@ -240,6 +244,10 @@ object PermissionUtil {
             optional.add("Phone Access")
         }
 
+        if (!isBluetoothPermissionsGranted(context)) {
+            optional.add("Bluetooth Access")
+        }
+
         return optional
     }
 
@@ -271,5 +279,18 @@ object PermissionUtil {
             context,
             Manifest.permission.READ_PHONE_STATE
         ) == PackageManager.PERMISSION_GRANTED
+    }
+ 
+    /**
+     * Check if Bluetooth permissions are granted (Connect and Advertise/Scan on Android 12+)
+     */
+    fun isBluetoothPermissionsGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // On older versions, manifest permissions are enough
+            true
+        }
     }
 }

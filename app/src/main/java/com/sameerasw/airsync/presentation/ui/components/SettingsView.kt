@@ -272,6 +272,7 @@ fun SettingsView(
             }
         }
 
+
         // Integration Section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingsCategoryTitle("Integration")

@@ -151,6 +151,7 @@ object DeviceInfoUtil {
                     volume = volumePercent,
                     isMuted = isMuted,
                     albumArt = null,
+                    albumArtLite = null,
                     likeStatus = "none"
                 )
             }
@@ -166,6 +167,7 @@ object DeviceInfoUtil {
                 volume = volumePercent,
                 isMuted = isMuted,
                 albumArt = mediaInfo.albumArt,
+                albumArtLite = mediaInfo.albumArtLite,
                 likeStatus = mediaInfo.likeStatus
             )
         } catch (e: Exception) {
@@ -188,6 +190,7 @@ object DeviceInfoUtil {
             volume = audioInfo.volume,
             isMuted = audioInfo.isMuted,
             albumArt = audioInfo.albumArt,
+            albumArtLite = audioInfo.albumArtLite,
             likeStatus = audioInfo.likeStatus
         )
     }

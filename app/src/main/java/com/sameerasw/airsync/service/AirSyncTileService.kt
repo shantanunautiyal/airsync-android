@@ -202,6 +202,11 @@ class AirSyncTileService : TileService() {
                             "Connected"
                         }
                     } ?: "Connected"
+                } else if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && lastDevice != null) {
+                    // BLE Connected state
+                    state = Tile.STATE_ACTIVE
+                    label = lastDevice.name
+                    subtitle = "Connected BT"
                 } else if (isAuto) {
                     // Auto-reconnect in progress or waiting
                     state = if (isConnecting) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
