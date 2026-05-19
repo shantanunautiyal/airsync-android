@@ -39,7 +39,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.UiState
-import com.sameerasw.airsync.presentation.ui.components.cards.BleSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardFeaturesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DefaultTabCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
@@ -273,14 +272,6 @@ fun SettingsView(
             }
         }
 
-
-        // Integration Section
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SettingsCategoryTitle("Bluetooth")
-            RoundedCardContainer {
-                BleSyncCard(viewModel = viewModel)
-            }
-        }
 
         // Integration Section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

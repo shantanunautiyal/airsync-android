@@ -1,12 +1,16 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -15,14 +19,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.presentation.ui.components.sheets.ConnectionSettingsBottomSheet
 import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.HapticUtil
 
@@ -119,8 +129,6 @@ fun LastConnectedDeviceCard(
 //                Text("Type: $type", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 //            }
 
-
-
             Button(
                 onClick = {
                     HapticUtil.performClick(haptics)
@@ -140,22 +148,68 @@ fun LastConnectedDeviceCard(
                 Text("Quick Connect")
             }
 
-            // Auto-reconnect toggle
+
+        }
+        var showBottomSheet by remember { mutableStateOf(false) }
+
+        // Auto-reconnect & Bluetooth settings card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    HapticUtil.performClick(haptics)
+                    showBottomSheet = true
+                },
+            shape = MaterialTheme.shapes.extraSmall,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth().padding(top = 8.dp),
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Auto reconnect", style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = isAutoReconnectEnabled, onCheckedChange = { enabled ->
-                    if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(
-                        haptics
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.rounded_compare_arrows_24),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
-                    onToggleAutoReconnect(enabled)
-                })
+                    Column {
+                        Text(
+                            text = stringResource(R.string.bluetooth_settings_card_title),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.bluetooth_settings_card_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Icon(
+                    painter = painterResource(id = R.drawable.rounded_keyboard_arrow_right_24),
+                    contentDescription = "Configure settings",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+        }
 
+        if (showBottomSheet) {
+            ConnectionSettingsBottomSheet(
+                isAutoReconnectEnabled = isAutoReconnectEnabled,
+                onToggleAutoReconnect = onToggleAutoReconnect,
+                onDismissRequest = { showBottomSheet = false }
+            )
         }
     }
 }
