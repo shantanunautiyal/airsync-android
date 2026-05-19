@@ -119,6 +119,11 @@ object UDPDiscoveryManager {
     }
 
     fun burstBroadcast(context: Context, durationMs: Long = 30000) {
+        if (!isDiscoveryEnabled) {
+            Log.d(TAG, "Discovery disabled, skipping burst broadcast")
+            return
+        }
+        
         Log.d(TAG, "Starting burst broadcast for ${durationMs}ms")
         burstJob?.cancel()
         burstJob = CoroutineScope(Dispatchers.IO).launch {
@@ -346,6 +351,8 @@ object UDPDiscoveryManager {
     }
 
     private fun broadcastPresence(context: Context) {
+        if (!isDiscoveryEnabled) return
+        
         val allIps = getAllIpAddresses()
         if (allIps.isEmpty()) {
             return
@@ -427,6 +434,8 @@ object UDPDiscoveryManager {
     }
 
     private fun broadcastGoodbye(context: Context) {
+        if (!isDiscoveryEnabled) return
+        
         val allIps = getAllIpAddresses()
         if (allIps.isEmpty()) return
 
@@ -447,7 +456,7 @@ object UDPDiscoveryManager {
                         val packet = DatagramPacket(
                             data,
                             data.size,
-                            InetAddress.getByName("255.55.255.255"),
+                            InetAddress.getByName("255.255.255.255"),
                             BROADCAST_PORT
                         )
                         DatagramSocket(0, InetAddress.getByName(bindIp)).use { sender ->

@@ -74,6 +74,16 @@ class BleGattServer(private val context: Context) {
             return
         }
 
+        val isEnabled = try {
+            runBlocking { dataStoreManager.getBleSyncEnabled().first() }
+        } catch (e: Exception) {
+            false
+        }
+        if (!isEnabled) {
+            Log.d(TAG, "BLE Sync is disabled in settings, skipping start")
+            return
+        }
+
         // Set Bluetooth adapter name dynamically based on configured device name to keep BLE matching precise
         val customName = try {
             runBlocking { dataStoreManager.getDeviceName().first() }
@@ -244,7 +254,17 @@ class BleGattServer(private val context: Context) {
                     _connectionState.value = if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
                     isAuthenticated = false
                     if (gattServer != null) {
-                        startAdvertising()
+                        val isEnabled = try {
+                            runBlocking { dataStoreManager.getBleSyncEnabled().first() }
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (isEnabled) {
+                            startAdvertising()
+                        } else {
+                            Log.d(TAG, "BLE Sync is disabled, stopping server")
+                            stop()
+                        }
                     }
                 }
             }
@@ -267,6 +287,14 @@ class BleGattServer(private val context: Context) {
 
         override fun onCharacteristicWriteRequest(device: BluetoothDevice, requestId: Int, characteristic: BluetoothGattCharacteristic, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) {
             Log.d(TAG, "Write request for ${characteristic.uuid}, length: ${value.size}")
+            
+            if (characteristic.uuid != BleConstants.CHAR_AUTH_TOKEN && !isAuthenticated) {
+                Log.w(TAG, "Blocked unauthorized write request to ${characteristic.uuid} from ${device.address}")
+                if (responseNeeded) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_WRITE_NOT_PERMITTED, offset, null)
+                }
+                return
+            }
             
             when (characteristic.uuid) {
                 BleConstants.CHAR_AUTH_TOKEN -> handleAuthRequest(device, value)
