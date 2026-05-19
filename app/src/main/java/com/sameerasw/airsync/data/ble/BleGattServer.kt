@@ -243,6 +243,9 @@ class BleGattServer(private val context: Context) {
                     stopHeartbeat()
                     _connectionState.value = if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
                     isAuthenticated = false
+                    if (gattServer != null) {
+                        startAdvertising()
+                    }
                 }
             }
         }
@@ -508,5 +511,19 @@ class BleGattServer(private val context: Context) {
         val configDescriptor = BluetoothGattDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"), BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE)
         char.addDescriptor(configDescriptor)
         return char
+    }
+
+    fun disconnectAllConnectedDevices() {
+        Log.d(TAG, "Disconnecting all connected BLE devices manually...")
+        val devicesCopy = synchronized(connectedDevices) { connectedDevices.toList() }
+        for (device in devicesCopy) {
+            try {
+                gattServer?.cancelConnection(device)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to cancel connection for ${device.address}: ${e.message}")
+            }
+        }
+        isAuthenticated = false
+        _connectionState.value = BleConnectionState.DISCONNECTED
     }
 }

@@ -74,4 +74,8 @@ class BleConnectionManager(private val context: Context) {
     fun sendNotification(characteristicUuid: java.util.UUID, data: ByteArray) {
         bleServer?.sendNotification(characteristicUuid, data)
     }
+
+    fun disconnectAllConnectedDevices() {
+        bleServer?.disconnectAllConnectedDevices()
+    }
 }

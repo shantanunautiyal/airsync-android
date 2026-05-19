@@ -655,6 +655,22 @@ object WebSocketUtil {
                 } catch (_: Exception) {
                 }
             }
+            
+            // Send manual disconnect signal over BLE before disconnecting BLE client
+            try {
+                val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
+                if (ble != null && ble.isAuthenticated) {
+                    Log.d(TAG, "Sending manual disconnect signal over BLE before disconnecting")
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, "remote|manual_disconnect")
+                    
+                    CoroutineScope(Dispatchers.IO).launch {
+                        delay(300)
+                        ble.disconnectAllConnectedDevices()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending manual disconnect signal over BLE: ${e.message}")
+            }
         }
 
         webSocket?.close(1000, "Manual disconnection")
