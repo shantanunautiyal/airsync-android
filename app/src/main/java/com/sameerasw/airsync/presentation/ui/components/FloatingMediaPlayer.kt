@@ -34,6 +34,7 @@ import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -59,6 +60,7 @@ import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -100,6 +102,21 @@ fun FloatingMediaPlayer(
     val screenHeight = config.screenHeightDp.dp
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+
+    var currentElapsedTimeMs by remember(musicInfo) { mutableStateOf(musicInfo?.elapsedTime ?: 0L) }
+
+    LaunchedEffect(musicInfo?.isPlaying, musicInfo?.elapsedTime) {
+        if (musicInfo?.isPlaying == true) {
+            var lastTime = System.currentTimeMillis()
+            while (true) {
+                kotlinx.coroutines.delay(500)
+                val now = System.currentTimeMillis()
+                val delta = (now - lastTime) * ((musicInfo.playbackRate).toFloat())
+                currentElapsedTimeMs += delta.toLong()
+                lastTime = now
+            }
+        }
+    }
 
     val collapsedHeight = 72.dp
     val expandedHeight = 280.dp
@@ -199,7 +216,7 @@ fun FloatingMediaPlayer(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.basicMarquee(),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -207,7 +224,7 @@ fun FloatingMediaPlayer(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier.basicMarquee(),
                         )
                     }
 
@@ -271,6 +288,44 @@ fun FloatingMediaPlayer(
                         }
                         
                         Spacer(modifier = Modifier.size(48.dp)) // To balance the chevron
+                    }
+
+                    if (musicInfo != null && musicInfo.duration > 0) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val durationSeconds = musicInfo.duration / 1000L
+                            val elapsedSeconds = (currentElapsedTimeMs / 1000L).coerceIn(0L, durationSeconds)
+                            val elapsedFraction = (currentElapsedTimeMs.toFloat() / musicInfo.duration.toFloat()).coerceIn(0f, 1f)
+
+                            LinearWavyProgressIndicator(
+                                progress = { elapsedFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(10.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primaryContainer,
+                                wavelength = 20.dp,
+                                amplitude = { if (musicInfo.isPlaying) 1.0f else 0f }
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = formatTime(elapsedSeconds),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = formatTime(durationSeconds),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
 
                     // Media Controls
@@ -349,4 +404,10 @@ fun FloatingMediaPlayer(
 
 fun lerp(start: Float, stop: Float, fraction: Float): Float {
     return (1 - fraction) * start + fraction * stop
+}
+
+private fun formatTime(seconds: Long): String {
+    val mins = seconds / 60
+    val secs = seconds % 60
+    return "$mins:${if (secs < 10) "0" else ""}$secs"
 }
