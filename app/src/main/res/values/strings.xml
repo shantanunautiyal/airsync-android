@@ -87,8 +87,6 @@
     <string name="bluetooth_settings_card_desc">Configure auto reconnect</string>
     <string name="setting_auto_reconnect_title">Auto re-connect</string>
     <string name="setting_auto_reconnect_desc">Attempted when disconnected unexpectedly</string>
-    <string name="setting_nearby_connection_title">Nearby connection</string>
-    <string name="setting_nearby_connection_desc">Use Bluetooth LE</string>
-    <string name="setting_auto_switch_title">Auto switch</string>
-    <string name="setting_auto_switch_desc">Auto switch to BLE if connection lost</string>
+    <string name="setting_nearby_connection_title">Switch to Nearby</string>
+    <string name="setting_nearby_connection_desc">Use Bluetooth LE if connection lost</string>
 </resources>

@@ -1,10 +1,5 @@
 package com.sameerasw.airsync.presentation.ui.components.sheets
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,7 +38,6 @@ fun ConnectionSettingsBottomSheet(
     val scope = rememberCoroutineScope()
 
     val bleEnabled by dataStoreManager.getBleSyncEnabled().collectAsState(initial = false)
-    val autoConnect by dataStoreManager.getBleAutoConnectEnabled().collectAsState(initial = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -85,28 +79,12 @@ fun ConnectionSettingsBottomSheet(
                     onCheckedChange = { enabled ->
                         scope.launch {
                             dataStoreManager.setBleSyncEnabled(enabled)
+                            dataStoreManager.setBleAutoConnectEnabled(enabled)
                         }
                     }
                 )
-
-                AnimatedVisibility(
-                    visible = bleEnabled,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    IconToggleItem(
-                        iconRes = R.drawable.rounded_bluetooth_searching_24,
-                        title = stringResource(R.string.setting_auto_switch_title),
-                        description = stringResource(R.string.setting_auto_switch_desc),
-                        isChecked = autoConnect,
-                        onCheckedChange = { enabled ->
-                            scope.launch {
-                                dataStoreManager.setBleAutoConnectEnabled(enabled)
-                            }
-                        }
-                    )
-                }
             }
         }
     }
 }
+
