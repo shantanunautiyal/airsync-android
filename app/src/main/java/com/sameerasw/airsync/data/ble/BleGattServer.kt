@@ -48,6 +48,7 @@ class BleGattServer(private val context: Context) {
         private set
     private var negotiatedMtu = 23
     private var heartbeatJob: Job? = null
+    private var isAdvertisingPaused = false
 
     enum class BleConnectionState {
         DISCONNECTED, ADVERTISING, CONNECTED, AUTHENTICATED
@@ -124,6 +125,7 @@ class BleGattServer(private val context: Context) {
         pendingServices.clear()
         _connectionState.value = BleConnectionState.DISCONNECTED
         isAuthenticated = false
+        isAdvertisingPaused = false
     }
 
     private fun setupGattServer() {
@@ -227,6 +229,32 @@ class BleGattServer(private val context: Context) {
         currentAdvertiseCallback = null
     }
 
+    /**
+     * Stop advertising while keeping the GATT server alive.
+     * Existing BLE connections remain active
+     */
+    fun pauseAdvertising() {
+        if (isAdvertisingPaused) return
+        Log.d(TAG, "BLE advertising paused (regular connection active)")
+        isAdvertisingPaused = true
+        stopAdvertising()
+        if (_connectionState.value == BleConnectionState.ADVERTISING) {
+            _connectionState.value = BleConnectionState.CONNECTED
+        }
+    }
+
+    /**
+     * Resume advertising after it was paused. No-op if already advertising.
+     */
+    fun resumeAdvertising() {
+        if (!isAdvertisingPaused) return
+        if (gattServer == null) return
+        if (_connectionState.value == BleConnectionState.DISCONNECTED) return
+        Log.d(TAG, "BLE advertising resumed")
+        isAdvertisingPaused = false
+        startAdvertising()
+    }
+
     private val gattServerCallback = object : BluetoothGattServerCallback() {
         override fun onServiceAdded(status: Int, service: BluetoothGattService) {
             Log.d(TAG, "Service added: ${service.uuid}, status: $status")
@@ -260,7 +288,9 @@ class BleGattServer(private val context: Context) {
                             false
                         }
                         if (isEnabled) {
-                            startAdvertising()
+                            if (!isAdvertisingPaused) {
+                                startAdvertising()
+                            }
                         } else {
                             Log.d(TAG, "BLE Sync is disabled, stopping server")
                             stop()

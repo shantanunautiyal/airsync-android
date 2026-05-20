@@ -40,22 +40,31 @@ class BleConnectionManager(private val context: Context) {
                 dataStoreManager.getBleSyncEnabled(),
                 dataStoreManager.getBleAutoConnectEnabled(),
                 WebSocketUtil.connectionState
-            ) { enabled, auto, wsState ->
-                Triple(enabled, auto, wsState)
-            }.collectLatest { (enabled, _, _) ->
+            ) { enabled, auto, wsConnected ->
+                Triple(enabled, auto, wsConnected)
+            }.collectLatest { (enabled, _, wsConnected) ->
                 isBleEnabled = enabled
-                updateBleState()
+                updateBleState(regularConnectionActive = wsConnected)
             }
         }
     }
 
-    private fun updateBleState() {
-        if (isBleEnabled) {
-            Log.d(TAG, "BLE enabled, starting GATT server")
-            bleServer?.start()
-        } else {
+    private fun updateBleState(regularConnectionActive: Boolean) {
+        if (!isBleEnabled) {
             Log.d(TAG, "BLE disabled, stopping server")
             bleServer?.stop()
+            return
+        }
+
+        if (regularConnectionActive) {
+            // Regular Wi-Fi/USB connection is up — pause advertising to save power.
+            Log.d(TAG, "Regular connection active — pausing BLE advertising")
+            bleServer?.pauseAdvertising()
+        } else {
+            // No regular connection — ensure server is started and advertising.
+            Log.d(TAG, "No regular connection — resuming BLE advertising")
+            bleServer?.start()
+            bleServer?.resumeAdvertising()
         }
     }
 
