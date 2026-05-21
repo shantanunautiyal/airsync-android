@@ -28,7 +28,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -43,6 +45,7 @@ class AirSyncService : Service() {
     private var isScanning = false
 
     private var webDavServer: WebDavServer? = null
+    private var webDavJob: Job? = null
 
     // Network state tracking
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -119,6 +122,27 @@ class AirSyncService : Service() {
         webDavServer = null
     }
 
+    private fun monitorWebDavRequirements() {
+        webDavJob?.cancel()
+        webDavJob = scope.launch {
+            val dataStoreManager = DataStoreManager.getInstance(applicationContext)
+            combine(
+                dataStoreManager.isFileAccessEnabled(),
+                dataStoreManager.getLastConnectedDevice()
+            ) { isEnabled, device ->
+                Log.d(TAG, "WebDAV flow evaluation: isEnabled=$isEnabled, isPlus=${device?.isPlus}")
+                isEnabled && device?.isPlus == true
+            }.collect { shouldStart ->
+                Log.d(TAG, "WebDAV requirement state updated: shouldStart = $shouldStart")
+                if (shouldStart) {
+                    startWebDavServer()
+                } else {
+                    stopWebDavServer()
+                }
+            }
+        }
+    }
+
     private fun handleAppForeground() {
         if (isScanning) {
             Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
@@ -156,11 +180,13 @@ class AirSyncService : Service() {
         UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
 
         WakeupService.startService(this)
-        startWebDavServer()
+        monitorWebDavRequirements()
     }
 
     private fun stopSync() {
         Log.d(TAG, "Stopping AirSync foreground service")
+        webDavJob?.cancel()
+        webDavJob = null
         stopWebDavServer()
         ShortcutUtil.refreshShortcuts(this, false)
         UDPDiscoveryManager.stop(this)

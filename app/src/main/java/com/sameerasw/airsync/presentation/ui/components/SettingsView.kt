@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.DeviceInfo
@@ -240,6 +241,16 @@ fun SettingsView(
                     isChecked = uiState.isQuickShareEnabled,
                     onCheckedChange = { enabled: Boolean ->
                         viewModel.setQuickShareEnabled(context, enabled)
+                    }
+                )
+
+                IconToggleItem(
+                    title = stringResource(R.string.label_file_access),
+                    description = stringResource(R.string.subtitle_file_access),
+                    iconRes = R.drawable.rounded_folder_managed_24,
+                    isChecked = uiState.isFileAccessEnabled,
+                    onCheckedChange = { enabled: Boolean ->
+                        viewModel.setFileAccessEnabled(context, enabled)
                     }
                 )
             }

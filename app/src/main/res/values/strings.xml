@@ -89,4 +89,6 @@
     <string name="setting_auto_reconnect_desc">Attempted when disconnected unexpectedly</string>
     <string name="setting_nearby_connection_title">Switch to Nearby</string>
     <string name="setting_nearby_connection_desc">Use Bluetooth LE if connection lost</string>
+    <string name="label_file_access">File Access</string>
+    <string name="subtitle_file_access">Mount storage in macOS Finder</string>
 </resources>
