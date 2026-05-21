@@ -154,6 +154,14 @@ dependencies {
 
     implementation(libs.wire.runtime)
     implementation(libs.bouncycastle)
+
+    // Ktor Server for WebDAV
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.host.common)
+    implementation(libs.ktor.server.status.pages)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.gson)
 }
 
 wire {

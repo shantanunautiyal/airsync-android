@@ -184,6 +184,13 @@ class AirSyncViewModel(
             }
         }
 
+        // Observe File Access preference
+        viewModelScope.launch {
+            repository.isFileAccessEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isFileAccessEnabled = enabled)
+            }
+        }
+
         // Observe BLE connection status
         viewModelScope.launch {
             com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.connectionState?.collect { state ->
@@ -688,6 +695,14 @@ class AirSyncViewModel(
             } else {
                 context.stopService(intent)
             }
+        }
+    }
+
+    fun setFileAccessEnabled(context: Context, enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isFileAccessEnabled = enabled)
+        viewModelScope.launch {
+            repository.setFileAccessEnabled(enabled)
+            ServiceManager.updateServiceState(context)
         }
     }
 

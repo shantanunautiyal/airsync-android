@@ -295,4 +295,12 @@ class AirSyncRepositoryImpl(
     override fun isQuickShareEnabled(): Flow<Boolean> {
         return dataStoreManager.isQuickShareEnabled()
     }
+
+    override suspend fun setFileAccessEnabled(enabled: Boolean) {
+        dataStoreManager.setFileAccessEnabled(enabled)
+    }
+
+    override fun isFileAccessEnabled(): Flow<Boolean> {
+        return dataStoreManager.isFileAccessEnabled()
+    }
 }
