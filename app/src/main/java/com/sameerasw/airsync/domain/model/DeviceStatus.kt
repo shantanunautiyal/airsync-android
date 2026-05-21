@@ -13,6 +13,10 @@ data class AudioInfo(
     val isMuted: Boolean,
     val albumArt: String? = null,
     val albumArtLite: String? = null,
+    val durationMs: Long = 0L,
+    val positionMs: Long = 0L,
+    val positionTimestampMs: Long = 0L,
+    val isBuffering: Boolean = false,
     // New: like status for current media ("liked", "not_liked", or "none")
     val likeStatus: String = "none"
 )
@@ -23,6 +27,10 @@ data class MediaInfo(
     val artist: String,
     val albumArt: String? = null,
     val albumArtLite: String? = null,
+    val durationMs: Long = 0L,
+    val positionMs: Long = 0L,
+    val positionTimestampMs: Long = 0L,
+    val isBuffering: Boolean = false,
     // New: like status for current media ("liked", "not_liked", or "none")
     val likeStatus: String = "none"
 )

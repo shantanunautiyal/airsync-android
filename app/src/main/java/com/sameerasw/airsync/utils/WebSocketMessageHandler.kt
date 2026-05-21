@@ -212,7 +212,7 @@ object WebSocketMessageHandler {
     }
 
     /**
-     * Handles media control commands (play/pause, next, previous, like).
+     * Handles media control commands (play/pause, seek, next, previous, like).
      * Sends a response back to Mac and updates local media state after a short delay.
      */
     private fun handleMediaControl(context: Context, data: JSONObject?) {
@@ -241,6 +241,13 @@ object WebSocketMessageHandler {
                 "pause" -> {
                     success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback paused" else "Failed to pause playback"
+                }
+
+                "seekTo" -> {
+                    val positionMs = data.optLong("positionMs", -1L)
+                    success = positionMs >= 0L && MediaControlUtil.seekTo(context, positionMs)
+                    message =
+                        if (success) "Seeked to ${positionMs}ms" else "Failed to seek playback"
                 }
 
                 "next" -> {
@@ -289,14 +296,15 @@ object WebSocketMessageHandler {
 
             // Send updated media state after successful control
             if (success) {
-                // For track skip actions (next/previous), add a delay to allow media player to update
-                CoroutineScope(Dispatchers.IO).launch {
-                    val delayMs = when (action) {
-                        "next", "previous" -> 1200L
-                        else -> 400L // smaller delay for like/others
-                    }
-                    delay(delayMs)
-                    SyncManager.onMediaStateChanged(context)
+                    // For track skip actions (next/previous), add a delay to allow media player to update
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val delayMs = when (action) {
+                            "seekTo" -> 650L
+                            "next", "previous" -> 1200L
+                            else -> 400L // smaller delay for like/others
+                        }
+                        delay(delayMs)
+                        SyncManager.onMediaStateChanged(context)
                 }
             }
         } catch (e: Exception) {
@@ -915,4 +923,3 @@ object WebSocketMessageHandler {
         }
     }
 }
-

@@ -95,6 +95,9 @@ object SyncManager {
                         last.artist != currentAudio.artist ||
                         last.volume != currentAudio.volume ||
                         last.isMuted != currentAudio.isMuted ||
+                        last.isBuffering != currentAudio.isBuffering ||
+                        last.durationMs != currentAudio.durationMs ||
+                        kotlin.math.abs(last.positionMs - currentAudio.positionMs) >= 5_000L ||
                         last.likeStatus != currentAudio.likeStatus
                     ) {
                         shouldSync = true

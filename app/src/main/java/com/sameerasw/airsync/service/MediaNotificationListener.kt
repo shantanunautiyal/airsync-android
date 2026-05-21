@@ -86,7 +86,7 @@ class MediaNotificationListener : NotificationListenerService() {
         fun getMediaInfo(context: Context): MediaInfo {
             // Respect global toggle; if disabled, return empty media
             if (!isNowPlayingEnabled) {
-                return MediaInfo(false, "", "", null, "none")
+                return MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
             }
             return try {
                 val mediaSessionManager =
@@ -119,6 +119,14 @@ class MediaNotificationListener : NotificationListenerService() {
                         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
                         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
+                        val durationMs = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+                        val positionMs = playbackState?.position ?: 0L
+                        val positionTimestampMs = System.currentTimeMillis()
+                        val isBuffering = when (playbackState?.state) {
+                            PlaybackState.STATE_BUFFERING,
+                            PlaybackState.STATE_CONNECTING -> true
+                            else -> false
+                        }
 
                         val albumArtBitmap =
                             metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
@@ -166,6 +174,10 @@ class MediaNotificationListener : NotificationListenerService() {
                                 artist = artist,
                                 albumArt = albumArtBase64,
                                 albumArtLite = albumArtLiteBase64,
+                                durationMs = durationMs,
+                                positionMs = positionMs,
+                                positionTimestampMs = positionTimestampMs,
+                                isBuffering = isBuffering,
                                 likeStatus = likeStatus
                             )
                         }
@@ -181,10 +193,10 @@ class MediaNotificationListener : NotificationListenerService() {
                 }
 
                 // Log.d(TAG, "No media info found")
-                MediaInfo(false, "", "", null, "none")
+                MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting media info: ${e.message}")
-                MediaInfo(false, "", "", null, "none")
+                MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
             }
         }
 
