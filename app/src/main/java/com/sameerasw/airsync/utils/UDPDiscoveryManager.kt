@@ -93,6 +93,10 @@ object UDPDiscoveryManager {
     }
 
     fun start(context: Context, discoveryEnabled: Boolean = true) {
+        if (!PermissionUtil.isLocalNetworkPermissionGranted(context)) {
+            Log.d(TAG, "Skipping UDP Discovery Manager start: local network permission not granted")
+            return
+        }
         isDiscoveryEnabled = discoveryEnabled
         if (isRunning) {
             updateBroadcastingState(context)
@@ -119,6 +123,10 @@ object UDPDiscoveryManager {
     }
 
     fun burstBroadcast(context: Context, durationMs: Long = 30000) {
+        if (!PermissionUtil.isLocalNetworkPermissionGranted(context)) {
+            Log.d(TAG, "Skipping burst broadcast: local network permission not granted")
+            return
+        }
         if (!isDiscoveryEnabled) {
             Log.d(TAG, "Discovery disabled, skipping burst broadcast")
             return
@@ -138,6 +146,11 @@ object UDPDiscoveryManager {
 
     private fun updateBroadcastingState(context: Context) {
         broadcastJob?.cancel()
+
+        if (!PermissionUtil.isLocalNetworkPermissionGranted(context)) {
+            Log.d(TAG, "Skipping broadcasting state update: local network permission not granted")
+            return
+        }
 
         if (!isDiscoveryEnabled) {
             Log.d(TAG, "Discovery broadcasting disabled completely")

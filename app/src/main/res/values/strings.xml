@@ -91,4 +91,11 @@
     <string name="setting_nearby_connection_desc">Use Bluetooth LE if connection lost</string>
     <string name="label_file_access">File Access</string>
     <string name="subtitle_file_access">Mount storage in macOS Finder</string>
+
+    <!-- Local Network Permission strings -->
+    <string name="permission_local_network_title">Local Network Access</string>
+    <string name="permission_local_network_desc">Discover nearby Mac devices on Wi-Fi</string>
+    <string name="permission_local_network_explain">AirSync needs access to your local network to discover and connect to your Mac over Wi-Fi.</string>
+    <string name="permission_local_network_why">Local network discovery allows the app to find and establish a secure, fast connection with your Mac on the same Wi-Fi network for syncing notifications, clipboard, and controlling media controls. Without this, Wi-Fi synchronization cannot function on Android 17+.</string>
+    <string name="permission_local_network_button">Grant Local Network Access</string>
 </resources>

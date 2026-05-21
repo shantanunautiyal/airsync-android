@@ -44,6 +44,7 @@ fun PermissionsScreen(
     onRequestContactsPermission: (() -> Unit)? = null,
     onRequestPhonePermission: (() -> Unit)? = null,
     onRequestBluetoothPermission: (() -> Unit)? = null,
+    onRequestLocalNetworkPermission: (() -> Unit)? = null,
     refreshTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -229,6 +230,15 @@ fun PermissionsScreen(
                                         isCritical = false
                                     )
                                 }
+
+                                "Local Network Access" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Discover nearby Mac devices on Wi-Fi",
+                                        onExplainClick = { showDialog = PermissionType.LOCAL_NETWORK },
+                                        isCritical = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -276,6 +286,10 @@ fun PermissionsScreen(
  
                     PermissionType.BLUETOOTH -> {
                         onRequestBluetoothPermission?.invoke()
+                    }
+
+                    PermissionType.LOCAL_NETWORK -> {
+                        onRequestLocalNetworkPermission?.invoke()
                     }
                 }
             }

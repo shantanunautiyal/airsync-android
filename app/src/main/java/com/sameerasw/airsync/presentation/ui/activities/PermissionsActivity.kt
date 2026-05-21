@@ -55,6 +55,10 @@ class PermissionsActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { refreshUI() }
 
+    private val localNetworkPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshUI() }
+
     private var refreshCounter by mutableStateOf(0)
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -127,6 +131,9 @@ class PermissionsActivity : ComponentActivity() {
                         onRequestBluetoothPermission = {
                             requestBluetoothPermission()
                         },
+                        onRequestLocalNetworkPermission = {
+                            requestLocalNetworkPermission()
+                        },
                         refreshTrigger = refreshCounter
                     )
                 }
@@ -174,6 +181,14 @@ class PermissionsActivity : ComponentActivity() {
                         Manifest.permission.BLUETOOTH_ADVERTISE
                     )
                 )
+            }
+        }
+    }
+
+    private fun requestLocalNetworkPermission() {
+        if (Build.VERSION.SDK_INT >= 37) {
+            if (!PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+                localNetworkPermissionLauncher.launch("android.permission.ACCESS_LOCAL_NETWORK")
             }
         }
     }

@@ -103,6 +103,20 @@ object PermissionUtil {
     }
 
     /**
+     * Check if ACCESS_LOCAL_NETWORK permission is granted (Android 17+)
+     */
+    fun isLocalNetworkPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= 37) {
+            ContextCompat.checkSelfPermission(
+                context,
+                "android.permission.ACCESS_LOCAL_NETWORK"
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    /**
      * Check if notification permissions are required for this Android version
      */
     fun isNotificationPermissionRequired(): Boolean {
@@ -191,6 +205,10 @@ object PermissionUtil {
             missing.add("Bluetooth Access")
         }
 
+        if (Build.VERSION.SDK_INT >= 37 && !isLocalNetworkPermissionGranted(context)) {
+            missing.add("Local Network Access")
+        }
+
         return missing
     }
 
@@ -246,6 +264,10 @@ object PermissionUtil {
 
         if (!isBluetoothPermissionsGranted(context)) {
             optional.add("Bluetooth Access")
+        }
+
+        if (Build.VERSION.SDK_INT >= 37 && !isLocalNetworkPermissionGranted(context)) {
+            optional.add("Local Network Access")
         }
 
         return optional

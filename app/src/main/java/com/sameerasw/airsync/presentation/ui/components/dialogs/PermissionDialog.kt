@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import com.sameerasw.airsync.R
 
 enum class PermissionType {
@@ -36,7 +38,8 @@ enum class PermissionType {
     CALL_LOG,
     CONTACTS,
     PHONE,
-    BLUETOOTH
+    BLUETOOTH,
+    LOCAL_NETWORK
 }
 
 data class PermissionInfo(
@@ -53,7 +56,8 @@ fun PermissionExplanationDialog(
     onDismiss: () -> Unit,
     onGrantPermission: () -> Unit
 ) {
-    val permissionInfo = getPermissionInfo(permissionType)
+    val context = LocalContext.current
+    val permissionInfo = getPermissionInfo(context, permissionType)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -155,7 +159,7 @@ fun PermissionExplanationDialog(
     }
 }
 
-private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
+private fun getPermissionInfo(context: Context, permissionType: PermissionType): PermissionInfo {
     return when (permissionType) {
         PermissionType.NOTIFICATION_ACCESS -> PermissionInfo(
             title = "Notification Access",
@@ -219,6 +223,14 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
             description = "AirSync uses Bluetooth Low Energy (BLE) as a secondary transport to sync notifications and media controls with your Mac when Wi-Fi is unavailable.",
             whyNeeded = "To discover and connect to your Mac via Bluetooth, Android requires Bluetooth permissions (Scan, Connect, and Advertise). \n\nThis enables a low-power background connection that keeps your devices synced even when they aren't on the same Wi-Fi network. AirSync only uses Bluetooth to communicate with your authorized Mac devices.",
             buttonText = "Grant Bluetooth Access"
+        )
+
+        PermissionType.LOCAL_NETWORK -> PermissionInfo(
+            title = context.getString(R.string.permission_local_network_title),
+            icon = R.drawable.rounded_sync_desktop_24,
+            description = context.getString(R.string.permission_local_network_explain),
+            whyNeeded = context.getString(R.string.permission_local_network_why),
+            buttonText = context.getString(R.string.permission_local_network_button)
         )
     }
 }
