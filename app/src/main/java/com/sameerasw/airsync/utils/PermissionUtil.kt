@@ -209,6 +209,10 @@ object PermissionUtil {
             missing.add("Local Network Access")
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(context)) {
+            missing.add("Answer Calls")
+        }
+
         return missing
     }
 
@@ -270,6 +274,10 @@ object PermissionUtil {
             optional.add("Local Network Access")
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(context)) {
+            optional.add("Answer Calls")
+        }
+
         return optional
     }
 
@@ -312,6 +320,20 @@ object PermissionUtil {
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
         } else {
             // On older versions, manifest permissions are enough
+            true
+        }
+    }
+
+    /**
+     * Check if ANSWER_PHONE_CALLS permission is granted
+     */
+    fun isAnswerCallsPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ANSWER_PHONE_CALLS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
             true
         }
     }

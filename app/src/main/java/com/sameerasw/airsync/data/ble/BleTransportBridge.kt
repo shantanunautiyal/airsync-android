@@ -5,6 +5,7 @@ import com.sameerasw.airsync.domain.model.BatteryInfo
 import com.sameerasw.airsync.domain.model.AudioInfo
 import java.security.MessageDigest
 import java.util.*
+import com.sameerasw.airsync.utils.CallControlUtil
 
 object BleTransportBridge {
     private const val TAG = "BleTransportBridge"
@@ -82,6 +83,8 @@ object BleTransportBridge {
             "playPause" -> com.sameerasw.airsync.utils.MediaControlUtil.playPause(context)
             "next" -> com.sameerasw.airsync.utils.MediaControlUtil.skipNext(context)
             "previous" -> com.sameerasw.airsync.utils.MediaControlUtil.skipPrevious(context)
+            "callAccept" -> CallControlUtil.acceptCall(context)
+            "callDecline", "callEnd" -> CallControlUtil.endCall(context)
         }
     }
 

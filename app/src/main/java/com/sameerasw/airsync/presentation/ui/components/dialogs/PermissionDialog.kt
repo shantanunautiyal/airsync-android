@@ -39,7 +39,8 @@ enum class PermissionType {
     CONTACTS,
     PHONE,
     BLUETOOTH,
-    LOCAL_NETWORK
+    LOCAL_NETWORK,
+    ANSWER_CALLS
 }
 
 data class PermissionInfo(
@@ -231,6 +232,14 @@ private fun getPermissionInfo(context: Context, permissionType: PermissionType):
             description = context.getString(R.string.permission_local_network_explain),
             whyNeeded = context.getString(R.string.permission_local_network_why),
             buttonText = context.getString(R.string.permission_local_network_button)
+        )
+
+        PermissionType.ANSWER_CALLS -> PermissionInfo(
+            title = context.getString(R.string.permission_answer_calls_title),
+            icon = R.drawable.rounded_settings_phone_24,
+            description = context.getString(R.string.permission_answer_calls_explain),
+            whyNeeded = context.getString(R.string.permission_answer_calls_why),
+            buttonText = context.getString(R.string.permission_answer_calls_button)
         )
     }
 }

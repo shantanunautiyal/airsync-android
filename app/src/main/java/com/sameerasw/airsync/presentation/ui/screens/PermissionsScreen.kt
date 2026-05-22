@@ -45,6 +45,7 @@ fun PermissionsScreen(
     onRequestPhonePermission: (() -> Unit)? = null,
     onRequestBluetoothPermission: (() -> Unit)? = null,
     onRequestLocalNetworkPermission: (() -> Unit)? = null,
+    onRequestAnswerCallsPermission: (() -> Unit)? = null,
     refreshTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -239,6 +240,15 @@ fun PermissionsScreen(
                                         isCritical = false
                                     )
                                 }
+
+                                "Answer Calls" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Accept and end calls from Mac",
+                                        onExplainClick = { showDialog = PermissionType.ANSWER_CALLS },
+                                        isCritical = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -290,6 +300,10 @@ fun PermissionsScreen(
 
                     PermissionType.LOCAL_NETWORK -> {
                         onRequestLocalNetworkPermission?.invoke()
+                    }
+
+                    PermissionType.ANSWER_CALLS -> {
+                        onRequestAnswerCallsPermission?.invoke()
                     }
                 }
             }

@@ -87,6 +87,7 @@ object WebSocketMessageHandler {
                 "refreshAdbPorts" -> handleRefreshAdbPorts(context)
                 "browseLs" -> handleBrowseLs(context, data)
                 "startQuickShare" -> handleStartQuickShare(context)
+                "callControl" -> handleCallControl(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -310,6 +311,28 @@ object WebSocketMessageHandler {
         } catch (e: Exception) {
             Log.e(TAG, "Error handling media control: ${e.message}")
             sendMediaControlResponse("unknown", false, "Error: ${e.message}")
+        }
+    }
+
+    /**
+     * Handles call control actions (accept, end, decline) from the Mac.
+     */
+    private fun handleCallControl(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Call control data is null")
+                return
+            }
+
+            val action = data.optString("action")
+            Log.d(TAG, "Handling call control action: $action")
+            when (action) {
+                "accept" -> CallControlUtil.acceptCall(context)
+                "end", "decline" -> CallControlUtil.endCall(context)
+                else -> Log.w(TAG, "Unknown call control action: $action")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling call control command: ${e.message}")
         }
     }
 

@@ -98,4 +98,11 @@
     <string name="permission_local_network_explain">AirSync needs access to your local network to discover and connect to your Mac over Wi-Fi.</string>
     <string name="permission_local_network_why">Local network discovery allows the app to find and establish a secure, fast connection with your Mac on the same Wi-Fi network for syncing notifications, clipboard, and controlling media controls. Without this, Wi-Fi synchronization cannot function on Android 17+.</string>
     <string name="permission_local_network_button">Grant Local Network Access</string>
+
+    <!-- Call Control Permission strings -->
+    <string name="permission_answer_calls_title">Answer Calls</string>
+    <string name="permission_answer_calls_desc">Allows accepting and ending calls from your Mac</string>
+    <string name="permission_answer_calls_explain">AirSync needs permission to manage phone calls so you can accept or decline them directly from your Mac companion window.</string>
+    <string name="permission_answer_calls_why">When you receive an incoming call, this permission enables the companion app to answer or decline/end the call programmatically in response to your actions on the Mac. Without this permission, the app will fall back to emulating headphone media click signals which may only toggle the call state rather than allowing explicit decline actions.</string>
+    <string name="permission_answer_calls_button">Grant Answer Calls Access</string>
 </resources>

@@ -59,6 +59,10 @@ class PermissionsActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { refreshUI() }
 
+    private val answerCallsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshUI() }
+
     private var refreshCounter by mutableStateOf(0)
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -134,6 +138,9 @@ class PermissionsActivity : ComponentActivity() {
                         onRequestLocalNetworkPermission = {
                             requestLocalNetworkPermission()
                         },
+                        onRequestAnswerCallsPermission = {
+                            requestAnswerCallsPermission()
+                        },
                         refreshTrigger = refreshCounter
                     )
                 }
@@ -189,6 +196,14 @@ class PermissionsActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 37) {
             if (!PermissionUtil.isLocalNetworkPermissionGranted(this)) {
                 localNetworkPermissionLauncher.launch("android.permission.ACCESS_LOCAL_NETWORK")
+            }
+        }
+    }
+
+    private fun requestAnswerCallsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!PermissionUtil.isAnswerCallsPermissionGranted(this)) {
+                answerCallsPermissionLauncher.launch(Manifest.permission.ANSWER_PHONE_CALLS)
             }
         }
     }
