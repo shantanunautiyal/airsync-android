@@ -6,6 +6,8 @@ import com.sameerasw.airsync.domain.model.AudioInfo
 import java.security.MessageDigest
 import java.util.*
 import com.sameerasw.airsync.utils.CallControlUtil
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 object BleTransportBridge {
     private const val TAG = "BleTransportBridge"
@@ -95,6 +97,46 @@ object BleTransportBridge {
                 val vol = volStr.toIntOrNull()
                 if (vol != null && vol in 0..100) {
                     com.sameerasw.airsync.utils.VolumeControlUtil.setVolume(context, vol)
+                }
+            }
+            action.startsWith("toggleNotif|") -> {
+                val parts = action.split("|")
+                if (parts.size >= 3) {
+                    val pkg = parts[1]
+                    val state = parts[2] == "true"
+                    Log.d(TAG, "Received toggleAppNotif via BLE: pkg=$pkg, state=$state")
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        try {
+                            val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
+                            val currentApps = dataStoreManager.getNotificationApps().first().toMutableList()
+                            val idx = currentApps.indexOfFirst { it.packageName == pkg }
+                            if (idx != -1) {
+                                currentApps[idx] = currentApps[idx].copy(isEnabled = state, lastUpdated = System.currentTimeMillis())
+                                dataStoreManager.saveNotificationApps(currentApps)
+                                Log.d(TAG, "Successfully toggled app notification preference via BLE for $pkg to $state")
+                            } else {
+                                val isSystemApp = try {
+                                    val applicationInfo = context.packageManager.getApplicationInfo(pkg, 0)
+                                    (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                                } catch (_: Exception) {
+                                    false
+                                }
+                                val newApp = com.sameerasw.airsync.domain.model.NotificationApp(
+                                    packageName = pkg,
+                                    appName = pkg,
+                                    isEnabled = state,
+                                    isSystemApp = isSystemApp,
+                                    lastUpdated = System.currentTimeMillis()
+                                )
+                                currentApps.add(newApp)
+                                dataStoreManager.saveNotificationApps(currentApps)
+                                Log.d(TAG, "Saved new app notification preference via BLE for $pkg to $state")
+                            }
+                            com.sameerasw.airsync.utils.SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error toggling app notification preference via BLE: ${e.message}")
+                        }
+                    }
                 }
             }
         }
