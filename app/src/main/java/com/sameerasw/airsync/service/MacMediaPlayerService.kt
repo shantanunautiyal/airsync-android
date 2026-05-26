@@ -103,6 +103,36 @@ class MacMediaPlayerService : Service() {
         super.onCreate()
         serviceInstance = this
         createNotificationChannel()
+        try {
+            mediaSession = MediaSessionCompat(this, "MacMediaPlayer").apply {
+                setCallback(object : MediaSessionCompat.Callback() {
+                    override fun onPlay() {
+                        sendMacMediaControl("play")
+                        updatePlaybackState(true)
+                    }
+
+                    override fun onPause() {
+                        sendMacMediaControl("pause")
+                        updatePlaybackState(false)
+                    }
+
+                    override fun onSkipToNext() {
+                        sendMacMediaControl("next")
+                    }
+
+                    override fun onSkipToPrevious() {
+                        sendMacMediaControl("previous")
+                    }
+
+                    override fun onStop() {
+                        sendMacMediaControl("stop")
+                        stopMacMediaSession()
+                    }
+                })
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create MediaSession in onCreate: ${e.message}")
+        }
         Log.d(TAG, "MacMediaPlayerService created")
     }
 
@@ -110,11 +140,18 @@ class MacMediaPlayerService : Service() {
         val action = intent?.action
         Log.d(TAG, "onStartCommand: action=$action")
 
+        // Immediately call startForeground to satisfy the Android OS watchdog
+        val initialTitle = intent?.getStringExtra(EXTRA_TITLE) ?: ""
+        val initialArtist = intent?.getStringExtra(EXTRA_ARTIST) ?: ""
+        val initialIsPlaying = intent?.getBooleanExtra(EXTRA_IS_PLAYING, false) ?: false
+        val notification = createMediaNotification(initialTitle, initialArtist, initialIsPlaying)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground in onStartCommand: ${e.message}")
+        }
+
         if (action == ACTION_STOP_MAC_MEDIA || action == null) {
-            if (mediaSession == null) {
-                val notification = createMediaNotification("", "", false)
-                startForeground(NOTIFICATION_ID, notification)
-            }
             stopMacMediaSession()
             return START_NOT_STICKY
         }
@@ -197,35 +234,6 @@ class MacMediaPlayerService : Service() {
         playbackRate: Double = 1.0
     ) {
         try {
-            if (mediaSession == null) {
-                mediaSession = MediaSessionCompat(this, "MacMediaPlayer").apply {
-                    setCallback(object : MediaSessionCompat.Callback() {
-                        override fun onPlay() {
-                            sendMacMediaControl("play")
-                            updatePlaybackState(true)
-                        }
-
-                        override fun onPause() {
-                            sendMacMediaControl("pause")
-                            updatePlaybackState(false)
-                        }
-
-                        override fun onSkipToNext() {
-                            sendMacMediaControl("next")
-                        }
-
-                        override fun onSkipToPrevious() {
-                            sendMacMediaControl("previous")
-                        }
-
-                        override fun onStop() {
-                            sendMacMediaControl("stop")
-                            stopMacMediaSession()
-                        }
-                    })
-                }
-            }
-
             updateMediaMetadata(title, artist, duration)
             updatePlaybackState(isPlaying, elapsedTime, timestamp, playbackRate)
             mediaSession?.isActive = true
