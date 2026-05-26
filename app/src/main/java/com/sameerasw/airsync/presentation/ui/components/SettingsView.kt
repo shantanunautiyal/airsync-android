@@ -35,6 +35,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.sameerasw.airsync.presentation.ui.components.sheets.AppSelectionSheet
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -96,6 +102,7 @@ fun SettingsView(
     onToggleDeveloperMode: () -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
+    var showAppSelectionSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -205,6 +212,20 @@ fun SettingsView(
                     },
                     onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                 )
+
+                if (uiState.isNotificationSyncEnabled && uiState.isNotificationEnabled) {
+                    IconToggleItem(
+                        title = stringResource(R.string.action_select_apps),
+                        description = stringResource(R.string.subtitle_to_be_notified),
+                        iconRes = R.drawable.rounded_notification_settings_24,
+                        showToggle = false,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            viewModel.loadNotificationApps(context)
+                            showAppSelectionSheet = true
+                        }
+                    )
+                }
 
                 ClipboardFeaturesCard(
                     isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
@@ -451,6 +472,21 @@ fun SettingsView(
         )
 
         Spacer(modifier = Modifier.height(180.dp))
+    }
+
+    if (showAppSelectionSheet) {
+        val apps by viewModel.notificationApps.collectAsState()
+        AppSelectionSheet(
+            onDismissRequest = { showAppSelectionSheet = false },
+            apps = apps,
+            onAppToggle = { pkg, enabled ->
+                viewModel.toggleNotificationApp(context, pkg, enabled)
+            },
+            onSaveAll = { updatedList ->
+                viewModel.saveAllNotificationApps(context, updatedList)
+            },
+            isLoading = apps.isEmpty()
+        )
     }
 }
 

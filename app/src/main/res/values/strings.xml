@@ -105,4 +105,6 @@
     <string name="permission_answer_calls_explain">AirSync needs permission to manage phone calls so you can accept or decline them directly from your Mac companion window.</string>
     <string name="permission_answer_calls_why">When you receive an incoming call, this permission enables the companion app to answer or decline/end the call programmatically in response to your actions on the Mac. Without this permission, the app will fall back to emulating headphone media click signals which may only toggle the call state rather than allowing explicit decline actions.</string>
     <string name="permission_answer_calls_button">Grant Answer Calls Access</string>
+    <string name="action_select_apps">Select apps</string>
+    <string name="subtitle_to_be_notified">To be notified</string>
 </resources>

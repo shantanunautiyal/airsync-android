@@ -26,6 +26,7 @@ import com.sameerasw.airsync.utils.ShortcutUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.UDPDiscoveryManager
 import com.sameerasw.airsync.utils.WebSocketUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -1129,6 +1130,47 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isOnboardingCompleted = completed)
         viewModelScope.launch {
             repository.setFirstRun(!completed)
+        }
+    }
+
+    private val _notificationApps = MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())
+    val notificationApps: StateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>> = _notificationApps.asStateFlow()
+
+    fun loadNotificationApps(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val installed = com.sameerasw.airsync.utils.AppUtil.getInstalledApps(context)
+                val saved = repository.getNotificationApps().first()
+                val merged = com.sameerasw.airsync.utils.AppUtil.mergeWithSavedApps(installed, saved)
+                _notificationApps.value = merged
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to load notification apps: ${e.message}")
+            }
+        }
+    }
+
+    fun toggleNotificationApp(context: Context, packageName: String, enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val current = _notificationApps.value.map {
+                    if (it.packageName == packageName) it.copy(isEnabled = enabled) else it
+                }
+                _notificationApps.value = current
+                repository.saveNotificationApps(current)
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to toggle notification app: ${e.message}")
+            }
+        }
+    }
+
+    fun saveAllNotificationApps(context: Context, apps: List<com.sameerasw.airsync.domain.model.NotificationApp>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _notificationApps.value = apps
+                repository.saveNotificationApps(apps)
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to save all notification apps: ${e.message}")
+            }
         }
     }
 
