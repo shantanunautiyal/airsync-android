@@ -19,27 +19,33 @@ fun DeviceInfoCard(
     deviceName: String,
     localIp: String,
     onDeviceNameChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraSmall,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            containerColor = MaterialTheme.colorScheme.surfaceBright
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("My Android", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+        Text("My Android", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
 
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = deviceName,
-                onValueChange = onDeviceNameChange,
-                label = { Text("Device Name") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-            )
-        }
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = deviceName,
+            onValueChange = onDeviceNameChange,
+            label = { Text("Device Name") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+        )
     }
 }
+}
+

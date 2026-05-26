@@ -60,6 +60,7 @@ import com.sameerasw.airsync.utils.KeyguardHelper
 import com.sameerasw.airsync.utils.NotesRoleManager
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.ShortcutUtil
+import com.sameerasw.airsync.utils.UDPDiscoveryManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -339,8 +340,12 @@ class MainActivity : ComponentActivity() {
         handleNotesRoleIntent(intent)
 
         // Start ADB discovery once at app startup and keep it running
-        AdbDiscoveryHolder.initialize(this)
-        Log.d("MainActivity", "Started persistent ADB discovery at app startup")
+        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+            AdbDiscoveryHolder.initialize(this)
+            Log.d("MainActivity", "Started persistent ADB discovery at app startup")
+        } else {
+            Log.d("MainActivity", "Skipping persistent ADB discovery at startup: ACCESS_LOCAL_NETWORK permission not granted")
+        }
 
         // Check if this is a QS tile long-press intent and device is not connected
         if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
@@ -581,11 +586,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+            AdbDiscoveryHolder.initialize(this)
+            val ds = DataStoreManager.getInstance(applicationContext)
+            val isDiscoveryEnabled = runBlocking {
+                ds.getDeviceDiscoveryEnabled().first()
+            }
+            UDPDiscoveryManager.start(this, isDiscoveryEnabled)
+            UDPDiscoveryManager.burstBroadcast(this)
+        }
+    }
+
     /**
      * Ensure ADB discovery is running (started at app startup, this just verifies it's active).
      */
     fun initializeAdbDiscovery() {
-        AdbDiscoveryHolder.initialize(this)
+        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+            AdbDiscoveryHolder.initialize(this)
+        }
     }
 
     /**

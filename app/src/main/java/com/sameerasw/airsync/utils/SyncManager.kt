@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object SyncManager {
     private const val TAG = "SyncManager"
-    private const val BATTERY_SYNC_INTERVAL = 20_000L // 20 seconds
+    private const val BATTERY_SYNC_INTERVAL = 10_000L // 10 seconds
     private const val MAX_DAILY_ICON_SYNCS = 3
 
     private var syncJob: Job? = null
@@ -42,8 +42,14 @@ object SyncManager {
 
             while (isActive && isSyncing.get()) {
                 try {
-                    // Check if WebSocket is connected and sync is enabled
-                    if (WebSocketUtil.isConnected()) {
+                    // Heartbeat: Sync battery over BLE if authenticated and WS not connected to keep Mac connection alive
+                    if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && !WebSocketUtil.isConnected()) {
+                        val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
+                        com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
+                    }
+
+                    // Check if sync is needed (either via WebSocket or BLE)
+                    if (WebSocketUtil.isConnected() || com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
                         val dataStoreManager = DataStoreManager(context)
                         val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
 
@@ -72,6 +78,9 @@ object SyncManager {
     }
 
     fun checkAndSyncDeviceStatus(context: Context, forceSync: Boolean = false) {
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val dataStoreManager = DataStoreManager(context)
@@ -89,6 +98,9 @@ object SyncManager {
                         last.artist != currentAudio.artist ||
                         last.volume != currentAudio.volume ||
                         last.isMuted != currentAudio.isMuted ||
+                        last.isBuffering != currentAudio.isBuffering ||
+                        last.durationMs != currentAudio.durationMs ||
+                        kotlin.math.abs(last.positionMs - currentAudio.positionMs) >= 5_000L ||
                         last.likeStatus != currentAudio.likeStatus
                     ) {
                         shouldSync = true
@@ -110,17 +122,17 @@ object SyncManager {
                     shouldSync = true // First time
                 }
 
-                if (shouldSync && WebSocketUtil.isConnected()) {
+                if (shouldSync) {
                     val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
+                    // sendMessage handles both WebSocket and BLE fallback internally
                     val success = WebSocketUtil.sendMessage(statusJson)
 
                     if (success) {
-                        // Log.d(TAG, "Device status synced successfully")
                         lastAudioInfo = currentAudio
                         lastBatteryInfo = currentBattery
                         lastVolume = currentAudio.volume
                     } else {
-                        Log.w(TAG, "Failed to sync device status")
+                        Log.w(TAG, "Failed to sync device status (WS/BLE)")
                     }
                 }
 
@@ -189,17 +201,22 @@ object SyncManager {
                 Log.d(TAG, "Discovered ADB ports: $adbPorts")
 
                 val deviceId = DeviceInfoUtil.getDeviceId(context)
+                val symmetricKey = dataStoreManager.getLastConnectedDevice().first()?.symmetricKey ?: ""
+                val bleAuthToken = com.sameerasw.airsync.data.ble.BleTransportBridge.deriveAuthToken(symmetricKey)
+
                 val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(
-                    deviceId,
-                    deviceName,
-                    localIp,
-                    port,
-                    version,
-                    adbPorts,
-                    WebSocketUtil.currentIpAddress
+                    id = deviceId,
+                    name = deviceName,
+                    ipAddress = localIp,
+                    port = port,
+                    version = version,
+                    wallpaperBase64 = null,
+                    adbPorts = adbPorts,
+                    bleAuthToken = bleAuthToken,
+                    targetIpAddress = WebSocketUtil.currentIpAddress
                 )
                 if (WebSocketUtil.sendMessage(liteDeviceInfoJson)) {
-                    Log.d(TAG, "Lite device info sent to trigger macInfo")
+                    Log.d(TAG, "Lite device info sent to trigger macInfo (BLE token included)")
                 } else {
                     Log.e(TAG, "Failed to send lite device info")
                 }
@@ -220,14 +237,15 @@ object SyncManager {
                         }
                         val currentAdbPorts = discoveredServices.map { it.port.toString() }
                         val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(
-                            deviceId,
-                            deviceName,
-                            localIp,
-                            port,
-                            version,
-                            wallpaperBase64,
-                            currentAdbPorts,
-                            WebSocketUtil.currentIpAddress
+                            id = deviceId,
+                            name = deviceName,
+                            ipAddress = localIp,
+                            port = port,
+                            version = version,
+                            wallpaperBase64 = wallpaperBase64,
+                            adbPorts = currentAdbPorts,
+                            bleAuthToken = bleAuthToken,
+                            targetIpAddress = WebSocketUtil.currentIpAddress
                         )
                         if (WebSocketUtil.sendMessage(fullDeviceInfoJson)) {
                             Log.d(

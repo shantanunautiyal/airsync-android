@@ -103,6 +103,20 @@ object PermissionUtil {
     }
 
     /**
+     * Check if ACCESS_LOCAL_NETWORK permission is granted (Android 17+)
+     */
+    fun isLocalNetworkPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= 37) {
+            ContextCompat.checkSelfPermission(
+                context,
+                "android.permission.ACCESS_LOCAL_NETWORK"
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    /**
      * Check if notification permissions are required for this Android version
      */
     fun isNotificationPermissionRequired(): Boolean {
@@ -187,6 +201,18 @@ object PermissionUtil {
             missing.add("Phone Access")
         }
 
+        if (!isBluetoothPermissionsGranted(context)) {
+            missing.add("Bluetooth Access")
+        }
+
+        if (Build.VERSION.SDK_INT >= 37 && !isLocalNetworkPermissionGranted(context)) {
+            missing.add("Local Network Access")
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(context)) {
+            missing.add("Answer Calls")
+        }
+
         return missing
     }
 
@@ -240,6 +266,18 @@ object PermissionUtil {
             optional.add("Phone Access")
         }
 
+        if (!isBluetoothPermissionsGranted(context)) {
+            optional.add("Bluetooth Access")
+        }
+
+        if (Build.VERSION.SDK_INT >= 37 && !isLocalNetworkPermissionGranted(context)) {
+            optional.add("Local Network Access")
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(context)) {
+            optional.add("Answer Calls")
+        }
+
         return optional
     }
 
@@ -271,5 +309,32 @@ object PermissionUtil {
             context,
             Manifest.permission.READ_PHONE_STATE
         ) == PackageManager.PERMISSION_GRANTED
+    }
+ 
+    /**
+     * Check if Bluetooth permissions are granted (Connect and Advertise/Scan on Android 12+)
+     */
+    fun isBluetoothPermissionsGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+        } else {
+            // On older versions, manifest permissions are enough
+            true
+        }
+    }
+
+    /**
+     * Check if ANSWER_PHONE_CALLS permission is granted
+     */
+    fun isAnswerCallsPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ANSWER_PHONE_CALLS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
     }
 }

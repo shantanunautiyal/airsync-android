@@ -17,14 +17,20 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
+import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.DiscoveryMode
+import com.sameerasw.airsync.utils.MacDeviceStatusManager
+import com.sameerasw.airsync.utils.ShortcutUtil
 import com.sameerasw.airsync.utils.UDPDiscoveryManager
+import com.sameerasw.airsync.utils.WebDavServer
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -38,6 +44,9 @@ class AirSyncService : Service() {
     private var connectedDeviceName: String? = null
     private var isScanning = false
 
+    private var webDavServer: WebDavServer? = null
+    private var webDavJob: Job? = null
+
     // Network state tracking
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
@@ -45,7 +54,7 @@ class AirSyncService : Service() {
         super.onCreate()
         Log.d(TAG, "AirSyncService created")
         createNotificationChannel()
-        com.sameerasw.airsync.utils.MacDeviceStatusManager.startMonitoring(this)
+        MacDeviceStatusManager.startMonitoring(this)
         registerNetworkCallback()
     }
 
@@ -58,7 +67,7 @@ class AirSyncService : Service() {
             ACTION_START_SYNC -> {
                 connectedDeviceName = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Mac"
                 startSync()
-                com.sameerasw.airsync.utils.ShortcutUtil.refreshShortcuts(this, true)
+                ShortcutUtil.refreshShortcuts(this, true)
             }
 
             ACTION_STOP_SYNC -> stopSync()
@@ -83,7 +92,7 @@ class AirSyncService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
 
         val dataStoreManager =
-            com.sameerasw.airsync.data.local.DataStoreManager.getInstance(applicationContext)
+            DataStoreManager.getInstance(applicationContext)
         val isDiscoveryEnabled = runBlocking {
             dataStoreManager.getDeviceDiscoveryEnabled().first()
         }
@@ -99,6 +108,39 @@ class AirSyncService : Service() {
 
         // Also trigger auto-reconnect logic to check if we already have a candidate
         WebSocketUtil.requestAutoReconnect(this)
+    }
+
+    private fun startWebDavServer() {
+        if (webDavServer == null) {
+            webDavServer = WebDavServer(this)
+        }
+        webDavServer?.start()
+    }
+
+    private fun stopWebDavServer() {
+        webDavServer?.stop()
+        webDavServer = null
+    }
+
+    private fun monitorWebDavRequirements() {
+        webDavJob?.cancel()
+        webDavJob = scope.launch {
+            val dataStoreManager = DataStoreManager.getInstance(applicationContext)
+            combine(
+                dataStoreManager.isFileAccessEnabled(),
+                dataStoreManager.getLastConnectedDevice()
+            ) { isEnabled, device ->
+                Log.d(TAG, "WebDAV flow evaluation: isEnabled=$isEnabled, isPlus=${device?.isPlus}")
+                isEnabled && device?.isPlus == true
+            }.collect { shouldStart ->
+                Log.d(TAG, "WebDAV requirement state updated: shouldStart = $shouldStart")
+                if (shouldStart) {
+                    startWebDavServer()
+                } else {
+                    stopWebDavServer()
+                }
+            }
+        }
     }
 
     private fun handleAppForeground() {
@@ -118,12 +160,16 @@ class AirSyncService : Service() {
     }
 
     private fun startSync() {
+        if (!isScanning && connectedDeviceName != null) {
+            Log.d(TAG, "AirSync foreground service already in sync state, ignoring")
+            return
+        }
         Log.d(TAG, "Starting AirSync foreground service (connected)")
         isScanning = false
         startForeground(NOTIFICATION_ID, buildNotification())
 
         val dataStoreManager =
-            com.sameerasw.airsync.data.local.DataStoreManager.getInstance(applicationContext)
+            DataStoreManager.getInstance(applicationContext)
         val isDiscoveryEnabled = runBlocking {
             dataStoreManager.getDeviceDiscoveryEnabled().first()
         }
@@ -134,11 +180,15 @@ class AirSyncService : Service() {
         UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
 
         WakeupService.startService(this)
+        monitorWebDavRequirements()
     }
 
     private fun stopSync() {
         Log.d(TAG, "Stopping AirSync foreground service")
-        com.sameerasw.airsync.utils.ShortcutUtil.refreshShortcuts(this, false)
+        webDavJob?.cancel()
+        webDavJob = null
+        stopWebDavServer()
+        ShortcutUtil.refreshShortcuts(this, false)
         UDPDiscoveryManager.stop(this)
         WakeupService.stopService(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -155,7 +205,9 @@ class AirSyncService : Service() {
 
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    Log.d(TAG, "Network available, triggering burst broadcast")
+                    Log.d(TAG, "Network available, triggering burst broadcast and refreshing socket")
+                    // Refresh UDP socket to bind to new network interface
+                    UDPDiscoveryManager.refreshSocket()
                     // When network becomes available, do a burst to announce ourselves
                     if (isScanning) {
                         UDPDiscoveryManager.burstBroadcast(applicationContext)
@@ -234,8 +286,9 @@ class AirSyncService : Service() {
             }
         }
 
-        com.sameerasw.airsync.utils.MacDeviceStatusManager.stopMonitoring()
-        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(this)
+        stopWebDavServer()
+        MacDeviceStatusManager.stopMonitoring()
+        MacDeviceStatusManager.cleanup(this)
         scope.coroutineContext.cancel()
         super.onDestroy()
     }

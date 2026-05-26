@@ -93,6 +93,10 @@ object UDPDiscoveryManager {
     }
 
     fun start(context: Context, discoveryEnabled: Boolean = true) {
+        if (!PermissionUtil.isLocalNetworkPermissionGranted(context)) {
+            Log.d(TAG, "Skipping UDP Discovery Manager start: local network permission not granted")
+            return
+        }
         isDiscoveryEnabled = discoveryEnabled
         if (isRunning) {
             updateBroadcastingState(context)
@@ -119,6 +123,15 @@ object UDPDiscoveryManager {
     }
 
     fun burstBroadcast(context: Context, durationMs: Long = 30000) {
+        if (!PermissionUtil.isLocalNetworkPermissionGranted(context)) {
+            Log.d(TAG, "Skipping burst broadcast: local network permission not granted")
+            return
+        }
+        if (!isDiscoveryEnabled) {
+            Log.d(TAG, "Discovery disabled, skipping burst broadcast")
+            return
+        }
+        
         Log.d(TAG, "Starting burst broadcast for ${durationMs}ms")
         burstJob?.cancel()
         burstJob = CoroutineScope(Dispatchers.IO).launch {
@@ -133,6 +146,11 @@ object UDPDiscoveryManager {
 
     private fun updateBroadcastingState(context: Context) {
         broadcastJob?.cancel()
+
+        if (!PermissionUtil.isLocalNetworkPermissionGranted(context)) {
+            Log.d(TAG, "Skipping broadcasting state update: local network permission not granted")
+            return
+        }
 
         if (!isDiscoveryEnabled) {
             Log.d(TAG, "Discovery broadcasting disabled completely")
@@ -186,35 +204,47 @@ object UDPDiscoveryManager {
         }
     }
 
+    fun refreshSocket() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "Refreshing UDP discovery socket due to network change")
+                socket?.close()
+                socket = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing socket: ${e.message}")
+            }
+        }
+    }
+
     private fun startListening(context: Context) {
         val appContext = context.applicationContext
         listeningJob = CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Ensure socket is closed before creating new one
-                socket?.close()
-                socket = DatagramSocket(BROADCAST_PORT).apply {
-                    broadcast = true
-                    reuseAddress = true
-                    soTimeout = 0
-                }
-
-                val buffer = ByteArray(4096)
-                while (isRunning) {
-                    try {
-                        val packet = DatagramPacket(buffer, buffer.size)
-                        socket?.receive(packet)
-
-                        val jsonString = String(packet.data, 0, packet.length)
-                        handleIncomingTraffic(appContext, jsonString, packet.address.hostAddress)
-                    } catch (e: Exception) {
-                        if (isRunning) {
-                            Log.e(TAG, "Error receiving packet: ${e.message}")
-                            delay(1000)
+            val buffer = ByteArray(4096)
+            while (isRunning) {
+                try {
+                    if (socket == null || socket!!.isClosed) {
+                        Log.d(TAG, "Creating new DatagramSocket on port $BROADCAST_PORT")
+                        socket = DatagramSocket(BROADCAST_PORT).apply {
+                            broadcast = true
+                            reuseAddress = true
+                            soTimeout = 0
                         }
                     }
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    socket?.receive(packet)
+
+                    val jsonString = String(packet.data, 0, packet.length)
+                    handleIncomingTraffic(appContext, jsonString, packet.address.hostAddress)
+                } catch (e: Exception) {
+                    if (isRunning) {
+                        Log.e(TAG, "Error receiving packet: ${e.message}, recreating socket...")
+                        try {
+                            socket?.close()
+                        } catch (_: Exception) {}
+                        socket = null
+                        delay(2000)
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Socket creation failed: ${e.message}")
             }
         }
     }
@@ -231,11 +261,10 @@ object UDPDiscoveryManager {
                         handlePresenceMessage(context, json, sourceIp)
 
                         // Optimization: If we receive a presence packet in PASSIVE mode, 
-                        // we might want to respond once so the Mac knows we are here,
-                        // essentially performing a "lazy handshake"
+                        // we respond so the Mac knows we are here (lazy handshake)
                         if (currentMode == DiscoveryMode.PASSIVE && isDiscoveryEnabled) {
                             CoroutineScope(Dispatchers.IO).launch {
-                                // broadcastPresence(context) // Optional: avoid if we want to be truly silent
+                                broadcastPresence(context)
                             }
                         }
                     }
@@ -346,6 +375,8 @@ object UDPDiscoveryManager {
     }
 
     private fun broadcastPresence(context: Context) {
+        if (!isDiscoveryEnabled) return
+        
         val allIps = getAllIpAddresses()
         if (allIps.isEmpty()) {
             return
@@ -427,6 +458,8 @@ object UDPDiscoveryManager {
     }
 
     private fun broadcastGoodbye(context: Context) {
+        if (!isDiscoveryEnabled) return
+        
         val allIps = getAllIpAddresses()
         if (allIps.isEmpty()) return
 

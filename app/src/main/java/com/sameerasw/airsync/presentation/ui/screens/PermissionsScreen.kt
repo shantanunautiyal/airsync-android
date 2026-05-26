@@ -43,6 +43,9 @@ fun PermissionsScreen(
     onRequestCallLogPermission: (() -> Unit)? = null,
     onRequestContactsPermission: (() -> Unit)? = null,
     onRequestPhonePermission: (() -> Unit)? = null,
+    onRequestBluetoothPermission: (() -> Unit)? = null,
+    onRequestLocalNetworkPermission: (() -> Unit)? = null,
+    onRequestAnswerCallsPermission: (() -> Unit)? = null,
     refreshTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -219,6 +222,33 @@ fun PermissionsScreen(
                                         isCritical = false
                                     )
                                 }
+ 
+                                "Bluetooth Access" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Enables background BLE sync",
+                                        onExplainClick = { showDialog = PermissionType.BLUETOOTH },
+                                        isCritical = false
+                                    )
+                                }
+
+                                "Local Network Access" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Discover nearby Mac devices on Wi-Fi",
+                                        onExplainClick = { showDialog = PermissionType.LOCAL_NETWORK },
+                                        isCritical = false
+                                    )
+                                }
+
+                                "Answer Calls" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Accept and end calls from Mac",
+                                        onExplainClick = { showDialog = PermissionType.ANSWER_CALLS },
+                                        isCritical = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -262,6 +292,18 @@ fun PermissionsScreen(
 
                     PermissionType.PHONE -> {
                         onRequestPhonePermission?.invoke()
+                    }
+ 
+                    PermissionType.BLUETOOTH -> {
+                        onRequestBluetoothPermission?.invoke()
+                    }
+
+                    PermissionType.LOCAL_NETWORK -> {
+                        onRequestLocalNetworkPermission?.invoke()
+                    }
+
+                    PermissionType.ANSWER_CALLS -> {
+                        onRequestAnswerCallsPermission?.invoke()
                     }
                 }
             }

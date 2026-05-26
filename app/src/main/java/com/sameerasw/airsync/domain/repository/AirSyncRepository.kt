@@ -132,4 +132,8 @@ interface AirSyncRepository {
     // Quick Share (receiving)
     suspend fun setQuickShareEnabled(enabled: Boolean)
     fun isQuickShareEnabled(): Flow<Boolean>
+
+    // File Access (WebDAV Server)
+    suspend fun setFileAccessEnabled(enabled: Boolean)
+    fun isFileAccessEnabled(): Flow<Boolean>
 }

@@ -30,3 +30,8 @@
 
 # Data Layer
 -keep class com.sameerasw.airsync.data.** { *; }
+
+# Ktor & SLF4J missing classes on Android
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+-dontwarn org.slf4j.impl.StaticLoggerBinder

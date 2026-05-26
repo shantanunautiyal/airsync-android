@@ -11,14 +11,13 @@ plugins {
 
 android {
     namespace = "com.sameerasw.airsync"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
-        targetSdk = 36
-        versionCode = 27
-        versionName = "3.1.0"
+        versionCode = 29
+        versionName = "4.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -47,21 +46,23 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = VERSION_11
-        targetCompatibility = VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
     buildFeatures {
         compose = true
         buildConfig = true
     }
+    compileSdkMinor = 0
 
     defaultConfig {
-        buildConfigField("String", "MIN_MAC_APP_VERSION", "\"3.0.0\"")
+        targetSdk = 37
+        buildConfigField("String", "MIN_MAC_APP_VERSION", "\"4.0.0\"")
     }
 }
 
@@ -154,6 +155,14 @@ dependencies {
 
     implementation(libs.wire.runtime)
     implementation(libs.bouncycastle)
+
+    // Ktor Server for WebDAV
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.host.common)
+    implementation(libs.ktor.server.status.pages)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.gson)
 }
 
 wire {

@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.rounded.Phonelink
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -85,6 +87,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -841,8 +844,15 @@ fun AirSyncMainScreen(
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = MaterialTheme.shapes.extraSmall,
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceBright
+                                        )
                                     ) {
-                                        Column(modifier = Modifier.padding(16.dp)) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp)
+                                        ) {
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -905,18 +915,14 @@ fun AirSyncMainScreen(
 
                                                     discoveredDevices.forEachIndexed { index, device ->
                                                         if (index > 0) {
-                                                            HorizontalDivider(
-                                                                modifier = Modifier.padding(vertical = 8.dp),
-                                                                thickness = 0.5.dp,
-                                                                color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                                    alpha = 0.5f
-                                                                )
-                                                            )
+                                                            Spacer(modifier = Modifier.height(8.dp))
                                                         }
 
                                                         Row(
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
+                                                                .clip(MaterialTheme.shapes.medium)
+                                                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                                                 .clickable {
                                                                     HapticUtil.performClick(haptics)
                                                                     viewModel.updateIpAddress(device.getBestIp())
@@ -926,7 +932,7 @@ fun AirSyncMainScreen(
                                                                     )
                                                                     connect(device.id)
                                                                 }
-                                                                .padding(vertical = 4.dp),
+                                                                .padding(horizontal = 16.dp, vertical = 12.dp),
                                                             verticalAlignment = Alignment.CenterVertically
                                                         ) {
                                                             Icon(

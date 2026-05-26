@@ -87,6 +87,7 @@ object WebSocketMessageHandler {
                 "refreshAdbPorts" -> handleRefreshAdbPorts(context)
                 "browseLs" -> handleBrowseLs(context, data)
                 "startQuickShare" -> handleStartQuickShare(context)
+                "callControl" -> handleCallControl(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -212,7 +213,7 @@ object WebSocketMessageHandler {
     }
 
     /**
-     * Handles media control commands (play/pause, next, previous, like).
+     * Handles media control commands (play/pause, seek, next, previous, like).
      * Sends a response back to Mac and updates local media state after a short delay.
      */
     private fun handleMediaControl(context: Context, data: JSONObject?) {
@@ -241,6 +242,13 @@ object WebSocketMessageHandler {
                 "pause" -> {
                     success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback paused" else "Failed to pause playback"
+                }
+
+                "seekTo" -> {
+                    val positionMs = data.optLong("positionMs", -1L)
+                    success = positionMs >= 0L && MediaControlUtil.seekTo(context, positionMs)
+                    message =
+                        if (success) "Seeked to ${positionMs}ms" else "Failed to seek playback"
                 }
 
                 "next" -> {
@@ -289,19 +297,42 @@ object WebSocketMessageHandler {
 
             // Send updated media state after successful control
             if (success) {
-                // For track skip actions (next/previous), add a delay to allow media player to update
-                CoroutineScope(Dispatchers.IO).launch {
-                    val delayMs = when (action) {
-                        "next", "previous" -> 1200L
-                        else -> 400L // smaller delay for like/others
-                    }
-                    delay(delayMs)
-                    SyncManager.onMediaStateChanged(context)
+                    // For track skip actions (next/previous), add a delay to allow media player to update
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val delayMs = when (action) {
+                            "seekTo" -> 650L
+                            "next", "previous" -> 1200L
+                            else -> 400L // smaller delay for like/others
+                        }
+                        delay(delayMs)
+                        SyncManager.onMediaStateChanged(context)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling media control: ${e.message}")
             sendMediaControlResponse("unknown", false, "Error: ${e.message}")
+        }
+    }
+
+    /**
+     * Handles call control actions (accept, end, decline) from the Mac.
+     */
+    private fun handleCallControl(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Call control data is null")
+                return
+            }
+
+            val action = data.optString("action")
+            Log.d(TAG, "Handling call control action: $action")
+            when (action) {
+                "accept" -> CallControlUtil.acceptCall(context)
+                "end", "decline" -> CallControlUtil.endCall(context)
+                else -> Log.w(TAG, "Unknown call control action: $action")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling call control command: ${e.message}")
         }
     }
 
@@ -450,6 +481,10 @@ object WebSocketMessageHandler {
                 if (music?.has("albumArt") == true) music.optString("albumArt", "") else null
 
             val likeStatus = music?.optString("likeStatus", "none") ?: "none"
+            val elapsedTime = ((music?.optDouble("elapsedTime", 0.0) ?: 0.0) * 1000).toLong()
+            val duration = ((music?.optDouble("duration", 0.0) ?: 0.0) * 1000).toLong()
+            val timestamp = music?.optString("timestamp")
+            val playbackRate = music?.optDouble("playbackRate", 1.0) ?: 1.0
 
             val isPaired = data.optBoolean("isPaired", true)
 
@@ -464,6 +499,7 @@ object WebSocketMessageHandler {
             // Update the Mac device status manager with all media info
             MacDeviceStatusManager.updateStatus(
                 context = context,
+                name = data.optString("name", MacDeviceStatusManager.macDeviceStatus.value?.name ?: "Unknown"),
                 batteryLevel = batteryLevel,
                 isCharging = isCharging,
                 isPaired = isPaired,
@@ -473,7 +509,11 @@ object WebSocketMessageHandler {
                 volume = volume,
                 isMuted = isMuted,
                 albumArt = albumArt,
-                likeStatus = likeStatus
+                likeStatus = likeStatus,
+                elapsedTime = elapsedTime,
+                duration = duration,
+                timestamp = timestamp,
+                playbackRate = playbackRate
             )
 
             // Persist a lightweight snapshot for widget consumption and throttle widget refresh
@@ -906,4 +946,3 @@ object WebSocketMessageHandler {
         }
     }
 }
-

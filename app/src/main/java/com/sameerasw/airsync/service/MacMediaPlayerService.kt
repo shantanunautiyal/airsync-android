@@ -27,6 +27,10 @@ class MacMediaPlayerService : Service() {
         const val EXTRA_ARTIST = "artist"
         const val EXTRA_IS_PLAYING = "is_playing"
         const val EXTRA_ALBUM_ART = "album_art"
+        const val EXTRA_ELAPSED_TIME = "elapsed_time"
+        const val EXTRA_DURATION = "duration"
+        const val EXTRA_TIMESTAMP = "timestamp"
+        const val EXTRA_PLAYBACK_RATE = "playback_rate"
 
         private const val TAG = "MacMediaPlayerService"
         private const val NOTIFICATION_ID = 1001
@@ -39,14 +43,21 @@ class MacMediaPlayerService : Service() {
             title: String,
             artist: String,
             isPlaying: Boolean,
-            albumArt: Bitmap?
+            albumArt: Bitmap?,
+            elapsedTime: Long = 0L,
+            duration: Long = 0L,
+            timestamp: String? = null,
+            playbackRate: Double = 1.0
         ) {
             val intent = Intent(context, MacMediaPlayerService::class.java).apply {
                 action = ACTION_START_MAC_MEDIA
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_ARTIST, artist)
                 putExtra(EXTRA_IS_PLAYING, isPlaying)
-                // Note: Bitmap cannot be passed via Intent, we'll handle it separately
+                putExtra(EXTRA_ELAPSED_TIME, elapsedTime)
+                putExtra(EXTRA_DURATION, duration)
+                putExtra(EXTRA_TIMESTAMP, timestamp)
+                putExtra(EXTRA_PLAYBACK_RATE, playbackRate)
             }
             context.startForegroundService(intent)
             serviceInstance?.updateAlbumArt(albumArt)
@@ -57,13 +68,21 @@ class MacMediaPlayerService : Service() {
             title: String,
             artist: String,
             isPlaying: Boolean,
-            albumArt: Bitmap?
+            albumArt: Bitmap?,
+            elapsedTime: Long = 0L,
+            duration: Long = 0L,
+            timestamp: String? = null,
+            playbackRate: Double = 1.0
         ) {
             val intent = Intent(context, MacMediaPlayerService::class.java).apply {
                 action = ACTION_UPDATE_MAC_MEDIA
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_ARTIST, artist)
                 putExtra(EXTRA_IS_PLAYING, isPlaying)
+                putExtra(EXTRA_ELAPSED_TIME, elapsedTime)
+                putExtra(EXTRA_DURATION, duration)
+                putExtra(EXTRA_TIMESTAMP, timestamp)
+                putExtra(EXTRA_PLAYBACK_RATE, playbackRate)
             }
             context.startService(intent)
             serviceInstance?.updateAlbumArt(albumArt)
@@ -84,27 +103,82 @@ class MacMediaPlayerService : Service() {
         super.onCreate()
         serviceInstance = this
         createNotificationChannel()
+        try {
+            mediaSession = MediaSessionCompat(this, "MacMediaPlayer").apply {
+                setCallback(object : MediaSessionCompat.Callback() {
+                    override fun onPlay() {
+                        sendMacMediaControl("play")
+                        updatePlaybackState(true)
+                    }
+
+                    override fun onPause() {
+                        sendMacMediaControl("pause")
+                        updatePlaybackState(false)
+                    }
+
+                    override fun onSkipToNext() {
+                        sendMacMediaControl("next")
+                    }
+
+                    override fun onSkipToPrevious() {
+                        sendMacMediaControl("previous")
+                    }
+
+                    override fun onStop() {
+                        sendMacMediaControl("stop")
+                        stopMacMediaSession()
+                    }
+                })
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create MediaSession in onCreate: ${e.message}")
+        }
         Log.d(TAG, "MacMediaPlayerService created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        val action = intent?.action
+        Log.d(TAG, "onStartCommand: action=$action")
+
+        // Immediately call startForeground to satisfy the Android OS watchdog
+        val initialTitle = intent?.getStringExtra(EXTRA_TITLE) ?: ""
+        val initialArtist = intent?.getStringExtra(EXTRA_ARTIST) ?: ""
+        val initialIsPlaying = intent?.getBooleanExtra(EXTRA_IS_PLAYING, false) ?: false
+        val notification = createMediaNotification(initialTitle, initialArtist, initialIsPlaying)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground in onStartCommand: ${e.message}")
+        }
+
+        if (action == ACTION_STOP_MAC_MEDIA || action == null) {
+            stopMacMediaSession()
+            return START_NOT_STICKY
+        }
+
+        when (action) {
             ACTION_START_MAC_MEDIA -> {
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
                 val artist = intent.getStringExtra(EXTRA_ARTIST) ?: ""
                 val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
-                startMacMediaSession(title, artist, isPlaying)
+                val elapsedTime = intent.getLongExtra(EXTRA_ELAPSED_TIME, 0L)
+                val duration = intent.getLongExtra(EXTRA_DURATION, 0L)
+                val timestamp = intent.getStringExtra(EXTRA_TIMESTAMP)
+                val playbackRate = intent.getDoubleExtra(EXTRA_PLAYBACK_RATE, 1.0)
+                
+                startMacMediaSession(title, artist, isPlaying, elapsedTime, duration, timestamp, playbackRate)
             }
 
             ACTION_UPDATE_MAC_MEDIA -> {
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
                 val artist = intent.getStringExtra(EXTRA_ARTIST) ?: ""
                 val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
-                updateMacMediaSession(title, artist, isPlaying)
-            }
-
-            ACTION_STOP_MAC_MEDIA -> {
-                stopMacMediaSession()
+                val elapsedTime = intent.getLongExtra(EXTRA_ELAPSED_TIME, 0L)
+                val duration = intent.getLongExtra(EXTRA_DURATION, 0L)
+                val timestamp = intent.getStringExtra(EXTRA_TIMESTAMP)
+                val playbackRate = intent.getDoubleExtra(EXTRA_PLAYBACK_RATE, 1.0)
+                
+                updateMacMediaSession(title, artist, isPlaying, elapsedTime, duration, timestamp, playbackRate)
             }
             // Handle media control actions from notification buttons
             "MAC_MEDIA_play" -> {
@@ -150,39 +224,18 @@ class MacMediaPlayerService : Service() {
         notificationManager.createNotificationChannel(channel)
     }
 
-    private fun startMacMediaSession(title: String, artist: String, isPlaying: Boolean) {
+    private fun startMacMediaSession(
+        title: String,
+        artist: String,
+        isPlaying: Boolean,
+        elapsedTime: Long = 0L,
+        duration: Long = 0L,
+        timestamp: String? = null,
+        playbackRate: Double = 1.0
+    ) {
         try {
-            if (mediaSession == null) {
-                mediaSession = MediaSessionCompat(this, "MacMediaPlayer").apply {
-                    setCallback(object : MediaSessionCompat.Callback() {
-                        override fun onPlay() {
-                            sendMacMediaControl("play")
-                            updatePlaybackState(true)
-                        }
-
-                        override fun onPause() {
-                            sendMacMediaControl("pause")
-                            updatePlaybackState(false)
-                        }
-
-                        override fun onSkipToNext() {
-                            sendMacMediaControl("next")
-                        }
-
-                        override fun onSkipToPrevious() {
-                            sendMacMediaControl("previous")
-                        }
-
-                        override fun onStop() {
-                            sendMacMediaControl("stop")
-                            stopMacMediaSession()
-                        }
-                    })
-                }
-            }
-
-            updateMediaMetadata(title, artist)
-            updatePlaybackState(isPlaying)
+            updateMediaMetadata(title, artist, duration)
+            updatePlaybackState(isPlaying, elapsedTime, timestamp, playbackRate)
             mediaSession?.isActive = true
 
             val notification = createMediaNotification(title, artist, isPlaying)
@@ -194,10 +247,18 @@ class MacMediaPlayerService : Service() {
         }
     }
 
-    private fun updateMacMediaSession(title: String, artist: String, isPlaying: Boolean) {
+    private fun updateMacMediaSession(
+        title: String,
+        artist: String,
+        isPlaying: Boolean,
+        elapsedTime: Long = 0L,
+        duration: Long = 0L,
+        timestamp: String? = null,
+        playbackRate: Double = 1.0
+    ) {
         try {
-            updateMediaMetadata(title, artist)
-            updatePlaybackState(isPlaying)
+            updateMediaMetadata(title, artist, duration)
+            updatePlaybackState(isPlaying, elapsedTime, timestamp, playbackRate)
 
             val notification = createMediaNotification(title, artist, isPlaying)
             val notificationManager = getSystemService(NotificationManager::class.java)
@@ -209,12 +270,12 @@ class MacMediaPlayerService : Service() {
         }
     }
 
-    private fun updateMediaMetadata(title: String, artist: String) {
+    private fun updateMediaMetadata(title: String, artist: String, duration: Long = 0L) {
         val metadataBuilder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
             .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Playing on Mac")
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, 180000)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
 
         currentAlbumArt?.let { bitmap ->
             metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
@@ -223,7 +284,12 @@ class MacMediaPlayerService : Service() {
         mediaSession?.setMetadata(metadataBuilder.build())
     }
 
-    private fun updatePlaybackState(isPlaying: Boolean) {
+    private fun updatePlaybackState(
+        isPlaying: Boolean,
+        elapsedTime: Long = -1L,
+        timestamp: String? = null,
+        playbackRate: Double = 1.0
+    ) {
         val state =
             if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
         val actions = PlaybackStateCompat.ACTION_PLAY_PAUSE or
@@ -231,9 +297,24 @@ class MacMediaPlayerService : Service() {
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
                 PlaybackStateCompat.ACTION_STOP
 
+        // Parse ISO8601 timestamp to calculate elapsed time since reporting
+        var position = if (elapsedTime >= 0) elapsedTime else (mediaSession?.controller?.playbackState?.position ?: 0L)
+        if (isPlaying && !timestamp.isNullOrEmpty()) {
+            try {
+                val reportedAt = java.time.Instant.parse(timestamp).toEpochMilli()
+                val now = System.currentTimeMillis()
+                val diff = now - reportedAt
+                if (diff > 0) {
+                    position += (diff * playbackRate).toLong()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse timestamp: $timestamp")
+            }
+        }
+
         mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
-                .setState(state, 30000L, if (isPlaying) 1.0f else 0.0f)
+                .setState(state, position, playbackRate.toFloat())
                 .setActions(actions)
                 .build()
         )
@@ -346,7 +427,11 @@ class MacMediaPlayerService : Service() {
                 val artist = metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST) ?: ""
                 val isPlaying =
                     it.controller.playbackState?.state == PlaybackStateCompat.STATE_PLAYING
-                updateMacMediaSession(title, artist, isPlaying)
+                val duration = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION)
+                val position = it.controller.playbackState?.position ?: 0L
+                val speed = it.controller.playbackState?.playbackSpeed?.toDouble() ?: 1.0
+                
+                updateMacMediaSession(title, artist, isPlaying, position, duration, null, speed)
             }
         }
     }

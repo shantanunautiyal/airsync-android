@@ -29,14 +29,24 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.sameerasw.airsync.presentation.ui.components.sheets.AppSelectionSheet
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardFeaturesCard
@@ -48,7 +58,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.MediaSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTilesCard
-import com.sameerasw.airsync.presentation.ui.components.cards.SendNowPlayingCard
+import com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem
 import com.sameerasw.airsync.presentation.ui.components.cards.SmartspacerCard
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.HapticUtil
@@ -92,6 +102,7 @@ fun SettingsView(
     onToggleDeveloperMode: () -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
+    var showAppSelectionSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -116,46 +127,16 @@ fun SettingsView(
             PermissionsCard(missingPermissionsCount = uiState.missingPermissions.size)
 
             // Help and guides card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        HapticUtil.performClick(haptics)
-                        onShowHelp()
-                    },
-                shape = MaterialTheme.shapes.extraSmall,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.label_help_guides),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_help_guides),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                    }
-
-                    Icon(
-                        painter = androidx.compose.ui.res.painterResource(id = com.sameerasw.airsync.R.drawable.rounded_keyboard_arrow_right_24),
-                        contentDescription = "Open help",
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
+            com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem(
+                iconRes = com.sameerasw.airsync.R.drawable.rounded_info_24,
+                title = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.label_help_guides),
+                description = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_help_guides),
+                showToggle = false,
+                onClick = {
+                    HapticUtil.performClick(haptics)
+                    onShowHelp()
                 }
-            }
+            )
 
             QuickSettingsTilesCard(
                 isConnectionTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(
@@ -165,10 +146,6 @@ fun SettingsView(
                 isClipboardTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(
                     context,
                     com.sameerasw.airsync.service.ClipboardTileService::class.java
-                ),
-                isQuickShareTileAdded = com.sameerasw.airsync.utils.QuickSettingsUtil.isQSTileAdded(
-                    context,
-
                 )
             )
         }
@@ -182,13 +159,9 @@ fun SettingsView(
                     onDefaultTabChange = { tab -> viewModel.setDefaultTab(tab) }
                 )
 
-                SendNowPlayingCard(
-                    isSendNowPlayingEnabled = uiState.isBlurSettingEnabled,
-                    onToggleSendNowPlaying = { enabled: Boolean ->
-                        viewModel.setUseBlurEnabled(enabled, context)
-                    },
+                IconToggleItem(
                     title = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.label_use_blur),
-                    subtitle = when {
+                    description = when {
                         com.sameerasw.airsync.utils.DeviceInfoUtil.isBlurProblematicDevice() ->
                             androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_blur_disabled_samsung)
 
@@ -197,25 +170,32 @@ fun SettingsView(
 
                         else -> androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_use_blur)
                     },
+                    iconRes = R.drawable.rounded_blur_on_24,
+                    isChecked = uiState.isBlurSettingEnabled,
+                    onCheckedChange = { enabled: Boolean ->
+                        viewModel.setUseBlurEnabled(enabled, context)
+                    },
                     enabled = !com.sameerasw.airsync.utils.DeviceInfoUtil.isBlurProblematicDevice()
                 )
 
-                SendNowPlayingCard(
-                    isSendNowPlayingEnabled = uiState.isPitchBlackThemeEnabled,
-                    onToggleSendNowPlaying = { enabled: Boolean ->
-                        viewModel.setPitchBlackThemeEnabled(enabled)
-                    },
+                IconToggleItem(
                     title = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.label_pitch_black_theme),
-                    subtitle = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_pitch_black_theme)
+                    description = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_pitch_black_theme),
+                    iconRes = R.drawable.rounded_dark_mode_24,
+                    isChecked = uiState.isPitchBlackThemeEnabled,
+                    onCheckedChange = { enabled: Boolean ->
+                        viewModel.setPitchBlackThemeEnabled(enabled)
+                    }
                 )
 
-                SendNowPlayingCard(
-                    isSendNowPlayingEnabled = uiState.isSentryReportingEnabled,
-                    onToggleSendNowPlaying = { enabled: Boolean ->
-                        viewModel.setSentryReportingEnabled(enabled)
-                    },
+                IconToggleItem(
                     title = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.label_error_reporting),
-                    subtitle = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_error_reporting)
+                    description = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.subtitle_error_reporting),
+                    iconRes = R.drawable.rounded_bug_report_24,
+                    isChecked = uiState.isSentryReportingEnabled,
+                    onCheckedChange = { enabled: Boolean ->
+                        viewModel.setSentryReportingEnabled(enabled)
+                    }
                 )
             }
         }
@@ -232,6 +212,20 @@ fun SettingsView(
                     },
                     onGrantPermissions = { viewModel.setPermissionDialogVisible(true) }
                 )
+
+                if (uiState.isNotificationSyncEnabled && uiState.isNotificationEnabled) {
+                    IconToggleItem(
+                        title = stringResource(R.string.action_select_apps),
+                        description = stringResource(R.string.subtitle_to_be_notified),
+                        iconRes = R.drawable.rounded_notification_settings_24,
+                        showToggle = false,
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            viewModel.loadNotificationApps(context)
+                            showAppSelectionSheet = true
+                        }
+                    )
+                }
 
                 ClipboardFeaturesCard(
                     isClipboardSyncEnabled = uiState.isClipboardSyncEnabled,
@@ -261,16 +255,28 @@ fun SettingsView(
                     }
                 )
 
-                SendNowPlayingCard(
-                    isSendNowPlayingEnabled = uiState.isQuickShareEnabled,
-                    onToggleSendNowPlaying = { enabled: Boolean ->
-                        viewModel.setQuickShareEnabled(context, enabled)
-                    },
+                IconToggleItem(
                     title = "Quick Share",
-                    subtitle = "Allow receiving files from nearby devices"
+                    description = "Allow receiving files from nearby devices",
+                    iconRes = R.drawable.quick_share,
+                    isChecked = uiState.isQuickShareEnabled,
+                    onCheckedChange = { enabled: Boolean ->
+                        viewModel.setQuickShareEnabled(context, enabled)
+                    }
+                )
+
+                IconToggleItem(
+                    title = stringResource(R.string.label_file_access),
+                    description = stringResource(R.string.subtitle_file_access),
+                    iconRes = R.drawable.rounded_folder_managed_24,
+                    isChecked = uiState.isFileAccessEnabled,
+                    onCheckedChange = { enabled: Boolean ->
+                        viewModel.setFileAccessEnabled(context, enabled)
+                    }
                 )
             }
         }
+
 
         // Integration Section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,51 +297,45 @@ fun SettingsView(
                 }
 
                 if (isEssentialsInstalled) {
-                    SendNowPlayingCard(
-                        isSendNowPlayingEnabled = uiState.isEssentialsConnectionEnabled,
-                        onToggleSendNowPlaying = { enabled: Boolean ->
-                            viewModel.setEssentialsConnectionEnabled(enabled)
-                        },
+                    IconToggleItem(
                         title = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.connect_to_essentials),
-                        subtitle = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.connect_to_essentials_summary)
+                        description = androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.connect_to_essentials_summary),
+                        iconRes = R.drawable.essentials_icon,
+                        isChecked = uiState.isEssentialsConnectionEnabled,
+                        onCheckedChange = { enabled: Boolean ->
+                            viewModel.setEssentialsConnectionEnabled(enabled)
+                        }
                     )
                 } else {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraSmall,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                        )
-                    ) {
-                        androidx.compose.material3.ListItem(
-                            colors = androidx.compose.material3.ListItemDefaults.colors(
-                                containerColor = androidx.compose.ui.graphics.Color.Transparent
-                            ),
-                            headlineContent = { Text(androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.download_essentials)) },
-                            supportingContent = {
-                                Text(
-                                    androidx.compose.ui.res.stringResource(
-                                        com.sameerasw.airsync.R.string.download_essentials_summary
-                                    )
+                    ListItem(
+                        colors = ListItemDefaults.colors(
+                            containerColor = androidx.compose.ui.graphics.Color.Transparent
+                        ),
+                        headlineContent = { Text(androidx.compose.ui.res.stringResource(com.sameerasw.airsync.R.string.download_essentials)) },
+                        supportingContent = {
+                            Text(
+                                androidx.compose.ui.res.stringResource(
+                                    com.sameerasw.airsync.R.string.download_essentials_summary
                                 )
-                            },
-                            trailingContent = {
-                                Button(
-                                    onClick = {
-                                        val intent = android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse("https://github.com/sameerasw/essentials/releases/latest")
-                                        )
-                                        intent.flags =
-                                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                        context.startActivity(intent)
-                                    }
-                                ) {
-                                    Text("Download")
+                            )
+                        },
+                        trailingContent = {
+                            Button(
+                                onClick = {
+                                    HapticUtil.performClick(haptics)
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://github.com/sameerasw/essentials/releases/latest")
+                                    )
+                                    intent.flags =
+                                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                    context.startActivity(intent)
                                 }
+                            ) {
+                                Text("Download")
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
         }
@@ -472,6 +472,21 @@ fun SettingsView(
         )
 
         Spacer(modifier = Modifier.height(180.dp))
+    }
+
+    if (showAppSelectionSheet) {
+        val apps by viewModel.notificationApps.collectAsState()
+        AppSelectionSheet(
+            onDismissRequest = { showAppSelectionSheet = false },
+            apps = apps,
+            onAppToggle = { pkg, enabled ->
+                viewModel.toggleNotificationApp(context, pkg, enabled)
+            },
+            onSaveAll = { updatedList ->
+                viewModel.saveAllNotificationApps(context, updatedList)
+            },
+            isLoading = apps.isEmpty()
+        )
     }
 }
 

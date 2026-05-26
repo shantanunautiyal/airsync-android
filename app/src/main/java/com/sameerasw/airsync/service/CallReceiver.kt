@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.telephony.TelephonyManager
 import android.util.Log
+import com.sameerasw.airsync.utils.WebSocketUtil
 
 /**
  * BroadcastReceiver that listens for telephony events (incoming/outgoing calls).
@@ -20,6 +21,9 @@ class CallReceiver : BroadcastReceiver() {
 
     @Suppress("DEPRECATION")
     override fun onReceive(context: Context, intent: Intent) {
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         Log.d(TAG, "Broadcast received: ${intent.action}")
 
         // Initialize the listener if it's the first time

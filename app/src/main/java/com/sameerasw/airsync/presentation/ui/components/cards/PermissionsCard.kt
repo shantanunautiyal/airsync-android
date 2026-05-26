@@ -26,53 +26,69 @@ import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun PermissionsCard(
-    missingPermissionsCount: Int = 0
+    missingPermissionsCount: Int = 0,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
+    val hasMissing = missingPermissionsCount > 0
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                HapticUtil.performClick(haptics)
-                val intent = Intent(context, PermissionsActivity::class.java)
-                context.startActivity(intent)
-            },
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraSmall,
         colors = CardDefaults.cardColors(
-            containerColor = if (missingPermissionsCount > 0)
+            containerColor = if (hasMissing)
                 MaterialTheme.colorScheme.errorContainer
             else
-                MaterialTheme.colorScheme.surfaceContainerHighest
+                MaterialTheme.colorScheme.surfaceBright
         )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .clickable {
+                    HapticUtil.performClick(haptics)
+                    val intent = Intent(context, PermissionsActivity::class.java)
+                    context.startActivity(intent)
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            if (hasMissing) {
+                Icon(
+                    painter = painterResource(id = R.drawable.rounded_shield_toggle_24),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.rounded_task_alt_24),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
                 Text(
                     "Permissions",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (missingPermissionsCount > 0)
-                        MaterialTheme.colorScheme.onErrorContainer
-                    else
-                        MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (hasMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    if (missingPermissionsCount > 0)
+                    if (hasMissing)
                         "$missingPermissionsCount missing"
                     else
                         "All permissions granted",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (missingPermissionsCount > 0)
-                        MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (hasMissing) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -80,12 +96,10 @@ fun PermissionsCard(
                 painter = painterResource(id = R.drawable.rounded_keyboard_arrow_right_24),
                 contentDescription = "Open permissions",
                 modifier = Modifier.size(24.dp),
-                tint = if (missingPermissionsCount > 0)
-                    MaterialTheme.colorScheme.onErrorContainer
-                else
-                    MaterialTheme.colorScheme.onSurface
+                tint = if (hasMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
+
 

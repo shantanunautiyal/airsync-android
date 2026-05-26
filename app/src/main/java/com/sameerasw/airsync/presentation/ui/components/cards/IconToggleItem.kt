@@ -1,16 +1,14 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -19,78 +17,86 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.sameerasw.airsync.R
 import com.sameerasw.airsync.utils.HapticUtil
 
 @Composable
 fun IconToggleItem(
-    iconRes: Int,
     title: String,
     modifier: Modifier = Modifier,
+    iconRes: Int? = null,
     description: String? = null,
-    isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
+    isChecked: Boolean = false,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
     enabled: Boolean = true,
     onDisabledClick: (() -> Unit)? = null,
-    showToggle: Boolean = true
+    showToggle: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    trailingIcon: Int? = null
 ) {
     val haptics = LocalHapticFeedback.current
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceBright,
-                shape = RoundedCornerShape(MaterialTheme.shapes.extraSmall.bottomEnd)
-            )
-            .clickable(enabled = !showToggle && enabled) {
-                if (enabled) {
-                    HapticUtil.performClick(haptics)
-                    onCheckedChange(!isChecked)
-                } else if (onDisabledClick != null) {
-                    HapticUtil.performClick(haptics)
-                    onDisabledClick()
-                }
-            }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Spacer(modifier = Modifier.size(2.dp))
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = title,
-            modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.primary
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraSmall,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceBright
         )
-        Spacer(modifier = Modifier.size(2.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    enabled = enabled || onDisabledClick != null,
+                    onClick = {
+                        if (enabled) {
+                            HapticUtil.performClick(haptics)
+                            if (onClick != null) {
+                                onClick()
+                            } else if (onCheckedChange != null && showToggle) {
+                                onCheckedChange(!isChecked)
+                            }
+                        } else if (onDisabledClick != null) {
+                            HapticUtil.performClick(haptics)
+                            onDisabledClick()
+                        }
+                    }
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = title,
+                    modifier = Modifier.size(24.dp),
+                    tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                )
+            }
 
-        if (description != null) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                 )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (description != null) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
-        } else {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
 
-        if (showToggle) {
-            Box {
+            if (showToggle && onCheckedChange != null) {
                 Switch(
                     checked = if (enabled) isChecked else false,
                     onCheckedChange = { checked ->
@@ -101,15 +107,13 @@ fun IconToggleItem(
                     },
                     enabled = enabled
                 )
-
-                if (!enabled && onDisabledClick != null) {
-                    Box(modifier = Modifier
-                        .matchParentSize()
-                        .clickable {
-                            HapticUtil.performClick(haptics)
-                            onDisabledClick()
-                        })
-                }
+            } else if (onClick != null && !showToggle) {
+                Icon(
+                    painter = painterResource(id = trailingIcon ?: R.drawable.rounded_keyboard_arrow_right_24),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
             }
         }
     }

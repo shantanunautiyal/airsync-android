@@ -22,6 +22,8 @@ object NetworkMonitor {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
+        var lastNetworkInfo: NetworkInfo? = null
+
         fun getCurrentNetworkInfo(): NetworkInfo {
             val activeNetwork = connectivityManager.activeNetwork
             val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
@@ -35,27 +37,39 @@ object NetworkMonitor {
             return NetworkInfo(isConnected, isWifi, ipAddress)
         }
 
+        fun sendIfChanged() {
+            val info = getCurrentNetworkInfo()
+            if (info != lastNetworkInfo) {
+                lastNetworkInfo = info
+                trySend(info)
+            }
+        }
+
         // Send initial state
-        trySend(getCurrentNetworkInfo())
+        sendIfChanged()
 
         // Use NetworkCallback for newer versions
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 Log.d(TAG, "Network available: $network")
-                trySend(getCurrentNetworkInfo())
+                sendIfChanged()
             }
 
             override fun onLost(network: Network) {
                 Log.d(TAG, "Network lost: $network")
-                trySend(getCurrentNetworkInfo())
+                sendIfChanged()
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities
             ) {
-                Log.d(TAG, "Network capabilities changed: $network")
-                trySend(getCurrentNetworkInfo())
+                val info = getCurrentNetworkInfo()
+                if (info != lastNetworkInfo) {
+                    Log.d(TAG, "Network capabilities changed and network info updated: $network")
+                    lastNetworkInfo = info
+                    trySend(info)
+                }
             }
         }
 

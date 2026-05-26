@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -33,19 +32,22 @@ import com.sameerasw.airsync.utils.HapticUtil
 @Composable
 fun DefaultTabCard(
     currentDefaultTab: String,
-    onDefaultTabChange: (String) -> Unit
+    onDefaultTabChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraSmall,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            containerColor = MaterialTheme.colorScheme.surfaceBright
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
             Text(
                 text = "Default tab",
@@ -66,7 +68,7 @@ fun DefaultTabCard(
             ) {
                 TabOption(
                     title = "Connect",
-                    iconRes = R.drawable.ic_launcher_monochrome,
+                    iconRes = R.drawable.rounded_devices_24,
                     isSelected = currentDefaultTab == "connect",
                     onClick = {
                         HapticUtil.performClick(haptics)
@@ -104,6 +106,7 @@ fun DefaultTabCard(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
