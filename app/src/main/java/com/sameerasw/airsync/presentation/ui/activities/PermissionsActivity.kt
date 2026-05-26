@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.sameerasw.airsync.presentation.ui.screens.PermissionsScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
-import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.PermissionUtil
 
 class PermissionsActivity : ComponentActivity() {
@@ -177,7 +176,7 @@ class PermissionsActivity : ComponentActivity() {
             phonePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
         }
     }
- 
+
     private fun requestBluetoothPermission() {
         if (!PermissionUtil.isBluetoothPermissionsGranted(this)) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

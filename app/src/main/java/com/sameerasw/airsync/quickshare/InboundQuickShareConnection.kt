@@ -7,28 +7,26 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import com.google.location.nearby.connections.proto.OfflineFrame
-import com.google.location.nearby.connections.proto.PayloadTransferFrame
-import com.google.location.nearby.connections.proto.V1Frame
-import com.google.location.nearby.connections.proto.ConnectionResponseFrame
-import com.google.location.nearby.connections.proto.OsInfo
-import com.google.security.cryptauth.lib.securegcm.Ukey2ClientFinished
-import com.google.security.cryptauth.lib.securegcm.Ukey2ClientInit
-import com.google.security.cryptauth.lib.securegcm.Ukey2ServerInit
-import okio.ByteString.Companion.toByteString
-import com.google.android.gms.nearby.sharing.ConnectionResponseFrame as SharingResponse
 import com.google.android.gms.nearby.sharing.Frame
 import com.google.android.gms.nearby.sharing.IntroductionFrame
 import com.google.android.gms.nearby.sharing.PairedKeyEncryptionFrame
 import com.google.android.gms.nearby.sharing.PairedKeyResultFrame
-import com.google.security.cryptauth.lib.securegcm.Ukey2Message
-import com.google.android.gms.nearby.sharing.V1Frame as SharingV1
+import com.google.location.nearby.connections.proto.ConnectionResponseFrame
+import com.google.location.nearby.connections.proto.OfflineFrame
+import com.google.location.nearby.connections.proto.OsInfo
+import com.google.location.nearby.connections.proto.PayloadTransferFrame
 import com.google.location.nearby.connections.proto.PayloadTransferFrame.PayloadHeader
+import com.google.location.nearby.connections.proto.V1Frame
+import com.google.security.cryptauth.lib.securegcm.Ukey2ClientInit
+import com.google.security.cryptauth.lib.securegcm.Ukey2Message
+import okio.ByteString.Companion.toByteString
 import java.io.File
 import java.io.FileOutputStream
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import com.google.android.gms.nearby.sharing.ConnectionResponseFrame as SharingResponse
+import com.google.android.gms.nearby.sharing.V1Frame as SharingV1
 
 /**
  * Handles an incoming Quick Share connection.
@@ -42,8 +40,10 @@ class InboundQuickShareConnection(
     var onConnectionReady: ((InboundQuickShareConnection) -> Unit)? = null
     var onIntroductionReceived: ((IntroductionFrame) -> Unit)? = null
     var onFinished: ((InboundQuickShareConnection) -> Unit)? = null
-    var onFileProgress: ((fileName: String, percent: Int, bytesTransferred: Long, totalSize: Long, transferId: String) -> Unit)? = null
-    var onFileComplete: ((fileName: String, transferId: String, success: Boolean, uri: android.net.Uri?) -> Unit)? = null
+    var onFileProgress: ((fileName: String, percent: Int, bytesTransferred: Long, totalSize: Long, transferId: String) -> Unit)? =
+        null
+    var onFileComplete: ((fileName: String, transferId: String, success: Boolean, uri: android.net.Uri?) -> Unit)? =
+        null
 
     companion object {
         private const val TAG = "InboundQSConnection"
@@ -109,9 +109,10 @@ class InboundQuickShareConnection(
             throw IllegalStateException("Expected CLIENT_INIT, got ${clientInitEnvelope.message_type}")
         }
         val clientInit = Ukey2ClientInit.ADAPTER.decode(clientInitEnvelope.message_data!!)
-        
+
         // Send ServerInit (Wrapped in Ukey2Message)
-        val serverInit = ukey2.handleClientInit(clientInit) ?: throw IllegalStateException("Failed to handle ClientInit")
+        val serverInit = ukey2.handleClientInit(clientInit)
+            ?: throw IllegalStateException("Failed to handle ClientInit")
         val serverInitEnvelope = Ukey2Message(
             message_type = Ukey2Message.Type.SERVER_INIT,
             message_data = serverInit.encode().toByteString()
@@ -133,7 +134,7 @@ class InboundQuickShareConnection(
             serverInitEnvelopeBytes = serverInitEnvelopeBytes,
             clientInit = clientInit
         )
-        
+
         Log.d(TAG, "UKEY2 Handshake complete. PIN: ${ukey2.authString}")
         onConnectionReady?.invoke(this)
 
@@ -144,9 +145,9 @@ class InboundQuickShareConnection(
         Log.d(TAG, "Read ConnectionResponse: ${responseFrameData.size} bytes")
         val responseFrame = OfflineFrame.ADAPTER.decode(responseFrameData)
         if (responseFrame.v1!!.type != V1Frame.FrameType.CONNECTION_RESPONSE) {
-             throw IllegalStateException("Expected CONNECTION_RESPONSE, got ${responseFrame.v1!!.type}")
+            throw IllegalStateException("Expected CONNECTION_RESPONSE, got ${responseFrame.v1!!.type}")
         }
-        
+
         // Send OUR ConnectionResponse (Accept)
         val ourResponse = OfflineFrame(
             version = OfflineFrame.Version.V1,
@@ -280,13 +281,13 @@ class InboundQuickShareConnection(
             try {
                 val d2dPayload = readEncryptedMessage()
                 val offlineFrame = OfflineFrame.ADAPTER.decode(d2dPayload)
-                
+
                 when (offlineFrame.v1?.type) {
                     V1Frame.FrameType.PAYLOAD_TRANSFER -> {
                         val transfer = offlineFrame.v1!!.payload_transfer!!
                         val header = transfer.payload_header
                         val chunk = transfer.payload_chunk
-                        
+
                         when (header?.type) {
                             PayloadHeader.PayloadType.BYTES -> {
                                 if (chunk?.body != null && chunk.body.size > 0) {
@@ -301,16 +302,20 @@ class InboundQuickShareConnection(
                                     pendingBytesPayload = null
                                 }
                             }
+
                             PayloadHeader.PayloadType.FILE -> {
                                 handlePayloadTransfer(transfer)
                             }
+
                             else -> Log.d(TAG, "Unknown payload type: ${header?.type}")
                         }
                     }
+
                     V1Frame.FrameType.DISCONNECTION -> {
                         Log.d(TAG, "Received disconnection frame")
                         isRunning = false
                     }
+
                     else -> Log.d(TAG, "Unknown offline frame type: ${offlineFrame.v1?.type}")
                 }
             } catch (e: Exception) {
@@ -333,13 +338,16 @@ class InboundQuickShareConnection(
                 prepareFiles(v1Frame.introduction!!)
                 onIntroductionReceived?.invoke(v1Frame.introduction!!)
             }
+
             SharingV1.FrameType.CANCEL -> {
                 Log.d(TAG, "Transfer cancelled by sender")
                 isRunning = false
             }
+
             SharingV1.FrameType.PAIRED_KEY_RESULT -> {
                 Log.d(TAG, "Received PairedKeyResult")
             }
+
             else -> Log.d(TAG, "Received unhandled sharing frame type: ${v1Frame.type}")
         }
     }
@@ -349,7 +357,7 @@ class InboundQuickShareConnection(
      */
     fun sendSharingResponse(status: SharingResponse.Status) {
         val responseFrame = SharingResponse(status = status)
-        
+
         val frame = Frame(
             version = Frame.Version.V1,
             v1 = SharingV1(
@@ -357,9 +365,9 @@ class InboundQuickShareConnection(
                 connection_response = responseFrame
             )
         )
-        
+
         writeSharingFrame(frame)
-        
+
         if (status == SharingResponse.Status.ACCEPT) {
             openFiles()
         }
@@ -382,7 +390,10 @@ class InboundQuickShareConnection(
                     put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                     put(MediaStore.Downloads.IS_PENDING, 1)
                 }
-                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                val uri = context.contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    values
+                )
                 if (uri != null) {
                     info.outputStream = context.contentResolver.openOutputStream(uri)
                     info.uri = uri
@@ -390,7 +401,8 @@ class InboundQuickShareConnection(
                 }
             } else {
                 @Suppress("DEPRECATION")
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val downloadsDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 downloadsDir.mkdirs()
                 var targetFile = File(downloadsDir, info.name)
                 var counter = 1
@@ -420,7 +432,13 @@ class InboundQuickShareConnection(
             // Update progress (throttle if needed, but for now simple)
             if (info.size > 0) {
                 val percent = ((info.bytesTransferred * 100) / info.size).toInt()
-                onFileProgress?.invoke(info.name, percent, info.bytesTransferred, info.size, id.toString())
+                onFileProgress?.invoke(
+                    info.name,
+                    percent,
+                    info.bytesTransferred,
+                    info.size,
+                    id.toString()
+                )
             }
         }
 
@@ -429,7 +447,7 @@ class InboundQuickShareConnection(
             Log.d(TAG, "File ${info.name} transfer complete (${info.bytesTransferred} bytes)")
             info.outputStream?.close()
             info.outputStream = null
-            
+
             // Clear IS_PENDING so file becomes visible in Downloads
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.uri != null) {
                 val values = ContentValues().apply {
@@ -437,9 +455,9 @@ class InboundQuickShareConnection(
                 }
                 context.contentResolver.update(info.uri!!, values, null, null)
             }
-            
+
             onFileComplete?.invoke(info.name, id.toString(), true, info.uri)
-            
+
             // Check if all files are finished
             if (transferredFiles.values.all { it.outputStream == null }) {
                 Log.d(TAG, "All files transferred")

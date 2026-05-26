@@ -8,11 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults
@@ -51,11 +49,11 @@ fun AirSyncFloatingToolbar(
     val configuration = LocalConfiguration.current
     val fontScale = LocalDensity.current.fontScale
     val screenWidth = configuration.screenWidthDp
-    
+
     // Hide label if font scale is large or screen width is too small
     val isLargeFont = fontScale > 1.25f
-    val isCompactScreen = screenWidth < 400 
-    
+    val isCompactScreen = screenWidth < 400
+
     val shouldHideLabel = isLargeFont || (isCompactScreen && tabs.size > 3)
 
     HorizontalFloatingToolbar(
@@ -104,7 +102,7 @@ fun AirSyncFloatingToolbar(
                     ),
                     label = "spacer_width_$index"
                 )
-                
+
                 // Always render the button, but animate its visibility
                 if (itemWidth > 0.dp || isSelected) {
                     IconButton(

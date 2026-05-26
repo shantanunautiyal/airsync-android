@@ -10,9 +10,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -290,7 +290,10 @@ object WebSocketUtil {
                                 Log.d(TAG, "RAW WebSocket message received: ${text}...")
                                 val decryptedMessage = currentSymmetricKey?.let { key ->
                                     val decrypted = CryptoUtil.decryptMessage(text, key)
-                                    if (decrypted == null) Log.e(TAG, "FAILED TO DECRYPT WebSocket message!")
+                                    if (decrypted == null) Log.e(
+                                        TAG,
+                                        "FAILED TO DECRYPT WebSocket message!"
+                                    )
                                     decrypted
                                 } ?: text
 
@@ -373,8 +376,13 @@ object WebSocketUtil {
                                     if (code != 1000) {
                                         if (com.sameerasw.airsync.AirSyncApp.isAppForeground()) {
                                             CoroutineScope(Dispatchers.Main).launch {
-                                                val msg = reason.ifEmpty { "Unknown Server Disconnect" }
-                                                android.widget.Toast.makeText(context, "Disconnected: $msg", android.widget.Toast.LENGTH_SHORT).show()
+                                                val msg =
+                                                    reason.ifEmpty { "Unknown Server Disconnect" }
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Disconnected: $msg",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
                                             }
                                         }
                                     }
@@ -389,18 +397,22 @@ object WebSocketUtil {
                                     } catch (_: Exception) {
                                     }
                                     try {
-                                        com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context)
-                                        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(context)
+                                        com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(
+                                            context
+                                        )
+                                        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(
+                                            context
+                                        )
                                     } catch (_: Exception) {
                                     }
                                     onConnectionStatusChanged?.invoke(false)
                                     notifyConnectionStatusListeners(false)
-                                    
+
                                     // Only auto-reconnect if it wasn't a manual close (1000)
                                     if (code != 1000) {
                                         tryStartAutoReconnect(context)
                                     }
-                                    
+
                                     try {
                                         AirSyncWidgetProvider.updateAllWidgets(context)
                                     } catch (_: Exception) {
@@ -416,7 +428,8 @@ object WebSocketUtil {
                                 val totalToTry = ipList.size
                                 val failedCount = failedAttempts.incrementAndGet()
                                 val wasActive = webSocket == WebSocketUtil.webSocket
-                                val isFinalManualAttempt = manualAttempt && !connectionStarted.get() && failedCount >= totalToTry
+                                val isFinalManualAttempt =
+                                    manualAttempt && !connectionStarted.get() && failedCount >= totalToTry
 
                                 if (wasActive || isFinalManualAttempt) {
                                     if (manualAttempt || isSocketOpen.get()) {
@@ -429,7 +442,11 @@ object WebSocketUtil {
                                                     is java.io.EOFException, is java.net.SocketException -> "Lost connection to your mac"
                                                     else -> t.message ?: "Unknown connection error"
                                                 }
-                                                android.widget.Toast.makeText(context, "AirSync: $msg", android.widget.Toast.LENGTH_LONG).show()
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "AirSync: $msg",
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
                                             }
                                         }
                                     }
@@ -445,17 +462,24 @@ object WebSocketUtil {
                                     } catch (_: Exception) {
                                     }
                                     try {
-                                        com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context)
-                                        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(context)
+                                        com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(
+                                            context
+                                        )
+                                        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(
+                                            context
+                                        )
                                     } catch (_: Exception) {
                                     }
                                     onConnectionStatusChanged?.invoke(false)
                                     notifyConnectionStatusListeners(false)
-                                    
+
                                     // Check manual disconnect flag before auto-reconnecting on failure
                                     CoroutineScope(Dispatchers.IO).launch {
                                         try {
-                                            val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
+                                            val ds =
+                                                com.sameerasw.airsync.data.local.DataStoreManager.getInstance(
+                                                    context
+                                                )
                                             val manual = ds.getUserManuallyDisconnected().first()
                                             if (!manual) {
                                                 tryStartAutoReconnect(context)
@@ -539,7 +563,7 @@ object WebSocketUtil {
                 Log.d(TAG, "WebSocket not connected, falling back to BLE: $message")
                 return sendOverBLE(message)
             }
-            
+
             Log.w(TAG, "Neither WebSocket nor BLE connected, cannot send message")
             return false
         }
@@ -560,6 +584,7 @@ object WebSocketUtil {
                     ble.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_ACTION, payload)
                     return true
                 }
+
                 "mediaControl" -> {
                     val action = data.optString("action")
                     // Protocol: type|action
@@ -567,6 +592,7 @@ object WebSocketUtil {
                     ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
                     return true
                 }
+
                 "volumeControl" -> {
                     val action = data.optString("action")
                     // Protocol: type|action
@@ -574,16 +600,19 @@ object WebSocketUtil {
                     ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
                     return true
                 }
+
                 "clipboard", "clipboardUpdate" -> {
                     val content = data.optString("text", data.optString("content"))
                     ble.sendChunkedNotification(BleConstants.CHAR_CLIPBOARD_DATA_NOTIFY, content)
                     return true
                 }
+
                 "dismissNotification" -> {
                     val id = data.optString("id")
                     ble.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_DISMISS_NOTIFY, id)
                     return true
                 }
+
                 "remoteControl" -> {
                     val action = data.optString("action")
                     // Filter out high-frequency cursor controls over BLE
@@ -596,6 +625,7 @@ object WebSocketUtil {
                     ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
                     return true
                 }
+
                 "notification" -> {
                     val pkg = data.optString("package")
                     val appName = data.optString("app")
@@ -604,11 +634,15 @@ object WebSocketUtil {
                     BleTransportBridge.sendNotification(pkg, appName, title, body)
                     return true
                 }
+
                 "status" -> {
                     val battery = data.optJSONObject("battery")
                     if (battery != null) {
                         val level = battery.optInt("level")
-                        ble.sendNotification(BleConstants.CHAR_BATTERY_LEVEL, byteArrayOf(level.toByte()))
+                        ble.sendNotification(
+                            BleConstants.CHAR_BATTERY_LEVEL,
+                            byteArrayOf(level.toByte())
+                        )
                     }
                     val music = data.optJSONObject("music")
                     if (music != null) {
@@ -655,14 +689,17 @@ object WebSocketUtil {
                 } catch (_: Exception) {
                 }
             }
-            
+
             // Send manual disconnect signal over BLE before disconnecting BLE client
             try {
                 val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
                 if (ble != null && ble.isAuthenticated) {
                     Log.d(TAG, "Sending manual disconnect signal over BLE before disconnecting")
-                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, "remote|manual_disconnect")
-                    
+                    ble.sendChunkedNotification(
+                        BleConstants.CHAR_MAC_CONTROL,
+                        "remote|manual_disconnect"
+                    )
+
                     CoroutineScope(Dispatchers.IO).launch {
                         delay(300)
                         ble.disconnectAllConnectedDevices()
@@ -800,8 +837,12 @@ object WebSocketUtil {
     private fun acquireWifiLock(context: Context) {
         try {
             if (wifiLock == null) {
-                val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-                wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "AirSync:ReconnectLock")
+                val wm =
+                    context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                wifiLock = wm.createWifiLock(
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                    "AirSync:ReconnectLock"
+                )
             }
             if (wifiLock?.isHeld == false) {
                 wifiLock?.acquire()
@@ -845,9 +886,12 @@ object WebSocketUtil {
                     while (autoReconnectActive.get() && !isConnected.get()) {
                         val manual = ds.getUserManuallyDisconnected().first()
                         val autoEnabled = ds.getAutoReconnectEnabled().first()
-                        
+
                         if (manual || !autoEnabled) {
-                            Log.d(TAG, "Auto-reconnect cancelled: manual=$manual, enabled=$autoEnabled")
+                            Log.d(
+                                TAG,
+                                "Auto-reconnect cancelled: manual=$manual, enabled=$autoEnabled"
+                            )
                             cancelAutoReconnect()
                             break
                         }
@@ -856,13 +900,18 @@ object WebSocketUtil {
                             val last = ds.getLastConnectedDevice().first()
                             if (last != null) {
                                 val all = ds.getAllNetworkDeviceConnections().first()
-                                val targetConnection = all.firstOrNull { it.deviceName == last.name }
-                                
+                                val targetConnection =
+                                    all.firstOrNull { it.deviceName == last.name }
+
                                 if (targetConnection != null) {
-                                    val ips = targetConnection.networkConnections.values.joinToString(",")
+                                    val ips =
+                                        targetConnection.networkConnections.values.joinToString(",")
                                     val port = targetConnection.port.toIntOrNull() ?: 6996
-                                    
-                                    Log.d(TAG, "Proactive retry to $ips:$port (backoff: ${backoffMs}ms)")
+
+                                    Log.d(
+                                        TAG,
+                                        "Proactive retry to $ips:$port (backoff: ${backoffMs}ms)"
+                                    )
                                     connect(
                                         context = context,
                                         ipAddress = ips,
@@ -879,7 +928,7 @@ object WebSocketUtil {
                                 }
                             }
                         }
-                        
+
                         delay(backoffMs)
                         // Exponential backoff capped at 1 minute
                         backoffMs = (backoffMs * 2).coerceAtMost(60_000L)
@@ -891,7 +940,7 @@ object WebSocketUtil {
                     if (!autoReconnectActive.get() || isConnected.get() || isConnecting.get()) return@collect
 
                     val last = ds.getLastConnectedDevice().first() ?: return@collect
-                    
+
                     // Match by name within the discovery list
                     val discoveryMatch = discoveredList.find { it.name == last.name }
                     if (discoveryMatch != null) {

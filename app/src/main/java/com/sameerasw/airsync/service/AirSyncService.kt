@@ -205,7 +205,10 @@ class AirSyncService : Service() {
 
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    Log.d(TAG, "Network available, triggering burst broadcast and refreshing socket")
+                    Log.d(
+                        TAG,
+                        "Network available, triggering burst broadcast and refreshing socket"
+                    )
                     // Refresh UDP socket to bind to new network interface
                     UDPDiscoveryManager.refreshSocket()
                     // When network becomes available, do a burst to announce ourselves

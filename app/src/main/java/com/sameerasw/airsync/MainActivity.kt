@@ -12,37 +12,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.NavHost
@@ -52,7 +30,6 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
-import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.AdbMdnsDiscovery
 import com.sameerasw.airsync.utils.ContentCaptureManager
 import com.sameerasw.airsync.utils.DevicePreviewResolver
@@ -246,7 +223,8 @@ class MainActivity : ComponentActivity() {
                                 this@MainActivity,
                                 R.color.material_primary
                             )
-                            splashIcon.imageTintList = android.content.res.ColorStateList.valueOf(colorPrimary)
+                            splashIcon.imageTintList =
+                                android.content.res.ColorStateList.valueOf(colorPrimary)
                             Log.d("MainActivity", "Switched to device icon with primary tint")
 
                             // Fade in the new device icon
@@ -299,28 +277,28 @@ class MainActivity : ComponentActivity() {
                     fadeOutIcon.start()
                 } else {
                     // No device icon found, or splashIcon is null/not ImageView (OEM device compatibility)
-                        // Proceed directly to outro after a brief hold
-                        try {
-                            splashScreenView.postDelayed({
-                                startOutroAnimation(
-                                    splashScreenView,
-                                    splashIcon,
-                                    splashScreenViewProvider
-                                )
-                            }, 500)
-                        } catch (e: Exception) {
-                            Log.e(
-                                "MainActivity",
-                                "Error scheduling outro with no icon: ${e.message}",
-                                e
-                            )
-                            // Fallback: start outro immediately
+                    // Proceed directly to outro after a brief hold
+                    try {
+                        splashScreenView.postDelayed({
                             startOutroAnimation(
                                 splashScreenView,
                                 splashIcon,
                                 splashScreenViewProvider
                             )
-                        }
+                        }, 500)
+                    } catch (e: Exception) {
+                        Log.e(
+                            "MainActivity",
+                            "Error scheduling outro with no icon: ${e.message}",
+                            e
+                        )
+                        // Fallback: start outro immediately
+                        startOutroAnimation(
+                            splashScreenView,
+                            splashIcon,
+                            splashScreenViewProvider
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 // Fallback for any unexpected exceptions during animation
@@ -344,7 +322,10 @@ class MainActivity : ComponentActivity() {
             AdbDiscoveryHolder.initialize(this)
             Log.d("MainActivity", "Started persistent ADB discovery at app startup")
         } else {
-            Log.d("MainActivity", "Skipping persistent ADB discovery at startup: ACCESS_LOCAL_NETWORK permission not granted")
+            Log.d(
+                "MainActivity",
+                "Skipping persistent ADB discovery at startup: ACCESS_LOCAL_NETWORK permission not granted"
+            )
         }
 
         // Check if this is a QS tile long-press intent and device is not connected
@@ -412,7 +393,8 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         composable("main") {
-                            val initialPage = if (intent?.action == ShortcutUtil.DASH_ACTION_REMOTE) 1 else 0
+                            val initialPage =
+                                if (intent?.action == ShortcutUtil.DASH_ACTION_REMOTE) 1 else 0
                             AirSyncMainScreen(
                                 initialIp = ip,
                                 initialPort = port,

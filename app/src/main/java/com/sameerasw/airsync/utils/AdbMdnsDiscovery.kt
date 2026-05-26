@@ -30,10 +30,13 @@ class AdbMdnsDiscovery(context: Context) {
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 Log.d(TAG, "Service found: ${serviceInfo.serviceName}")
-                
+
                 synchronized(discoveredServices) {
                     if (discoveredServices.any { it.serviceName == serviceInfo.serviceName }) {
-                        Log.d(TAG, "Service ${serviceInfo.serviceName} already discovered, skipping resolve")
+                        Log.d(
+                            TAG,
+                            "Service ${serviceInfo.serviceName} already discovered, skipping resolve"
+                        )
                         return
                     }
                 }

@@ -57,96 +57,96 @@ fun ManualConnectionCard(
         )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-        IconToggleItem(
-            iconRes = R.drawable.rounded_devices_24,
-            title = "Manual Connection",
-            description = if (expanded) "Hide connection details" else "Enter connection details manually",
-            showToggle = false,
-            onClick = {
-                HapticUtil.performLightTick(haptics)
-                expanded = !expanded
-            },
-            trailingIcon = if (expanded) R.drawable.outline_expand_circle_up_24 else R.drawable.outline_expand_circle_down_24
-        )
+            IconToggleItem(
+                iconRes = R.drawable.rounded_devices_24,
+                title = "Manual Connection",
+                description = if (expanded) "Hide connection details" else "Enter connection details manually",
+                showToggle = false,
+                onClick = {
+                    HapticUtil.performLightTick(haptics)
+                    expanded = !expanded
+                },
+                trailingIcon = if (expanded) R.drawable.outline_expand_circle_up_24 else R.drawable.outline_expand_circle_down_24
+            )
 
-        AnimatedVisibility(visible = expanded) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                if (onQrScanClick != null) {
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    if (onQrScanClick != null) {
+                        Button(
+                            onClick = {
+                                HapticUtil.performClick(haptics)
+                                onQrScanClick()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.rounded_qr_code_scanner_24),
+                                contentDescription = "Scan QR Code",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .padding(end = 8.dp)
+                            )
+                            Text("Scan QR Code")
+                        }
+                    }
+                    OutlinedTextField(
+                        value = uiState.ipAddress,
+                        onValueChange = onIpChange,
+                        label = { Text("IP Address") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = uiState.port,
+                        onValueChange = onPortChange,
+                        label = { Text("Port") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = uiState.manualPcName,
+                        onValueChange = onPcNameChange,
+                        label = { Text("PC Name (Optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                    OutlinedTextField(
+                        value = uiState.symmetricKey ?: "",
+                        onValueChange = onSymmetricKeyChange,
+                        label = { Text("Encryption Key") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("AirSync+", color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.weight(1f))
+                        Switch(
+                            checked = uiState.manualIsPlus,
+                            onCheckedChange = { enabled ->
+                                if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(
+                                    haptics
+                                )
+                                onIsPlusChange(enabled)
+                            }
+                        )
+                    }
                     Button(
                         onClick = {
                             HapticUtil.performClick(haptics)
-                            onQrScanClick()
+                            onConnect()
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.rounded_qr_code_scanner_24),
-                            contentDescription = "Scan QR Code",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(end = 8.dp)
-                        )
-                        Text("Scan QR Code")
+                        Text("Connect")
                     }
-                }
-                OutlinedTextField(
-                    value = uiState.ipAddress,
-                    onValueChange = onIpChange,
-                    label = { Text("IP Address") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                OutlinedTextField(
-                    value = uiState.port,
-                    onValueChange = onPortChange,
-                    label = { Text("Port") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                OutlinedTextField(
-                    value = uiState.manualPcName,
-                    onValueChange = onPcNameChange,
-                    label = { Text("PC Name (Optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                )
-                OutlinedTextField(
-                    value = uiState.symmetricKey ?: "",
-                    onValueChange = onSymmetricKeyChange,
-                    label = { Text("Encryption Key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("AirSync+", color = MaterialTheme.colorScheme.onSurface)
-                    Spacer(Modifier.weight(1f))
-                    Switch(
-                        checked = uiState.manualIsPlus,
-                        onCheckedChange = { enabled ->
-                            if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(
-                                haptics
-                            )
-                            onIsPlusChange(enabled)
-                        }
-                    )
-                }
-                Button(
-                    onClick = {
-                        HapticUtil.performClick(haptics)
-                        onConnect()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Connect")
                 }
             }
         }
     }
-}
 }
 

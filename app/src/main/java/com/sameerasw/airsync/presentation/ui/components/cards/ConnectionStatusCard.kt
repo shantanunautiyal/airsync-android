@@ -64,140 +64,141 @@ fun ConnectionStatusCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-        // 1) Device image at the top (only when connected)
-        if (isConnected) {
-            val previewRes = DevicePreviewResolver.getPreviewRes(connectedDevice)
-            Image(
-                painter = painterResource(id = previewRes),
-                contentDescription = "Connected Mac preview",
-                modifier = Modifier.fillMaxWidth(0.75f),
-                contentScale = ContentScale.Fit,
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)
-            )
-        }
-
-        // 2) Device info block (when connected)
-        if (isConnected && connectedDevice != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "${connectedDevice.name}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
+            // 1) Device image at the top (only when connected)
+            if (isConnected) {
+                val previewRes = DevicePreviewResolver.getPreviewRes(connectedDevice)
+                Image(
+                    painter = painterResource(id = previewRes),
+                    contentDescription = "Connected Mac preview",
+                    modifier = Modifier.fillMaxWidth(0.75f),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)
                 )
+            }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (connectedDevice.isPlus)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp)
+            // 2) Device info block (when connected)
+            if (isConnected && connectedDevice != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (connectedDevice.isPlus) "PLUS" else "FREE",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (connectedDevice.isPlus)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        "${connectedDevice.name}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
                     )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (connectedDevice.isPlus)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp)
+                    ) {
+                        Text(
+                            text = if (connectedDevice.isPlus) "PLUS" else "FREE",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (connectedDevice.isPlus)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val ips =
+                        uiState.ipAddress.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    ips.forEach { ip ->
+                        val isActive = ip == uiState.activeIp
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.animateContentSize()
+                        ) {
+                            Text(
+                                text = "$ip:${connectedDevice.port}",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
 
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // 3) Connection status row last
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = if (isConnected) 0.dp else 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val ips = uiState.ipAddress.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                ips.forEach { ip ->
-                    val isActive = ip == uiState.activeIp
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.animateContentSize()
+                val statusText = when {
+                    isConnecting -> "Connecting..."
+                    isConnected -> "Syncing"
+                    else -> "Disconnected"
+                }
+
+                if (isConnecting) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { LoadingIndicator() }
+                }
+
+                if (isConnected) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        SlowlyRotatingAppIcon(
+                            modifier = Modifier.size(54.dp)
+                        )
+                    }
+                } else if (!isConnecting) {
+                    Icon(
+                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
+                        contentDescription = "Disconnected",
+                        modifier = Modifier.padding(end = 8.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (isConnected) {
+                    Button(
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onDisconnect()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceBright,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier.height(48.dp)
                     ) {
+                        Icon(
+                            painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.size(6.dp))
                         Text(
-                            text = "$ip:${connectedDevice.port}",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Disconnect",
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1
                         )
                     }
                 }
             }
         }
-
-        // 3) Connection status row last
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = if (isConnected) 0.dp else 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val statusText = when {
-                isConnecting -> "Connecting..."
-                isConnected -> "Syncing"
-                else -> "Disconnected"
-            }
-
-            if (isConnecting) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) { LoadingIndicator() }
-            }
-
-            if (isConnected) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    SlowlyRotatingAppIcon(
-                        modifier = Modifier.size(54.dp)
-                    )
-                }
-            } else if (!isConnecting) {
-                Icon(
-                    painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
-                    contentDescription = "Disconnected",
-                    modifier = Modifier.padding(end = 8.dp),
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
-
-            if (isConnected) {
-                Button(
-                    onClick = {
-                        HapticUtil.performClick(haptics)
-                        onDisconnect()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceBright,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.height(48.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(
-                        text = "Disconnect",
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
     }
-}
 }

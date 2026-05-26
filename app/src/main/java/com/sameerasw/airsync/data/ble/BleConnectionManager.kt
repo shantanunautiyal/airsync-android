@@ -4,28 +4,34 @@ import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.WebSocketUtil
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
 
 class BleConnectionManager(private val context: Context) {
     companion object {
         private const val TAG = "BleConnectionManager"
     }
-    
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val dataStoreManager = DataStoreManager(context)
     private var bleServer: BleGattServer? = null
-    
+
     private var isBleEnabled = false
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val _serverFlow = kotlinx.coroutines.flow.MutableStateFlow<BleGattServer?>(null)
-    
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val connectionState = _serverFlow.flatMapLatest { server ->
-        server?.connectionState ?: kotlinx.coroutines.flow.MutableStateFlow(BleGattServer.BleConnectionState.DISCONNECTED)
+        server?.connectionState
+            ?: kotlinx.coroutines.flow.MutableStateFlow(BleGattServer.BleConnectionState.DISCONNECTED)
     }
 
     fun start() {

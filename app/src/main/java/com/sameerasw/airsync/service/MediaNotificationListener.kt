@@ -119,12 +119,14 @@ class MediaNotificationListener : NotificationListenerService() {
                         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
                         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
-                        val durationMs = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+                        val durationMs =
+                            metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
                         val positionMs = playbackState?.position ?: 0L
                         val positionTimestampMs = System.currentTimeMillis()
                         val isBuffering = when (playbackState?.state) {
                             PlaybackState.STATE_BUFFERING,
                             PlaybackState.STATE_CONNECTING -> true
+
                             else -> false
                         }
 
@@ -540,7 +542,7 @@ class MediaNotificationListener : NotificationListenerService() {
         serviceScope.launch {
             try {
                 val id = NotificationDismissalUtil.getIdForSbn(sbn) ?: sbn.key
-                
+
                 // If this dismissal was initiated by our own dismiss request, skip echo
                 val wasSuppressed = NotificationDismissalUtil.consumeSuppressed(id)
                 if (wasSuppressed) {
@@ -558,7 +560,7 @@ class MediaNotificationListener : NotificationListenerService() {
                     )
                 )
                 WebSocketUtil.sendMessage(updateJson)
-                
+
                 Log.d(TAG, "Sent notification removal sync for $id")
 
                 // Remove from caches since it's gone now

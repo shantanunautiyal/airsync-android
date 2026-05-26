@@ -8,13 +8,11 @@ import com.google.security.cryptauth.lib.securegcm.Ukey2ServerInit
 import com.google.security.cryptauth.lib.securemessage.EcP256PublicKey
 import com.google.security.cryptauth.lib.securemessage.GenericPublicKey
 import com.google.security.cryptauth.lib.securemessage.PublicKeyType
-import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.digests.SHA512Digest
 import org.bouncycastle.crypto.generators.HKDFBytesGenerator
 import org.bouncycastle.crypto.params.HKDFParameters
-import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.KeyPair
 import java.security.KeyPairGenerator
@@ -35,10 +33,38 @@ class Ukey2Context {
         }
 
         private val D2D_SALT = byteArrayOf(
-            0x82.toByte(), 0xAA.toByte(), 0x55.toByte(), 0xA0.toByte(), 0xD3.toByte(), 0x97.toByte(), 0xF8.toByte(), 0x83.toByte(),
-            0x46.toByte(), 0xCA.toByte(), 0x1C.toByte(), 0xEE.toByte(), 0x8D.toByte(), 0x39.toByte(), 0x09.toByte(), 0xB9.toByte(),
-            0x5F.toByte(), 0x13.toByte(), 0xFA.toByte(), 0x7D.toByte(), 0xEB.toByte(), 0x1D.toByte(), 0x4A.toByte(), 0xB3.toByte(),
-            0x83.toByte(), 0x76.toByte(), 0xB8.toByte(), 0x25.toByte(), 0x6D.toByte(), 0xA8.toByte(), 0x55.toByte(), 0x10.toByte()
+            0x82.toByte(),
+            0xAA.toByte(),
+            0x55.toByte(),
+            0xA0.toByte(),
+            0xD3.toByte(),
+            0x97.toByte(),
+            0xF8.toByte(),
+            0x83.toByte(),
+            0x46.toByte(),
+            0xCA.toByte(),
+            0x1C.toByte(),
+            0xEE.toByte(),
+            0x8D.toByte(),
+            0x39.toByte(),
+            0x09.toByte(),
+            0xB9.toByte(),
+            0x5F.toByte(),
+            0x13.toByte(),
+            0xFA.toByte(),
+            0x7D.toByte(),
+            0xEB.toByte(),
+            0x1D.toByte(),
+            0x4A.toByte(),
+            0xB3.toByte(),
+            0x83.toByte(),
+            0x76.toByte(),
+            0xB8.toByte(),
+            0x25.toByte(),
+            0x6D.toByte(),
+            0xA8.toByte(),
+            0x55.toByte(),
+            0x10.toByte()
         )
     }
 
@@ -104,8 +130,9 @@ class Ukey2Context {
         digest.update(clientFinishEnvelopeBytes, 0, clientFinishEnvelopeBytes.size)
         val calculatedCommitment = ByteArray(digest.digestSize)
         digest.doFinal(calculatedCommitment, 0)
-        
-        val p256Commitment = clientInit.cipher_commitments.find { it.handshake_cipher == Ukey2HandshakeCipher.P256_SHA512 }?.commitment?.toByteArray()
+
+        val p256Commitment =
+            clientInit.cipher_commitments.find { it.handshake_cipher == Ukey2HandshakeCipher.P256_SHA512 }?.commitment?.toByteArray()
         if (p256Commitment == null || !p256Commitment.contentEquals(calculatedCommitment)) {
             Log.w("Ukey2Context", "Commitment mismatch (bypassed for reliability)")
         } else {
@@ -113,13 +140,15 @@ class Ukey2Context {
         }
 
         val clientFinished = Ukey2ClientFinished.ADAPTER.decode(
-            com.google.security.cryptauth.lib.securegcm.Ukey2Message.ADAPTER.decode(clientFinishEnvelopeBytes).message_data!!
+            com.google.security.cryptauth.lib.securegcm.Ukey2Message.ADAPTER.decode(
+                clientFinishEnvelopeBytes
+            ).message_data!!
         )
-        
+
         // 2. ECDH Shared Secret
         val clientPubKeyProto = GenericPublicKey.ADAPTER.decode(clientFinished.public_key!!)
         val clientPubKey = decodePublicKey(clientPubKeyProto.ec_p256_public_key!!)
-        
+
         val ka = KeyAgreement.getInstance("ECDH")
         ka.init(keyPair.private)
         ka.doPhase(clientPubKey, true)
@@ -131,7 +160,7 @@ class Ukey2Context {
 
         // 4. HKDF Derivation — use the raw Ukey2Message envelope bytes, matching the Mac
         val ukeyInfo = clientInitEnvelopeBytes + serverInitEnvelopeBytes
-        
+
         val authKey = hkdf(derivedSecretKey, "UKEY2 v1 auth".toByteArray(), ukeyInfo)
         val nextSecret = hkdf(derivedSecretKey, "UKEY2 v1 next".toByteArray(), ukeyInfo)
 
@@ -149,7 +178,12 @@ class Ukey2Context {
         sendHmacKey = hkdf(d2dServerKey, smsgSalt, "SIG:1".toByteArray())
     }
 
-    private fun hkdf(key: ByteArray, salt: ByteArray, info: ByteArray, length: Int = 32): ByteArray {
+    private fun hkdf(
+        key: ByteArray,
+        salt: ByteArray,
+        info: ByteArray,
+        length: Int = 32
+    ): ByteArray {
         val generator = HKDFBytesGenerator(SHA256Digest())
         generator.init(HKDFParameters(key, salt, info))
         val result = ByteArray(length)
@@ -179,14 +213,15 @@ class Ukey2Context {
         val x = java.math.BigInteger(1, ecPubKey.x.toByteArray())
         val y = java.math.BigInteger(1, ecPubKey.y.toByteArray())
         val ecPoint = java.security.spec.ECPoint(x, y)
-        
+
         val kf = java.security.KeyFactory.getInstance("EC")
-        
+
         // Get P-256 parameter spec
         val algorithmParameters = java.security.AlgorithmParameters.getInstance("EC")
         algorithmParameters.init(java.security.spec.ECGenParameterSpec("secp256r1"))
-        val ecParameterSpec = algorithmParameters.getParameterSpec(java.security.spec.ECParameterSpec::class.java)
-        
+        val ecParameterSpec =
+            algorithmParameters.getParameterSpec(java.security.spec.ECParameterSpec::class.java)
+
         val keySpec = java.security.spec.ECPublicKeySpec(ecPoint, ecParameterSpec)
         return kf.generatePublic(keySpec)
     }

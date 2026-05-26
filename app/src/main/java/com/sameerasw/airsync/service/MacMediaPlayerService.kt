@@ -165,8 +165,16 @@ class MacMediaPlayerService : Service() {
                 val duration = intent.getLongExtra(EXTRA_DURATION, 0L)
                 val timestamp = intent.getStringExtra(EXTRA_TIMESTAMP)
                 val playbackRate = intent.getDoubleExtra(EXTRA_PLAYBACK_RATE, 1.0)
-                
-                startMacMediaSession(title, artist, isPlaying, elapsedTime, duration, timestamp, playbackRate)
+
+                startMacMediaSession(
+                    title,
+                    artist,
+                    isPlaying,
+                    elapsedTime,
+                    duration,
+                    timestamp,
+                    playbackRate
+                )
             }
 
             ACTION_UPDATE_MAC_MEDIA -> {
@@ -177,8 +185,16 @@ class MacMediaPlayerService : Service() {
                 val duration = intent.getLongExtra(EXTRA_DURATION, 0L)
                 val timestamp = intent.getStringExtra(EXTRA_TIMESTAMP)
                 val playbackRate = intent.getDoubleExtra(EXTRA_PLAYBACK_RATE, 1.0)
-                
-                updateMacMediaSession(title, artist, isPlaying, elapsedTime, duration, timestamp, playbackRate)
+
+                updateMacMediaSession(
+                    title,
+                    artist,
+                    isPlaying,
+                    elapsedTime,
+                    duration,
+                    timestamp,
+                    playbackRate
+                )
             }
             // Handle media control actions from notification buttons
             "MAC_MEDIA_play" -> {
@@ -298,7 +314,9 @@ class MacMediaPlayerService : Service() {
                 PlaybackStateCompat.ACTION_STOP
 
         // Parse ISO8601 timestamp to calculate elapsed time since reporting
-        var position = if (elapsedTime >= 0) elapsedTime else (mediaSession?.controller?.playbackState?.position ?: 0L)
+        var position =
+            if (elapsedTime >= 0) elapsedTime else (mediaSession?.controller?.playbackState?.position
+                ?: 0L)
         if (isPlaying && !timestamp.isNullOrEmpty()) {
             try {
                 val reportedAt = java.time.Instant.parse(timestamp).toEpochMilli()
@@ -430,7 +448,7 @@ class MacMediaPlayerService : Service() {
                 val duration = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION)
                 val position = it.controller.playbackState?.position ?: 0L
                 val speed = it.controller.playbackState?.playbackSpeed?.toDouble() ?: 1.0
-                
+
                 updateMacMediaSession(title, artist, isPlaying, position, duration, null, speed)
             }
         }

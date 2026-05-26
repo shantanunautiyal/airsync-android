@@ -6,9 +6,9 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
 import android.telecom.TelecomManager
+import android.util.Log
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
-import android.util.Log
 
 object CallControlUtil {
     private const val TAG = "CallControlUtil"
@@ -26,7 +26,8 @@ object CallControlUtil {
 
             if (hasPermission) {
                 try {
-                    val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+                    val telecomManager =
+                        context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
                     if (telecomManager != null) {
                         Log.d(TAG, "Accepting ringing call via TelecomManager")
                         telecomManager.acceptRingingCall()
@@ -36,7 +37,10 @@ object CallControlUtil {
                     Log.e(TAG, "Failed to accept ringing call via TelecomManager, falling back", e)
                 }
             } else {
-                Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted, falling back to media key hook")
+                Log.w(
+                    TAG,
+                    "ANSWER_PHONE_CALLS permission not granted, falling back to media key hook"
+                )
             }
         }
 
@@ -57,7 +61,8 @@ object CallControlUtil {
 
             if (hasPermission) {
                 try {
-                    val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+                    val telecomManager =
+                        context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
                     if (telecomManager != null) {
                         Log.d(TAG, "Ending/declining call via TelecomManager")
                         val success = telecomManager.endCall()
@@ -70,7 +75,10 @@ object CallControlUtil {
                     Log.e(TAG, "Failed to end call via TelecomManager, falling back", e)
                 }
             } else {
-                Log.w(TAG, "ANSWER_PHONE_CALLS permission not granted, falling back to media key hook")
+                Log.w(
+                    TAG,
+                    "ANSWER_PHONE_CALLS permission not granted, falling back to media key hook"
+                )
             }
         }
 

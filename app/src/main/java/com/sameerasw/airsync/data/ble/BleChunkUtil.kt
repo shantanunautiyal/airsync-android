@@ -12,7 +12,7 @@ object BleChunkUtil {
     fun splitIntoChunks(payload: String, mtu: Int): List<ByteArray> {
         val data = payload.toByteArray(Charsets.UTF_8)
         val maxPayloadSize = mtu - BleConstants.CHUNK_HEADER_SIZE
-        
+
         if (maxPayloadSize <= 0) {
             Log.e(TAG, "MTU too small: $mtu")
             return emptyList()
@@ -20,21 +20,21 @@ object BleChunkUtil {
 
         val totalChunks = (data.size + maxPayloadSize - 1) / maxPayloadSize
         val chunks = mutableListOf<ByteArray>()
-        
+
         for (i in 0 until totalChunks) {
             val start = i * maxPayloadSize
             val end = minOf(start + maxPayloadSize, data.size)
             val chunkData = data.sliceArray(start until end)
-            
+
             val chunk = ByteArray(BleConstants.CHUNK_HEADER_SIZE + chunkData.size)
             val buffer = java.nio.ByteBuffer.wrap(chunk)
             buffer.putShort(i.toShort())
             buffer.putShort(totalChunks.toShort())
-            
+
             chunkData.copyInto(chunk, BleConstants.CHUNK_HEADER_SIZE)
             chunks.add(chunk)
         }
-        
+
         return chunks
     }
 
@@ -45,20 +45,20 @@ object BleChunkUtil {
     fun reassemble(chunks: Map<Int, ByteArray>): String {
         val sortedIndices = chunks.keys.sorted()
         if (sortedIndices.isEmpty()) return ""
-        
+
         val totalSize = chunks.values.sumOf { it.size }
         val result = ByteArray(totalSize)
-        
+
         var offset = 0
         for (index in sortedIndices) {
             val chunk = chunks[index] ?: continue
             chunk.copyInto(result, offset)
             offset += chunk.size
         }
-        
+
         return String(result, Charsets.UTF_8)
     }
-    
+
     /**
      * Extracts header information from a raw BLE packet.
      */
@@ -89,15 +89,15 @@ object BleChunkUtil {
             val header = parseHeader(packet) ?: return null
             val current = header.first
             val total = header.second
-            
+
             if (totalChunks != -1 && totalChunks != total) {
                 // New transmission started or mismatch, reset
                 chunks.clear()
             }
             totalChunks = total
-            
+
             chunks[current] = getPayload(packet)
-            
+
             if (chunks.size == totalChunks) {
                 val result = reassemble(chunks)
                 chunks.clear()

@@ -60,94 +60,94 @@ fun LastConnectedDeviceCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-        Text(
-            "Last Connected Device",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val previewRes = DevicePreviewResolver.getPreviewRes(device)
-            Image(
-                painter = painterResource(id = previewRes),
-                contentDescription = "Connected Mac preview",
-                modifier = Modifier.fillMaxWidth(0.45f),
-                contentScale = ContentScale.Fit,
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)
+            Text(
+                "Last Connected Device",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
             )
-        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "${device.name}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                val lastConnectedTime = remember(device.lastConnected) {
-                    val currentTime = System.currentTimeMillis()
-                    val diffMinutes = (currentTime - device.lastConnected) / (1000 * 60)
-                    when {
-                        diffMinutes < 1 -> "Just now"
-                        diffMinutes < 60 -> "${diffMinutes}m ago"
-                        diffMinutes < 1440 -> "${diffMinutes / 60}h ago"
-                        else -> "${diffMinutes / 1440}d ago"
-                    }
-                }
-                Text(
-                    "Last seen $lastConnectedTime",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (device.isPlus)
-                    MaterialTheme.colorScheme.primaryContainer
-                else
-                    MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.padding(start = 8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (device.isPlus) "PLUS" else "FREE",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (device.isPlus)
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                val previewRes = DevicePreviewResolver.getPreviewRes(device)
+                Image(
+                    painter = painterResource(id = previewRes),
+                    contentDescription = "Connected Mac preview",
+                    modifier = Modifier.fillMaxWidth(0.45f),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)
                 )
             }
-        }
 
-        Button(
-            onClick = {
-                HapticUtil.performClick(haptics)
-                onQuickConnect()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .requiredHeight(48.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_sync_desktop_24),
-                contentDescription = "Quick connect",
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Quick Connect")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${device.name}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    val lastConnectedTime = remember(device.lastConnected) {
+                        val currentTime = System.currentTimeMillis()
+                        val diffMinutes = (currentTime - device.lastConnected) / (1000 * 60)
+                        when {
+                            diffMinutes < 1 -> "Just now"
+                            diffMinutes < 60 -> "${diffMinutes}m ago"
+                            diffMinutes < 1440 -> "${diffMinutes / 60}h ago"
+                            else -> "${diffMinutes / 1440}d ago"
+                        }
+                    }
+                    Text(
+                        "Last seen $lastConnectedTime",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (device.isPlus)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(
+                        text = if (device.isPlus) "PLUS" else "FREE",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (device.isPlus)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    HapticUtil.performClick(haptics)
+                    onQuickConnect()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .requiredHeight(48.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_sync_desktop_24),
+                    contentDescription = "Quick connect",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Quick Connect")
+            }
         }
-    }
 
 
         IconToggleItem(
@@ -168,5 +168,5 @@ fun LastConnectedDeviceCard(
                 onDismissRequest = { showBottomSheet = false }
             )
         }
-}
+    }
 }

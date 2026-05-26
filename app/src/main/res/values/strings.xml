@@ -74,7 +74,7 @@
     <string name="help_guides_title">Help &amp; Guides</string>
     <string name="action_how_to_connect">How to Connect?</string>
     <string name="action_back">Back</string>
-    
+
     <!-- Sentry Reporting (Picker) -->
     <string name="sentry_report_mode_title">Crash reporting</string>
     <string name="sentry_mode_off">Off</string>

@@ -97,7 +97,8 @@ class AirSyncViewModel(
     // Connection status listener for WebSocket updates
     private val connectionStatusListener: (Boolean) -> Unit = { isWsConnected ->
         viewModelScope.launch {
-            val isBleConnected = _uiState.value.bleConnectionState == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
+            val isBleConnected =
+                _uiState.value.bleConnectionState == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
             val isGlobalConnected = isWsConnected || isBleConnected
 
             _uiState.value = _uiState.value.copy(
@@ -196,14 +197,15 @@ class AirSyncViewModel(
         viewModelScope.launch {
             com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.connectionState?.collect { state ->
                 Log.d("AirSyncViewModel", "BLE connection state changed: $state")
-                val isBleAuthenticated = state == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
+                val isBleAuthenticated =
+                    state == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
                 val isWsConnected = WebSocketUtil.isConnected()
-                
+
                 _uiState.value = _uiState.value.copy(
                     bleConnectionState = state,
                     isConnected = isWsConnected || isBleAuthenticated
                 )
-                
+
                 if (isBleAuthenticated && !isWsConnected) {
                     // Refresh shortcuts and other side effects if this is the only connection
                     appContext?.let { ctx ->
@@ -318,7 +320,7 @@ class AirSyncViewModel(
             val isPowerSaveMode = DeviceInfoUtil.isPowerSaveMode(context)
             val isBlurProblematic = DeviceInfoUtil.isBlurProblematicDevice()
             val isQuickShareEnabled = repository.isQuickShareEnabled().first()
-            
+
             // Replicate Essentials logic for initial state
             val isBlurEnabled = isBlurEnabledSetting && !isPowerSaveMode && !isBlurProblematic
 
@@ -411,7 +413,7 @@ class AirSyncViewModel(
 
             // Start AirSync Service conditionally
             ServiceManager.updateServiceState(context)
-            
+
             // Initial shortcut state
             ShortcutUtil.refreshShortcuts(context, WebSocketUtil.isConnected())
             isNetworkMonitoringActive = true
@@ -686,7 +688,8 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isQuickShareEnabled = enabled)
         viewModelScope.launch {
             repository.setQuickShareEnabled(enabled)
-            val intent = Intent(context, com.sameerasw.airsync.quickshare.QuickShareService::class.java)
+            val intent =
+                Intent(context, com.sameerasw.airsync.quickshare.QuickShareService::class.java)
             if (enabled) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
@@ -1133,15 +1136,18 @@ class AirSyncViewModel(
         }
     }
 
-    private val _notificationApps = MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())
-    val notificationApps: StateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>> = _notificationApps.asStateFlow()
+    private val _notificationApps =
+        MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())
+    val notificationApps: StateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>> =
+        _notificationApps.asStateFlow()
 
     fun loadNotificationApps(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val installed = com.sameerasw.airsync.utils.AppUtil.getInstalledApps(context)
                 val saved = repository.getNotificationApps().first()
-                val merged = com.sameerasw.airsync.utils.AppUtil.mergeWithSavedApps(installed, saved)
+                val merged =
+                    com.sameerasw.airsync.utils.AppUtil.mergeWithSavedApps(installed, saved)
                 _notificationApps.value = merged
             } catch (e: Exception) {
                 Log.e("AirSyncViewModel", "Failed to load notification apps: ${e.message}")
@@ -1163,7 +1169,10 @@ class AirSyncViewModel(
         }
     }
 
-    fun saveAllNotificationApps(context: Context, apps: List<com.sameerasw.airsync.domain.model.NotificationApp>) {
+    fun saveAllNotificationApps(
+        context: Context,
+        apps: List<com.sameerasw.airsync.domain.model.NotificationApp>
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 _notificationApps.value = apps

@@ -209,7 +209,10 @@ object PermissionUtil {
             missing.add("Local Network Access")
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(context)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(
+                context
+            )
+        ) {
             missing.add("Answer Calls")
         }
 
@@ -274,7 +277,10 @@ object PermissionUtil {
             optional.add("Local Network Access")
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(context)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(
+                context
+            )
+        ) {
             optional.add("Answer Calls")
         }
 
@@ -310,14 +316,20 @@ object PermissionUtil {
             Manifest.permission.READ_PHONE_STATE
         ) == PackageManager.PERMISSION_GRANTED
     }
- 
+
     /**
      * Check if Bluetooth permissions are granted (Connect and Advertise/Scan on Android 12+)
      */
     fun isBluetoothPermissionsGranted(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.BLUETOOTH_ADVERTISE
+                    ) == PackageManager.PERMISSION_GRANTED
         } else {
             // On older versions, manifest permissions are enough
             true

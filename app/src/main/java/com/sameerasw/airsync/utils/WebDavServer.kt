@@ -3,19 +3,35 @@ package com.sameerasw.airsync.utils
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
-import io.ktor.server.plugins.statuspages.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLPathPart
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.call
+import io.ktor.server.application.install
+import io.ktor.server.cio.CIO
+import io.ktor.server.engine.ApplicationEngine
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.path
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondFile
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.head
+import io.ktor.server.routing.method
+import io.ktor.server.routing.route
+import io.ktor.server.routing.routing
 import java.io.File
 import java.net.ServerSocket
 import java.net.URLDecoder
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class WebDavServer(private val context: Context) {
     private var engine: ApplicationEngine? = null
@@ -116,7 +132,11 @@ class WebDavServer(private val context: Context) {
         val depth = call.request.headers["Depth"] ?: "1"
         val xml = buildPropfindXml(file, relativePath, depth)
 
-        call.respondText(xml, ContentType.Text.Xml.withParameter("charset", "utf-8"), HttpStatusCode.MultiStatus)
+        call.respondText(
+            xml,
+            ContentType.Text.Xml.withParameter("charset", "utf-8"),
+            HttpStatusCode.MultiStatus
+        )
     }
 
     private fun buildPropfindXml(file: File, relativePath: String, depth: String): String {
@@ -131,7 +151,8 @@ class WebDavServer(private val context: Context) {
                 ?.filter { !it.name.startsWith(".") }
                 ?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
                 ?.forEach { child ->
-                    val childRelPath = if (relativePath.isEmpty()) child.name else "$relativePath/${child.name}"
+                    val childRelPath =
+                        if (relativePath.isEmpty()) child.name else "$relativePath/${child.name}"
                     appendFileEntry(sb, child, childRelPath)
                 }
         }
@@ -170,7 +191,8 @@ class WebDavServer(private val context: Context) {
         } else {
             sb.append("        <d:resourcetype/>\n")
             sb.append("        <d:getcontentlength>${file.length()}</d:getcontentlength>\n")
-            val contentType = java.net.URLConnection.guessContentTypeFromName(file.name) ?: "application/octet-stream"
+            val contentType = java.net.URLConnection.guessContentTypeFromName(file.name)
+                ?: "application/octet-stream"
             sb.append("        <d:getcontenttype>$contentType</d:getcontenttype>\n")
         }
         sb.append("        <d:getlastmodified>$lastModified</d:getlastmodified>\n")
@@ -210,13 +232,17 @@ class WebDavServer(private val context: Context) {
 
         if (!file.isDirectory) {
             call.response.header(HttpHeaders.ContentLength, file.length().toString())
-            val contentType = java.net.URLConnection.guessContentTypeFromName(file.name) ?: "application/octet-stream"
+            val contentType = java.net.URLConnection.guessContentTypeFromName(file.name)
+                ?: "application/octet-stream"
             call.response.header(HttpHeaders.ContentType, contentType)
         }
         val rfc1123Format = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("GMT")
         }
-        call.response.header(HttpHeaders.LastModified, rfc1123Format.format(Date(file.lastModified())))
+        call.response.header(
+            HttpHeaders.LastModified,
+            rfc1123Format.format(Date(file.lastModified()))
+        )
         call.respond(HttpStatusCode.OK)
     }
 }

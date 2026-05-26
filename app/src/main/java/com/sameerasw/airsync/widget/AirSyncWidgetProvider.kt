@@ -106,16 +106,21 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             val widgetAlpha = runBlocking { ds.getWidgetTransparency().first() }
 
             // Apply background transparency
-            val baseBg = androidx.core.content.ContextCompat.getColor(context, R.color.widget_background)
-            val bgWithAlpha = androidx.core.graphics.ColorUtils.setAlphaComponent(baseBg, (widgetAlpha * 255).toInt().coerceIn(0, 255))
+            val baseBg =
+                androidx.core.content.ContextCompat.getColor(context, R.color.widget_background)
+            val bgWithAlpha = androidx.core.graphics.ColorUtils.setAlphaComponent(
+                baseBg,
+                (widgetAlpha * 255).toInt().coerceIn(0, 255)
+            )
             views.setInt(R.id.widget_container, "setBackgroundColor", bgWithAlpha)
 
             // Device image (large preview) and name
             val previewRes = DevicePreviewResolver.getPreviewRes(lastDevice)
             views.setImageViewResource(R.id.widget_device_image, previewRes)
-            
+
             // Apply primary accent tint
-            val accentColor = androidx.core.content.ContextCompat.getColor(context, R.color.material_primary)
+            val accentColor =
+                androidx.core.content.ContextCompat.getColor(context, R.color.material_primary)
             views.setInt(R.id.widget_device_image, "setColorFilter", accentColor)
 
             // Dim the device image when not connected (including while connecting)

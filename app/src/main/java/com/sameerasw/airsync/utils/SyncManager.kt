@@ -45,7 +45,9 @@ object SyncManager {
                     // Heartbeat: Sync battery over BLE if authenticated and WS not connected to keep Mac connection alive
                     if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && !WebSocketUtil.isConnected()) {
                         val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
-                        com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(currentBattery)
+                        com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(
+                            currentBattery
+                        )
                     }
 
                     // Check if sync is needed (either via WebSocket or BLE)
@@ -201,8 +203,10 @@ object SyncManager {
                 Log.d(TAG, "Discovered ADB ports: $adbPorts")
 
                 val deviceId = DeviceInfoUtil.getDeviceId(context)
-                val symmetricKey = dataStoreManager.getLastConnectedDevice().first()?.symmetricKey ?: ""
-                val bleAuthToken = com.sameerasw.airsync.data.ble.BleTransportBridge.deriveAuthToken(symmetricKey)
+                val symmetricKey =
+                    dataStoreManager.getLastConnectedDevice().first()?.symmetricKey ?: ""
+                val bleAuthToken =
+                    com.sameerasw.airsync.data.ble.BleTransportBridge.deriveAuthToken(symmetricKey)
 
                 val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(
                     id = deviceId,

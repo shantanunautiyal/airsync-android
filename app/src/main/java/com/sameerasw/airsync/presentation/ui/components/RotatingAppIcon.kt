@@ -10,14 +10,18 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -39,7 +43,8 @@ fun RotatingAppIcon(
     val scope = rememberCoroutineScope()
     val rotationAnimatable = remember { Animatable(0f) }
 
-    val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    val sensorManager =
+        remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val gravitySensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
     var accumulatedRotation by remember { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(0f) }
@@ -68,7 +73,10 @@ fun RotatingAppIcon(
                         val tiltMagnitudeSqr = smoothedAx * smoothedAx + smoothedAy * smoothedAy
                         if (tiltMagnitudeSqr < 2.0f) return
 
-                        val targetAngle = (atan2(smoothedAx.toDouble(), smoothedAy.toDouble()) * 180 / PI).toFloat()
+                        val targetAngle = (atan2(
+                            smoothedAx.toDouble(),
+                            smoothedAy.toDouble()
+                        ) * 180 / PI).toFloat()
 
                         var delta = targetAngle - lastAngle
                         if (delta > 180) delta -= 360
@@ -107,11 +115,17 @@ fun RotatingAppIcon(
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
                     Lifecycle.Event.ON_RESUME -> {
-                        sensorManager.registerListener(listener, gravitySensor, SensorManager.SENSOR_DELAY_UI)
+                        sensorManager.registerListener(
+                            listener,
+                            gravitySensor,
+                            SensorManager.SENSOR_DELAY_UI
+                        )
                     }
+
                     Lifecycle.Event.ON_PAUSE -> {
                         sensorManager.unregisterListener(listener)
                     }
+
                     else -> {}
                 }
             }
@@ -119,7 +133,11 @@ fun RotatingAppIcon(
             lifecycleOwner.lifecycle.addObserver(observer)
             // Initial register if already resumed
             if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                sensorManager.registerListener(listener, gravitySensor, SensorManager.SENSOR_DELAY_UI)
+                sensorManager.registerListener(
+                    listener,
+                    gravitySensor,
+                    SensorManager.SENSOR_DELAY_UI
+                )
             }
 
             onDispose {
