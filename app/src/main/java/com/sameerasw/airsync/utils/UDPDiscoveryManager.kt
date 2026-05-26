@@ -204,35 +204,47 @@ object UDPDiscoveryManager {
         }
     }
 
+    fun refreshSocket() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "Refreshing UDP discovery socket due to network change")
+                socket?.close()
+                socket = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing socket: ${e.message}")
+            }
+        }
+    }
+
     private fun startListening(context: Context) {
         val appContext = context.applicationContext
         listeningJob = CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Ensure socket is closed before creating new one
-                socket?.close()
-                socket = DatagramSocket(BROADCAST_PORT).apply {
-                    broadcast = true
-                    reuseAddress = true
-                    soTimeout = 0
-                }
-
-                val buffer = ByteArray(4096)
-                while (isRunning) {
-                    try {
-                        val packet = DatagramPacket(buffer, buffer.size)
-                        socket?.receive(packet)
-
-                        val jsonString = String(packet.data, 0, packet.length)
-                        handleIncomingTraffic(appContext, jsonString, packet.address.hostAddress)
-                    } catch (e: Exception) {
-                        if (isRunning) {
-                            Log.e(TAG, "Error receiving packet: ${e.message}")
-                            delay(1000)
+            val buffer = ByteArray(4096)
+            while (isRunning) {
+                try {
+                    if (socket == null || socket!!.isClosed) {
+                        Log.d(TAG, "Creating new DatagramSocket on port $BROADCAST_PORT")
+                        socket = DatagramSocket(BROADCAST_PORT).apply {
+                            broadcast = true
+                            reuseAddress = true
+                            soTimeout = 0
                         }
                     }
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    socket?.receive(packet)
+
+                    val jsonString = String(packet.data, 0, packet.length)
+                    handleIncomingTraffic(appContext, jsonString, packet.address.hostAddress)
+                } catch (e: Exception) {
+                    if (isRunning) {
+                        Log.e(TAG, "Error receiving packet: ${e.message}, recreating socket...")
+                        try {
+                            socket?.close()
+                        } catch (_: Exception) {}
+                        socket = null
+                        delay(2000)
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Socket creation failed: ${e.message}")
             }
         }
     }
@@ -249,11 +261,10 @@ object UDPDiscoveryManager {
                         handlePresenceMessage(context, json, sourceIp)
 
                         // Optimization: If we receive a presence packet in PASSIVE mode, 
-                        // we might want to respond once so the Mac knows we are here,
-                        // essentially performing a "lazy handshake"
+                        // we respond so the Mac knows we are here (lazy handshake)
                         if (currentMode == DiscoveryMode.PASSIVE && isDiscoveryEnabled) {
                             CoroutineScope(Dispatchers.IO).launch {
-                                // broadcastPresence(context) // Optional: avoid if we want to be truly silent
+                                broadcastPresence(context)
                             }
                         }
                     }
