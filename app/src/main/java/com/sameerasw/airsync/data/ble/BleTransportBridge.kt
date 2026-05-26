@@ -47,7 +47,7 @@ object BleTransportBridge {
             audio.volume.toString(),
             if (audio.isMuted) "1" else "0",
             audio.likeStatus,
-            audio.albumArtLite ?: ""
+            "" // Avoid sending heavy base64 art over BLE to conserve bandwidth
         ).joinToString(BleConstants.DELIMITER)
         
         gattServer?.sendChunkedNotification(BleConstants.CHAR_MEDIA_STATE, payload)
@@ -79,12 +79,24 @@ object BleTransportBridge {
 
     fun handleMediaControl(action: String, context: android.content.Context) {
         Log.d(TAG, "Media control from BLE: $action")
-        when (action) {
-            "playPause" -> com.sameerasw.airsync.utils.MediaControlUtil.playPause(context)
-            "next" -> com.sameerasw.airsync.utils.MediaControlUtil.skipNext(context)
-            "previous" -> com.sameerasw.airsync.utils.MediaControlUtil.skipPrevious(context)
-            "callAccept" -> CallControlUtil.acceptCall(context)
-            "callDecline", "callEnd" -> CallControlUtil.endCall(context)
+        when {
+            action == "playPause" -> com.sameerasw.airsync.utils.MediaControlUtil.playPause(context)
+            action == "next" -> com.sameerasw.airsync.utils.MediaControlUtil.skipNext(context)
+            action == "previous" -> com.sameerasw.airsync.utils.MediaControlUtil.skipPrevious(context)
+            action == "callAccept" -> CallControlUtil.acceptCall(context)
+            action == "callDecline" || action == "callEnd" -> CallControlUtil.endCall(context)
+            
+            // Volume Controls over BLE
+            action == "volumeUp" -> com.sameerasw.airsync.utils.VolumeControlUtil.increaseVolume(context)
+            action == "volumeDown" -> com.sameerasw.airsync.utils.VolumeControlUtil.decreaseVolume(context)
+            action == "muteToggle" -> com.sameerasw.airsync.utils.VolumeControlUtil.toggleMute(context)
+            action.startsWith("setVolume|") -> {
+                val volStr = action.substringAfter("setVolume|")
+                val vol = volStr.toIntOrNull()
+                if (vol != null && vol in 0..100) {
+                    com.sameerasw.airsync.utils.VolumeControlUtil.setVolume(context, vol)
+                }
+            }
         }
     }
 
