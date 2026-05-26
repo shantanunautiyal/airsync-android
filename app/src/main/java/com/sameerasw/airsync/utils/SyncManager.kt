@@ -78,6 +78,9 @@ object SyncManager {
     }
 
     fun checkAndSyncDeviceStatus(context: Context, forceSync: Boolean = false) {
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val dataStoreManager = DataStoreManager(context)
