@@ -407,7 +407,12 @@ fun lerp(start: Float, stop: Float, fraction: Float): Float {
 }
 
 private fun formatTime(seconds: Long): String {
-    val mins = seconds / 60
+    val hours = seconds / 3600
+    val mins = (seconds % 3600) / 60
     val secs = seconds % 60
-    return "$mins:${if (secs < 10) "0" else ""}$secs"
+    return if (hours > 0) {
+        "$hours:${if (mins < 10) "0" else ""}$mins:${if (secs < 10) "0" else ""}$secs"
+    } else {
+        "$mins:${if (secs < 10) "0" else ""}$secs"
+    }
 }
