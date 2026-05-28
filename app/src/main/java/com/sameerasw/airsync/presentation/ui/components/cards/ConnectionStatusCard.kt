@@ -180,7 +180,7 @@ fun ConnectionStatusCard(
                             onDisconnect()
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceBright,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         ),
                         modifier = Modifier.height(48.dp)
