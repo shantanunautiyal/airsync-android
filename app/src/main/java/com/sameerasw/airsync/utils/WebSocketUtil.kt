@@ -76,10 +76,6 @@ object WebSocketUtil {
             .connectTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // Keep connection alive
-            .pingInterval(
-                20,
-                TimeUnit.SECONDS
-            ) // Send ping every 20 seconds
             .build()
     }
 
