@@ -41,6 +41,7 @@ object WebSocketUtil {
     private fun updateConnectedStatus(status: Boolean) {
         isConnected.set(status)
         _connectionStateFlow.value = status
+        notifyConnectionStatusListeners(status)
     }
 
     // Transport state: true after OkHttp onOpen, false after closing/failure/disconnect
@@ -147,6 +148,7 @@ object WebSocketUtil {
 
             isConnecting.set(true)
             handshakeCompleted.set(false)
+            notifyConnectionStatusListeners(false)
 
             // Reset manual disconnect flag on manual attempt
             if (manualAttempt) {
@@ -820,6 +822,7 @@ object WebSocketUtil {
         autoReconnectJob = null
         autoReconnectAttempts = 0
         autoReconnectStartTime = 0L
+        notifyConnectionStatusListeners(false)
     }
 
     fun isAutoReconnecting(): Boolean = autoReconnectActive.get()
@@ -868,6 +871,7 @@ object WebSocketUtil {
         if (autoReconnectActive.get()) return // already running
         autoReconnectActive.set(true)
         autoReconnectStartTime = System.currentTimeMillis()
+        notifyConnectionStatusListeners(false)
         Log.d(TAG, "Starting Smart Auto-Reconnect strategy")
 
         autoReconnectJob?.cancel()
