@@ -87,6 +87,7 @@ object DeviceInfoUtil {
 
                 @Suppress("DEPRECATION")
                 val wifiInfo = wifiManager.connectionInfo
+
                 @Suppress("DEPRECATION")
                 val ipAddress = wifiInfo.ipAddress
                 if (ipAddress != 0) {
@@ -210,7 +211,7 @@ object DeviceInfoUtil {
     fun isBlurProblematicDevice(): Boolean {
         // Samsung devices on One UI 7 (Android 15) or below have a broken blur implementation
         // that causes a gray screen overlay. Disable it for them. (╯°□°）╯︵ ┻━┻
-        return Build.MANUFACTURER.equals("samsung", ignoreCase = true) && 
+        return Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
                 Build.VERSION.SDK_INT <= 35 // Android 15
     }
 
@@ -224,7 +225,8 @@ object DeviceInfoUtil {
     }
 
     fun isPowerSaveMode(context: Context): Boolean {
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val powerManager =
+            context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
         return powerManager?.isPowerSaveMode == true
     }
 }

@@ -3,7 +3,6 @@ package com.sameerasw.airsync.quickshare
 import android.content.Context
 import android.util.Log
 import java.net.ServerSocket
-import java.net.Socket
 import java.util.concurrent.Executors
 
 /**
@@ -27,18 +26,18 @@ class QuickShareServer(
     fun start() {
         if (isRunning) return
         isRunning = true
-        
+
         try {
             serverSocket = ServerSocket(0) // Bind to any available port synchronously
             val currentPort = port
             Log.d(TAG, "Server bound to port $currentPort")
-            
+
             executor.execute {
                 try {
                     while (isRunning) {
                         val socket = serverSocket?.accept() ?: break
                         Log.d(TAG, "New connection from ${socket.remoteSocketAddress}")
-                        
+
                         val connection = InboundQuickShareConnection(
                             context = context,
                             socket = socket

@@ -1,7 +1,6 @@
 package com.sameerasw.airsync.utils
 
 import androidx.annotation.DrawableRes
-import com.sameerasw.airsync.R
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 
 /**

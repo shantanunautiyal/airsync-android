@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.dialogs
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,13 +22,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.platform.LocalContext
-import android.content.Context
 import com.sameerasw.airsync.R
 
 enum class PermissionType {
@@ -76,7 +76,8 @@ fun PermissionExplanationDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(18.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -217,7 +218,7 @@ private fun getPermissionInfo(context: Context, permissionType: PermissionType):
             whyNeeded = "This permission allows AirSync to detect when your phone is ringing, when you answer, or when a call ends, so it can display a live call status on your Mac. \n\nAirSync NEVER accesses your call audio or records conversations. This is used solely to facilitate the remote call notification feature as a device companion.",
             buttonText = "Grant Phone Access"
         )
- 
+
         PermissionType.BLUETOOTH -> PermissionInfo(
             title = "Bluetooth Access",
             icon = R.drawable.rounded_sync_desktop_24,

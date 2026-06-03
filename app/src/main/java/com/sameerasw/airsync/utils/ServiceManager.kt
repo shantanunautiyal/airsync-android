@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
  * and user preferences for background features.
  */
 object ServiceManager {
-    
+
     /**
      * Determines if any background service should be running based on settings.
      */
@@ -22,7 +22,7 @@ object ServiceManager {
         val isConnected = WebSocketUtil.isConnected()
         val isAutoReconnectEnabled = dataStore.getAutoReconnectEnabled().first()
         val isDiscoveryEnabled = dataStore.getDeviceDiscoveryEnabled().first()
-        
+
         // Service needs to run if:
         // 1. We are currently connected
         // 2. We need to auto-reconnect in the background

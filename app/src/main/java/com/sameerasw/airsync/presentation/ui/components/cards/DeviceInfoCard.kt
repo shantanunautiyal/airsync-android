@@ -33,19 +33,19 @@ fun DeviceInfoCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-        Text("My Android", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
+            Text("My Android", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
 
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = deviceName,
-            onValueChange = onDeviceNameChange,
-            label = { Text("Device Name") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-        )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = deviceName,
+                onValueChange = onDeviceNameChange,
+                label = { Text("Device Name") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+            )
+        }
     }
-}
 }
 

@@ -5,8 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
-import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.ble.BleGattServer
+import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MacBattery
 import com.sameerasw.airsync.domain.model.MacDeviceStatus
 import com.sameerasw.airsync.domain.model.MacMusicInfo
@@ -159,7 +159,8 @@ object MacDeviceStatusManager {
             CoroutineScope(Dispatchers.IO).launch {
                 val ds = DataStoreManager(context)
                 val isMediaControlsEnabled = ds.getMacMediaControlsEnabled().first()
-                val isConnected = WebSocketUtil.isConnected() || WebSocketUtil.isConnecting() || BleGattServer.isAnyAuthenticated()
+                val isConnected =
+                    WebSocketUtil.isConnected() || WebSocketUtil.isConnecting() || BleGattServer.isAnyAuthenticated()
                 val isEssentialsEnabled = ds.getEssentialsConnectionEnabled().first()
 
                 if (isConnected && isMediaControlsEnabled && (title.isNotEmpty() || artist.isNotEmpty() || isPlaying)) {

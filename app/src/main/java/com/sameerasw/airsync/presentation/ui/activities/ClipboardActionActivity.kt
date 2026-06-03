@@ -13,25 +13,16 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -47,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -62,7 +52,6 @@ import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.ClipboardUtil
-import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.ShortcutUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.delay
@@ -273,7 +262,7 @@ private fun ClipboardActionScreenContent(
                 )
 
                 // Divider or Space if needed, but spacing is enough
-                
+
                 // Status Icon / Loading Indicator
                 AnimatedContent(
                     targetState = uiState,
@@ -309,7 +298,7 @@ private fun ClipboardActionScreenContent(
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
-                            
+
                             else -> {
                                 // Default/Idle icon
                                 val iconPainter = when (shortcutAction) {

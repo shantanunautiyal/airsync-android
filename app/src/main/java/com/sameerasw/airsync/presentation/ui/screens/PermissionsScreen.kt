@@ -222,7 +222,7 @@ fun PermissionsScreen(
                                         isCritical = false
                                     )
                                 }
- 
+
                                 "Bluetooth Access" -> {
                                     PermissionButton(
                                         permissionName = permission,
@@ -236,7 +236,9 @@ fun PermissionsScreen(
                                     PermissionButton(
                                         permissionName = permission,
                                         description = "Discover nearby Mac devices on Wi-Fi",
-                                        onExplainClick = { showDialog = PermissionType.LOCAL_NETWORK },
+                                        onExplainClick = {
+                                            showDialog = PermissionType.LOCAL_NETWORK
+                                        },
                                         isCritical = false
                                     )
                                 }
@@ -245,7 +247,9 @@ fun PermissionsScreen(
                                     PermissionButton(
                                         permissionName = permission,
                                         description = "Accept and end calls from Mac",
-                                        onExplainClick = { showDialog = PermissionType.ANSWER_CALLS },
+                                        onExplainClick = {
+                                            showDialog = PermissionType.ANSWER_CALLS
+                                        },
                                         isCritical = false
                                     )
                                 }
@@ -293,7 +297,7 @@ fun PermissionsScreen(
                     PermissionType.PHONE -> {
                         onRequestPhonePermission?.invoke()
                     }
- 
+
                     PermissionType.BLUETOOTH -> {
                         onRequestBluetoothPermission?.invoke()
                     }

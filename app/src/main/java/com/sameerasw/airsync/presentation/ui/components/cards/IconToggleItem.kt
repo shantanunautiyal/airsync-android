@@ -73,7 +73,9 @@ fun IconToggleItem(
                     painter = painterResource(id = iconRes),
                     contentDescription = title,
                     modifier = Modifier.size(24.dp),
-                    tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.38f
+                    )
                 )
             }
 
@@ -84,13 +86,17 @@ fun IconToggleItem(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.38f
+                    )
                 )
                 if (description != null) {
                     Text(
                         text = description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                        color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = 0.38f
+                        ),
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
@@ -109,10 +115,14 @@ fun IconToggleItem(
                 )
             } else if (onClick != null && !showToggle) {
                 Icon(
-                    painter = painterResource(id = trailingIcon ?: R.drawable.rounded_keyboard_arrow_right_24),
+                    painter = painterResource(
+                        id = trailingIcon ?: R.drawable.rounded_keyboard_arrow_right_24
+                    ),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                        alpha = 0.38f
+                    )
                 )
             }
         }

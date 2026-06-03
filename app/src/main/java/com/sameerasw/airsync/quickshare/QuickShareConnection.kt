@@ -64,9 +64,9 @@ open class QuickShareConnection(
     fun readEncryptedMessage(): ByteArray {
         val context = ukey2Context ?: throw IllegalStateException("UKEY2 context not set")
         val frameData = readFrame()
-        
+
         val smsg = SecureMessage.ADAPTER.decode(frameData)
-        
+
         // 1. Verify HMAC
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(context.receiveHmacKey, "HmacSHA256"))
@@ -80,7 +80,11 @@ open class QuickShareConnection(
         val hb = HeaderAndBody.ADAPTER.decode(smsg.header_and_body!!)
         val iv = hb.header_!!.iv!!.toByteArray()
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(context.decryptKey, "AES"), IvParameterSpec(iv))
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            SecretKeySpec(context.decryptKey, "AES"),
+            IvParameterSpec(iv)
+        )
         val decryptedData = cipher.doFinal(hb.body!!.toByteArray())
 
         // 3. Parse DeviceToDeviceMessage
@@ -111,7 +115,11 @@ open class QuickShareConnection(
         // 2. Encrypt with AES-CBC
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         val iv = ByteArray(16).also { java.util.Random().nextBytes(it) }
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(context.encryptKey, "AES"), IvParameterSpec(iv))
+        cipher.init(
+            Cipher.ENCRYPT_MODE,
+            SecretKeySpec(context.encryptKey, "AES"),
+            IvParameterSpec(iv)
+        )
         val encryptedData = cipher.doFinal(serializedD2D)
 
         // 3. Create HeaderAndBody

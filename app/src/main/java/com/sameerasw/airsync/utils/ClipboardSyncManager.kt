@@ -172,15 +172,7 @@ object ClipboardSyncManager {
                 } catch (_: Exception) {
                     true
                 }
-                // Only for Plus and while connected
-                val isConnected = WebSocketUtil.isConnected()
-                val last = try {
-                    dataStoreManager.getLastConnectedDevice().first()
-                } catch (_: Exception) {
-                    null
-                }
-                val isPlus = last?.isPlus == true
-                if (continueEnabled && isConnected && isPlus && isLinkOnly(text)) {
+                if (continueEnabled && WebSocketUtil.isConnected() && isLinkOnly(text)) {
                     NotificationUtil.showContinueBrowsingLink(context, text.trim(), keepPrevious)
                 }
             }

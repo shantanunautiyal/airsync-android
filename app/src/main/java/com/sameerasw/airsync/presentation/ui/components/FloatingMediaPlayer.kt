@@ -1,21 +1,24 @@
 package com.sameerasw.airsync.presentation.ui.components
 
 import android.graphics.Bitmap
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,54 +37,37 @@ import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.animation.core.exponentialDecay
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.gestures.AnchoredDraggableState
-import androidx.compose.foundation.gestures.DraggableAnchors
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.anchoredDraggable
-import androidx.compose.foundation.gestures.animateTo
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.MacMusicInfo
 import com.sameerasw.airsync.utils.HapticUtil
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 enum class DragValue { Collapsed, Expanded }
 
@@ -120,7 +106,7 @@ fun FloatingMediaPlayer(
 
     val collapsedHeight = 72.dp
     val expandedHeight = 280.dp
-    
+
     val collapsedPx = with(density) { collapsedHeight.toPx() }
     val expandedPx = with(density) { expandedHeight.toPx() }
 
@@ -194,7 +180,7 @@ fun FloatingMediaPlayer(
                 ) {
                     // Expand Button
                     IconButton(
-                        onClick = { 
+                        onClick = {
                             scope.launch { anchoredDraggableState.animateTo(DragValue.Expanded) }
                         },
                         modifier = Modifier.size(40.dp)
@@ -212,7 +198,8 @@ fun FloatingMediaPlayer(
                             .weight(1f)
                     ) {
                         Text(
-                            text = musicInfo?.title?.takeIf { it.isNotEmpty() } ?: "Nothing Playing",
+                            text = musicInfo?.title?.takeIf { it.isNotEmpty() }
+                                ?: "Nothing Playing",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -255,7 +242,7 @@ fun FloatingMediaPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             scope.launch { anchoredDraggableState.animateTo(DragValue.Collapsed) }
                         }) {
                             Icon(
@@ -264,14 +251,15 @@ fun FloatingMediaPlayer(
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        
+
                         // Metadata (Centered)
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = musicInfo?.title?.takeIf { it.isNotEmpty() } ?: "Nothing Playing",
+                                text = musicInfo?.title?.takeIf { it.isNotEmpty() }
+                                    ?: "Nothing Playing",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -279,14 +267,15 @@ fun FloatingMediaPlayer(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = musicInfo?.artist?.takeIf { it.isNotEmpty() } ?: "from your Mac",
+                                text = musicInfo?.artist?.takeIf { it.isNotEmpty() }
+                                    ?: "from your Mac",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        
+
                         Spacer(modifier = Modifier.size(48.dp)) // To balance the chevron
                     }
 
@@ -296,8 +285,13 @@ fun FloatingMediaPlayer(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             val durationSeconds = musicInfo.duration / 1000L
-                            val elapsedSeconds = (currentElapsedTimeMs / 1000L).coerceIn(0L, durationSeconds)
-                            val elapsedFraction = (currentElapsedTimeMs.toFloat() / musicInfo.duration.toFloat()).coerceIn(0f, 1f)
+                            val elapsedSeconds =
+                                (currentElapsedTimeMs / 1000L).coerceIn(0L, durationSeconds)
+                            val elapsedFraction =
+                                (currentElapsedTimeMs.toFloat() / musicInfo.duration.toFloat()).coerceIn(
+                                    0f,
+                                    1f
+                                )
 
                             LinearWavyProgressIndicator(
                                 progress = { elapsedFraction },
@@ -342,14 +336,22 @@ fun FloatingMediaPlayer(
                             content = {
                                 FilledTonalIconButton(
                                     onClick = { onMediaAction("media_prev") },
-                                    modifier = Modifier.weight(0.7f).fillMaxHeight()
+                                    modifier = Modifier
+                                        .weight(0.7f)
+                                        .fillMaxHeight()
                                 ) {
-                                    Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(36.dp))
+                                    Icon(
+                                        Icons.Rounded.SkipPrevious,
+                                        contentDescription = "Previous",
+                                        modifier = Modifier.size(36.dp)
+                                    )
                                 }
 
                                 FilledIconButton(
                                     onClick = { onMediaAction("media_play_pause") },
-                                    modifier = Modifier.weight(1.5f).fillMaxHeight()
+                                    modifier = Modifier
+                                        .weight(1.5f)
+                                        .fillMaxHeight()
                                 ) {
                                     Icon(
                                         imageVector = if (musicInfo?.isPlaying == true) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -360,9 +362,15 @@ fun FloatingMediaPlayer(
 
                                 FilledTonalIconButton(
                                     onClick = { onMediaAction("media_next") },
-                                    modifier = Modifier.weight(0.7f).fillMaxHeight()
+                                    modifier = Modifier
+                                        .weight(0.7f)
+                                        .fillMaxHeight()
                                 ) {
-                                    Icon(Icons.Rounded.SkipNext, contentDescription = "Next", modifier = Modifier.size(36.dp))
+                                    Icon(
+                                        Icons.Rounded.SkipNext,
+                                        contentDescription = "Next",
+                                        modifier = Modifier.size(36.dp)
+                                    )
                                 }
                             }
                         )

@@ -31,10 +31,19 @@ object ShortcutUtil {
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_SCAN)
                     .setShortLabel("Scan")
                     .setLongLabel("Scan QR Code")
-                    .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_qr_code_scanner_24))
-                    .setIntent(Intent(context, com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity::class.java).apply {
-                        action = "com.sameerasw.airsync.SCAN_QR"
-                    })
+                    .setIcon(
+                        IconCompat.createWithResource(
+                            context,
+                            R.drawable.rounded_qr_code_scanner_24
+                        )
+                    )
+                    .setIntent(
+                        Intent(
+                            context,
+                            com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity::class.java
+                        ).apply {
+                            action = "com.sameerasw.airsync.SCAN_QR"
+                        })
                     .build()
             )
 
@@ -56,11 +65,20 @@ object ShortcutUtil {
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_REMOTE)
                     .setShortLabel("Remote")
                     .setLongLabel("Remote Control")
-                    .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_compare_arrows_24))
-                    .setIntent(Intent(context, com.sameerasw.airsync.MainActivity::class.java).apply {
-                        action = DASH_ACTION_REMOTE
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    })
+                    .setIcon(
+                        IconCompat.createWithResource(
+                            context,
+                            R.drawable.rounded_compare_arrows_24
+                        )
+                    )
+                    .setIntent(
+                        Intent(
+                            context,
+                            com.sameerasw.airsync.MainActivity::class.java
+                        ).apply {
+                            action = DASH_ACTION_REMOTE
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        })
                     .build()
             )
 
@@ -93,7 +111,12 @@ object ShortcutUtil {
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_DISCONNECT)
                     .setShortLabel("Disconnect")
                     .setLongLabel("Disconnect")
-                    .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_mimo_disconnect_24))
+                    .setIcon(
+                        IconCompat.createWithResource(
+                            context,
+                            R.drawable.rounded_mimo_disconnect_24
+                        )
+                    )
                     .setIntent(Intent(context, ClipboardActionActivity::class.java).apply {
                         action = DASH_ACTION_DISCONNECT
                     })

@@ -15,14 +15,15 @@ class AirSyncApp : Application() {
     companion object {
         private var instance: AirSyncApp? = null
         fun isAppForeground(): Boolean = instance?.isForeground() ?: false
-        fun getBleConnectionManager(): com.sameerasw.airsync.data.ble.BleConnectionManager? = instance?.bleConnectionManager
+        fun getBleConnectionManager(): com.sameerasw.airsync.data.ble.BleConnectionManager? =
+            instance?.bleConnectionManager
     }
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         initSentry()
-        
+
         bleConnectionManager = com.sameerasw.airsync.data.ble.BleConnectionManager(this)
         bleConnectionManager.start()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
@@ -30,11 +31,13 @@ class AirSyncApp : Application() {
             override fun onActivityStarted(activity: Activity) {
                 activityCount++
             }
+
             override fun onActivityResumed(activity: Activity) {}
             override fun onActivityPaused(activity: Activity) {}
             override fun onActivityStopped(activity: Activity) {
                 activityCount--
             }
+
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
             override fun onActivityDestroyed(activity: Activity) {}
         })
@@ -49,7 +52,8 @@ class AirSyncApp : Application() {
         if (!isEnabled) return
 
         SentryAndroid.init(this) { options ->
-            options.dsn = "https://cb9b0ead9e88e0818269e773cb662141@o4510996760887296.ingest.de.sentry.io/4511002261389392"
+            options.dsn =
+                "https://cb9b0ead9e88e0818269e773cb662141@o4510996760887296.ingest.de.sentry.io/4511002261389392"
             options.isEnabled = true
         }
     }

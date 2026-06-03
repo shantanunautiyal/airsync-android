@@ -44,7 +44,7 @@ object BleConstants {
     // Chunking
     const val MAX_MTU = 512
     const val CHUNK_HEADER_SIZE = 4 // [index: UInt16][total: UInt16]
-    
+
     // Delimiter for compact strings
     const val DELIMITER = "\u001F"
 }

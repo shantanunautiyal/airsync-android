@@ -3,11 +3,11 @@
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="12dp"
     android:background="@drawable/widget_background"
     android:clickable="true"
-    android:gravity="center_horizontal">
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="12dp">
 
     <!-- Device image with overlay hint -->
     <FrameLayout
@@ -20,22 +20,22 @@
             android:id="@+id/widget_device_image"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:contentDescription="Device image"
-            android:src="@drawable/ic_laptop_24"
-            android:scaleType="fitCenter"
             android:adjustViewBounds="true"
-            android:padding="0dp" />
+            android:contentDescription="Device image"
+            android:padding="0dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_laptop_24" />
 
         <TextView
             android:id="@+id/widget_tap_hint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Tap to reconnect"
-            android:textStyle="bold"
-            android:textSize="12sp"
-            android:textColor="@color/widget_primary_text"
-            android:background="@drawable/widget_tap_hint_bg"
             android:layout_gravity="center"
+            android:background="@drawable/widget_tap_hint_bg"
+            android:text="Tap to reconnect"
+            android:textColor="@color/widget_primary_text"
+            android:textSize="12sp"
+            android:textStyle="bold"
             android:visibility="gone" />
 
         <!-- Battery overlay (shown when connected) -->
@@ -43,13 +43,13 @@
             android:id="@+id/widget_battery_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
             android:layout_gravity="center"
-            android:gravity="center_vertical"
             android:background="@drawable/widget_tap_hint_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:paddingStart="8dp"
-            android:paddingEnd="8dp"
             android:paddingTop="4dp"
+            android:paddingEnd="8dp"
             android:paddingBottom="4dp"
             android:visibility="gone">
 
@@ -59,8 +59,8 @@
                 android:layout_height="16dp"
                 android:adjustViewBounds="true"
                 android:scaleType="centerInside"
-                android:tint="@color/widget_primary_text"
-                android:src="@drawable/outline_battery_full_24" />
+                android:src="@drawable/outline_battery_full_24"
+                android:tint="@color/widget_primary_text" />
 
             <TextView
                 android:id="@+id/widget_battery_text"
@@ -68,9 +68,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:text="100%"
-                android:textStyle="bold"
+                android:textColor="@color/widget_primary_text"
                 android:textSize="12sp"
-                android:textColor="@color/widget_primary_text" />
+                android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>
 
@@ -94,19 +94,19 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="AirSync"
-                android:textStyle="bold"
+                android:textColor="@color/widget_primary_text"
                 android:textSize="16sp"
-                android:textColor="@color/widget_primary_text" />
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_media_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text=""
-                android:textSize="12sp"
-                android:textColor="@color/widget_secondary_text"
-                android:maxLines="1"
                 android:ellipsize="end"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/widget_secondary_text"
+                android:textSize="12sp"
                 android:visibility="gone" />
 
             <TextView
@@ -114,8 +114,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=""
-                android:textSize="12sp"
                 android:textColor="@color/widget_secondary_text"
+                android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>

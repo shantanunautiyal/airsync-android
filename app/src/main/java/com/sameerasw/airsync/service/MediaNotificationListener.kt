@@ -119,12 +119,14 @@ class MediaNotificationListener : NotificationListenerService() {
                         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
                         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
-                        val durationMs = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+                        val durationMs =
+                            metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
                         val positionMs = playbackState?.position ?: 0L
                         val positionTimestampMs = System.currentTimeMillis()
                         val isBuffering = when (playbackState?.state) {
                             PlaybackState.STATE_BUFFERING,
                             PlaybackState.STATE_CONNECTING -> true
+
                             else -> false
                         }
 
@@ -540,7 +542,7 @@ class MediaNotificationListener : NotificationListenerService() {
         serviceScope.launch {
             try {
                 val id = NotificationDismissalUtil.getIdForSbn(sbn) ?: sbn.key
-                
+
                 // If this dismissal was initiated by our own dismiss request, skip echo
                 val wasSuppressed = NotificationDismissalUtil.consumeSuppressed(id)
                 if (wasSuppressed) {
@@ -558,7 +560,7 @@ class MediaNotificationListener : NotificationListenerService() {
                     )
                 )
                 WebSocketUtil.sendMessage(updateJson)
-                
+
                 Log.d(TAG, "Sent notification removal sync for $id")
 
                 // Remove from caches since it's gone now
@@ -641,12 +643,13 @@ class MediaNotificationListener : NotificationListenerService() {
                         return@launch
                     }
 
-                    // Generate unique notification ID
-                    val notificationId = NotificationDismissalUtil.generateNotificationId(
-                        sbn.packageName,
-                        title,
-                        sbn.postTime
-                    )
+                    // Retrieve existing notification ID or generate a new one
+                    val notificationId = NotificationDismissalUtil.getIdBySystemKey(sbn.key)
+                        ?: NotificationDismissalUtil.generateNotificationId(
+                            sbn.packageName,
+                            title,
+                            sbn.postTime
+                        )
 
                     // Store notification for potential dismissal or actions
                     NotificationDismissalUtil.storeNotification(notificationId, sbn)
@@ -668,10 +671,37 @@ class MediaNotificationListener : NotificationListenerService() {
                         Log.w(TAG, "Failed to extract actions: ${e.message}")
                     }
 
-                    // Get notification priority (alerting vs silent)
-                    val priority = getNotificationPriority(sbn)
+                    // Check for progress bar extras
+                    var progress: Int? = null
+                    var progressMax: Int? = null
+                    var progressIndeterminate: Boolean? = null
+                    val ongoing = (notification.flags and Notification.FLAG_ONGOING_EVENT) != 0
 
-                    // Create notification JSON with actions
+                    try {
+                        val hasProgress = extras.containsKey(Notification.EXTRA_PROGRESS) ||
+                                extras.containsKey(Notification.EXTRA_PROGRESS_MAX)
+                        if (hasProgress) {
+                            val maxVal = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
+                            val progressVal = extras.getInt(Notification.EXTRA_PROGRESS, 0)
+                            val indeterminateVal = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+
+                            if (maxVal > 0 || indeterminateVal) {
+                                progress = progressVal
+                                progressMax = maxVal
+                                progressIndeterminate = indeterminateVal
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to parse notification progress: ${e.message}")
+                    }
+
+                    // Get notification priority (alerting vs silent)
+                    var priority = getNotificationPriority(sbn)
+                    if (progressMax != null || progressIndeterminate == true) {
+                        priority = "silent"
+                    }
+
+                    // Create notification JSON with actions and progress details
                     val notificationJson = JsonUtil.toSingleLine(
                         JsonUtil.createNotificationJson(
                             id = notificationId,
@@ -680,7 +710,11 @@ class MediaNotificationListener : NotificationListenerService() {
                             app = appName,
                             packageName = sbn.packageName,
                             priority = priority,
-                            actions = actions
+                            actions = actions,
+                            progress = progress,
+                            progressMax = progressMax,
+                            progressIndeterminate = progressIndeterminate,
+                            ongoing = ongoing
                         )
                     )
 

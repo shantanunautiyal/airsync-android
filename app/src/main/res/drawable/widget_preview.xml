@@ -11,10 +11,10 @@
 
     <!-- Border -->
     <path
-        android:strokeColor="#E0E0E0"
-        android:strokeWidth="1"
         android:fillColor="@android:color/transparent"
-        android:pathData="M8,0L172,0A8,8 0 0,1 180,8L180,102A8,8 0 0,1 172,110L8,110A8,8 0 0,1 0,102L0,8A8,8 0 0,1 8,0z" />
+        android:pathData="M8,0L172,0A8,8 0 0,1 180,8L180,102A8,8 0 0,1 172,110L8,110A8,8 0 0,1 0,102L0,8A8,8 0 0,1 8,0z"
+        android:strokeWidth="1"
+        android:strokeColor="#E0E0E0" />
 
     <!-- Status indicator (green circle) -->
     <path
@@ -44,8 +44,8 @@
     <!-- Secondary button mockup -->
     <path
         android:fillColor="#FFFFFF"
-        android:strokeColor="#79747E"
+        android:pathData="M95,75L168,75A4,4 0 0,1 172,79L172,95A4,4 0 0,1 168,99L95,99A4,4 0 0,1 91,95L91,79A4,4 0 0,1 95,75z"
         android:strokeWidth="1"
-        android:pathData="M95,75L168,75A4,4 0 0,1 172,79L172,95A4,4 0 0,1 168,99L95,99A4,4 0 0,1 91,95L91,79A4,4 0 0,1 95,75z" />
+        android:strokeColor="#79747E" />
 
 </vector>

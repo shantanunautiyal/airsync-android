@@ -57,6 +57,7 @@ object UDPDiscoveryManager {
 
     @Volatile
     private var isRunning = false
+
     @Volatile
     private var currentMode = DiscoveryMode.ACTIVE
 
@@ -69,7 +70,8 @@ object UDPDiscoveryManager {
     private fun acquireMulticastLock(context: Context) {
         try {
             if (multicastLock == null) {
-                val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                val wm =
+                    context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
                 multicastLock = wm.createMulticastLock("AirSync:DiscoveryLock")
             }
             if (multicastLock?.isHeld == false) {
@@ -131,7 +133,7 @@ object UDPDiscoveryManager {
             Log.d(TAG, "Discovery disabled, skipping burst broadcast")
             return
         }
-        
+
         Log.d(TAG, "Starting burst broadcast for ${durationMs}ms")
         burstJob?.cancel()
         burstJob = CoroutineScope(Dispatchers.IO).launch {
@@ -240,7 +242,8 @@ object UDPDiscoveryManager {
                         Log.e(TAG, "Error receiving packet: ${e.message}, recreating socket...")
                         try {
                             socket?.close()
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) {
+                        }
                         socket = null
                         delay(2000)
                     }
@@ -376,7 +379,7 @@ object UDPDiscoveryManager {
 
     private fun broadcastPresence(context: Context) {
         if (!isDiscoveryEnabled) return
-        
+
         val allIps = getAllIpAddresses()
         if (allIps.isEmpty()) {
             return
@@ -459,7 +462,7 @@ object UDPDiscoveryManager {
 
     private fun broadcastGoodbye(context: Context) {
         if (!isDiscoveryEnabled) return
-        
+
         val allIps = getAllIpAddresses()
         if (allIps.isEmpty()) return
 

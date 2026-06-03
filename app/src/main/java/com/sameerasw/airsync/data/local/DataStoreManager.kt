@@ -95,7 +95,8 @@ class DataStoreManager(private val context: Context) {
         private val FILE_ACCESS_ENABLED = booleanPreferencesKey("file_access_enabled")
 
         // Widget preferences
-        private val WIDGET_TRANSPARENCY = androidx.datastore.preferences.core.floatPreferencesKey("widget_transparency")
+        private val WIDGET_TRANSPARENCY =
+            androidx.datastore.preferences.core.floatPreferencesKey("widget_transparency")
 
         private val REMOTE_FLIPPED = booleanPreferencesKey("remote_flipped")
 
@@ -1031,11 +1032,13 @@ class DataStoreManager(private val context: Context) {
         context.dataStore.edit { it[BLE_SYNC_ENABLED] = enabled }
     }
 
-    fun getBleSyncEnabled(): Flow<Boolean> = context.dataStore.data.map { it[BLE_SYNC_ENABLED] ?: false }
+    fun getBleSyncEnabled(): Flow<Boolean> =
+        context.dataStore.data.map { it[BLE_SYNC_ENABLED] ?: false }
 
     suspend fun setBleAutoConnectEnabled(enabled: Boolean) {
         context.dataStore.edit { it[BLE_AUTO_CONNECT_ENABLED] = enabled }
     }
 
-    fun getBleAutoConnectEnabled(): Flow<Boolean> = context.dataStore.data.map { it[BLE_AUTO_CONNECT_ENABLED] ?: true }
+    fun getBleAutoConnectEnabled(): Flow<Boolean> =
+        context.dataStore.data.map { it[BLE_AUTO_CONNECT_ENABLED] ?: true }
 }

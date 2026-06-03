@@ -1,7 +1,15 @@
 package com.sameerasw.airsync.data.ble
 
 import android.annotation.SuppressLint
-import android.bluetooth.*
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothGattServer
+import android.bluetooth.BluetoothGattServerCallback
+import android.bluetooth.BluetoothGattService
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -9,14 +17,21 @@ import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
+import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
-import com.sameerasw.airsync.utils.ClipboardSyncManager
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import java.util.*
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 
 @SuppressLint("MissingPermission")
@@ -31,7 +46,8 @@ class BleGattServer(private val context: Context) {
         instance = this
     }
 
-    private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+    private val bluetoothManager =
+        context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val adapter = bluetoothManager.adapter
     private var gattServer: BluetoothGattServer? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -91,14 +107,17 @@ class BleGattServer(private val context: Context) {
         } catch (e: Exception) {
             ""
         }
-        val rawName = if (customName.isNotBlank()) customName else com.sameerasw.airsync.utils.DeviceInfoUtil.getDeviceName(context)
+        val rawName =
+            if (customName.isNotBlank()) customName else com.sameerasw.airsync.utils.DeviceInfoUtil.getDeviceName(
+                context
+            )
         val baseName = rawName
             .replace("AirSync-AirSync-", "")
             .replace("AirSync-", "")
             .replace("airsync-", "")
             .replace("airsync", "")
             .trim()
-            
+
         val bleName = "AirSync-$baseName"
         try {
             if (adapter.name != bleName) {
@@ -130,11 +149,14 @@ class BleGattServer(private val context: Context) {
 
     private fun setupGattServer() {
         gattServer = bluetoothManager.openGattServer(context, gattServerCallback)
-        
+
         pendingServices.clear()
 
         // System Service
-        val systemService = BluetoothGattService(BleConstants.SERVICE_SYSTEM, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val systemService = BluetoothGattService(
+            BleConstants.SERVICE_SYSTEM,
+            BluetoothGattService.SERVICE_TYPE_PRIMARY
+        )
         systemService.addCharacteristic(createReadCharacteristic(BleConstants.CHAR_PROTOCOL_VERSION))
         systemService.addCharacteristic(createWriteCharacteristic(BleConstants.CHAR_AUTH_TOKEN))
         systemService.addCharacteristic(createNotifyCharacteristic(BleConstants.CHAR_AUTH_RESULT))
@@ -146,7 +168,10 @@ class BleGattServer(private val context: Context) {
         pendingServices.add(systemService)
 
         // Notifications Service
-        val notifService = BluetoothGattService(BleConstants.SERVICE_NOTIFICATIONS, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val notifService = BluetoothGattService(
+            BleConstants.SERVICE_NOTIFICATIONS,
+            BluetoothGattService.SERVICE_TYPE_PRIMARY
+        )
         notifService.addCharacteristic(createNotifyCharacteristic(BleConstants.CHAR_NOTIFICATION_DATA))
         notifService.addCharacteristic(createWriteCharacteristic(BleConstants.CHAR_NOTIFICATION_ACTION))
         notifService.addCharacteristic(createWriteCharacteristic(BleConstants.CHAR_NOTIFICATION_DISMISS))
@@ -154,14 +179,20 @@ class BleGattServer(private val context: Context) {
         pendingServices.add(notifService)
 
         // Media Service
-        val mediaService = BluetoothGattService(BleConstants.SERVICE_MEDIA, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val mediaService = BluetoothGattService(
+            BleConstants.SERVICE_MEDIA,
+            BluetoothGattService.SERVICE_TYPE_PRIMARY
+        )
         mediaService.addCharacteristic(createNotifyCharacteristic(BleConstants.CHAR_MEDIA_STATE))
         mediaService.addCharacteristic(createWriteCharacteristic(BleConstants.CHAR_MEDIA_CONTROL))
         mediaService.addCharacteristic(createWriteCharacteristic(BleConstants.CHAR_MAC_MEDIA_STATE))
         pendingServices.add(mediaService)
 
         // Clipboard Service
-        val clipService = BluetoothGattService(BleConstants.SERVICE_CLIPBOARD, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val clipService = BluetoothGattService(
+            BleConstants.SERVICE_CLIPBOARD,
+            BluetoothGattService.SERVICE_TYPE_PRIMARY
+        )
         clipService.addCharacteristic(createNotifyCharacteristic(BleConstants.CHAR_CLIPBOARD_DATA_NOTIFY))
         clipService.addCharacteristic(createWriteCharacteristic(BleConstants.CHAR_CLIPBOARD_DATA_WRITE))
         pendingServices.add(clipService)
@@ -182,7 +213,7 @@ class BleGattServer(private val context: Context) {
         if (currentAdvertiseCallback != null) {
             stopAdvertising()
         }
-        
+
         val advertiser = adapter.bluetoothLeAdvertiser ?: return
 
         val settings = AdvertiseSettings.Builder()
@@ -268,7 +299,10 @@ class BleGattServer(private val context: Context) {
         }
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
-            Log.d(TAG, "onConnectionStateChange: device=${device.address}, status=$status, newState=$newState, bond=${device.bondState}")
+            Log.d(
+                TAG,
+                "onConnectionStateChange: device=${device.address}, status=$status, newState=$newState, bond=${device.bondState}"
+            )
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.d(TAG, "Device connected: ${device.address}")
@@ -279,7 +313,8 @@ class BleGattServer(private val context: Context) {
                 connectedDevices.remove(device)
                 if (connectedDevices.isEmpty()) {
                     stopHeartbeat()
-                    _connectionState.value = if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
+                    _connectionState.value =
+                        if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
                     isAuthenticated = false
                     if (gattServer != null) {
                         val isEnabled = try {
@@ -305,48 +340,109 @@ class BleGattServer(private val context: Context) {
             negotiatedMtu = mtu
         }
 
-        override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int, characteristic: BluetoothGattCharacteristic) {
+        override fun onCharacteristicReadRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            offset: Int,
+            characteristic: BluetoothGattCharacteristic
+        ) {
             if (characteristic.uuid == BleConstants.CHAR_PROTOCOL_VERSION) {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, byteArrayOf(BleConstants.PROTOCOL_VERSION.toByte()))
+                gattServer?.sendResponse(
+                    device,
+                    requestId,
+                    BluetoothGatt.GATT_SUCCESS,
+                    0,
+                    byteArrayOf(BleConstants.PROTOCOL_VERSION.toByte())
+                )
             } else {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, 0, null)
+                gattServer?.sendResponse(
+                    device,
+                    requestId,
+                    BluetoothGatt.GATT_READ_NOT_PERMITTED,
+                    0,
+                    null
+                )
             }
         }
 
         private val chunkBuffers = mutableMapOf<UUID, MutableMap<Int, ByteArray>>()
 
-        override fun onCharacteristicWriteRequest(device: BluetoothDevice, requestId: Int, characteristic: BluetoothGattCharacteristic, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) {
+        override fun onCharacteristicWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            characteristic: BluetoothGattCharacteristic,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray
+        ) {
             Log.d(TAG, "Write request for ${characteristic.uuid}, length: ${value.size}")
-            
+
             if (characteristic.uuid != BleConstants.CHAR_AUTH_TOKEN && !isAuthenticated) {
-                Log.w(TAG, "Blocked unauthorized write request to ${characteristic.uuid} from ${device.address}")
+                Log.w(
+                    TAG,
+                    "Blocked unauthorized write request to ${characteristic.uuid} from ${device.address}"
+                )
                 if (responseNeeded) {
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_WRITE_NOT_PERMITTED, offset, null)
+                    gattServer?.sendResponse(
+                        device,
+                        requestId,
+                        BluetoothGatt.GATT_WRITE_NOT_PERMITTED,
+                        offset,
+                        null
+                    )
                 }
                 return
             }
-            
+
             when (characteristic.uuid) {
                 BleConstants.CHAR_AUTH_TOKEN -> handleAuthRequest(device, value)
                 BleConstants.CHAR_MAC_BATTERY -> handleMacBattery(value)
-                BleConstants.CHAR_NOTIFICATION_ACTION -> handleChunkedWrite(characteristic.uuid, value) { handleNotificationAction(it.toByteArray(Charsets.UTF_8)) }
-                BleConstants.CHAR_MEDIA_CONTROL -> handleChunkedWrite(characteristic.uuid, value) { handleMediaControl(it.toByteArray(Charsets.UTF_8)) }
-                BleConstants.CHAR_MAC_MEDIA_STATE -> handleChunkedWrite(characteristic.uuid, value) { handleMacMediaState(it) }
-                BleConstants.CHAR_CLIPBOARD_DATA_WRITE -> handleChunkedWrite(characteristic.uuid, value) {
+                BleConstants.CHAR_NOTIFICATION_ACTION -> handleChunkedWrite(
+                    characteristic.uuid,
+                    value
+                ) { handleNotificationAction(it.toByteArray(Charsets.UTF_8)) }
+
+                BleConstants.CHAR_MEDIA_CONTROL -> handleChunkedWrite(
+                    characteristic.uuid,
+                    value
+                ) { handleMediaControl(it.toByteArray(Charsets.UTF_8)) }
+
+                BleConstants.CHAR_MAC_MEDIA_STATE -> handleChunkedWrite(
+                    characteristic.uuid,
+                    value
+                ) { handleMacMediaState(it) }
+
+                BleConstants.CHAR_CLIPBOARD_DATA_WRITE -> handleChunkedWrite(
+                    characteristic.uuid,
+                    value
+                ) {
                     Log.d(TAG, "Received clipboard from Mac via BLE: ${it.take(50)}")
                     ClipboardSyncManager.handleClipboardUpdate(context, it)
                 }
-                BleConstants.CHAR_DEVICE_NAME -> handleChunkedWrite(characteristic.uuid, value) { 
+
+                BleConstants.CHAR_DEVICE_NAME -> handleChunkedWrite(characteristic.uuid, value) {
                     Log.d(TAG, "Received Mac Device Name: $it")
                     // Update Mac name in status manager
                     MacDeviceStatusManager.updateMacStatus(context, name = it)
                 }
-                BleConstants.CHAR_NOTIFICATION_DISMISS -> handleChunkedWrite(characteristic.uuid, value) { handleNotificationDismiss(it) }
+
+                BleConstants.CHAR_NOTIFICATION_DISMISS -> handleChunkedWrite(
+                    characteristic.uuid,
+                    value
+                ) { handleNotificationDismiss(it) }
+
                 else -> Log.w(TAG, "Unknown characteristic write: ${characteristic.uuid}")
             }
 
             if (responseNeeded) {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                gattServer?.sendResponse(
+                    device,
+                    requestId,
+                    BluetoothGatt.GATT_SUCCESS,
+                    offset,
+                    value
+                )
             }
         }
 
@@ -359,10 +455,10 @@ class BleGattServer(private val context: Context) {
             }
             val (current, total) = header
             val payload = BleChunkUtil.getPayload(value)
-            
+
             val buffer = chunkBuffers.getOrPut(uuid) { mutableMapOf() }
             buffer[current] = payload
-            
+
             if (buffer.size == total) {
                 val completePayload = BleChunkUtil.reassemble(buffer)
                 chunkBuffers.remove(uuid)
@@ -370,15 +466,37 @@ class BleGattServer(private val context: Context) {
             }
         }
 
-        override fun onDescriptorReadRequest(device: BluetoothDevice, requestId: Int, offset: Int, descriptor: BluetoothGattDescriptor) {
+        override fun onDescriptorReadRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            offset: Int,
+            descriptor: BluetoothGattDescriptor
+        ) {
             Log.d(TAG, "Descriptor read request: ${descriptor.uuid}")
             gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
         }
 
-        override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) {
-            Log.d(TAG, "Descriptor write request: ${descriptor.uuid}, value: ${value.contentToString()}")
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray
+        ) {
+            Log.d(
+                TAG,
+                "Descriptor write request: ${descriptor.uuid}, value: ${value.contentToString()}"
+            )
             if (responseNeeded) {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                gattServer?.sendResponse(
+                    device,
+                    requestId,
+                    BluetoothGatt.GATT_SUCCESS,
+                    offset,
+                    value
+                )
             }
         }
 
@@ -392,12 +510,15 @@ class BleGattServer(private val context: Context) {
         scope.launch {
             val deviceData = dataStoreManager.getLastConnectedDevice().first()
             val storedKey = deviceData?.symmetricKey
-            Log.d(TAG, "Handling auth request from ${device.address}. Device in DB: ${deviceData?.name}, hasKey: ${storedKey != null}")
-            
+            Log.d(
+                TAG,
+                "Handling auth request from ${device.address}. Device in DB: ${deviceData?.name}, hasKey: ${storedKey != null}"
+            )
+
             if (storedKey != null) {
                 val expectedToken = BleTransportBridge.deriveAuthToken(storedKey)
                 val receivedTokenStr = String(token, Charsets.UTF_8)
-                
+
                 Log.d(TAG, "Expected token: $expectedToken")
                 Log.d(TAG, "Received token: $receivedTokenStr")
 
@@ -405,16 +526,25 @@ class BleGattServer(private val context: Context) {
                     Log.i(TAG, "BLE Auth Success!")
                     isAuthenticated = true
                     _connectionState.value = BleConnectionState.AUTHENTICATED
-                    sendNotification(BleConstants.CHAR_AUTH_RESULT, byteArrayOf(BleConstants.AUTH_SUCCESS))
+                    sendNotification(
+                        BleConstants.CHAR_AUTH_RESULT,
+                        byteArrayOf(BleConstants.AUTH_SUCCESS)
+                    )
                     BleTransportBridge.sendDeviceName()
                     startHeartbeat()
                 } else {
                     Log.w(TAG, "BLE Auth Failed! Token mismatch.")
-                    sendNotification(BleConstants.CHAR_AUTH_RESULT, byteArrayOf(BleConstants.AUTH_FAILED))
+                    sendNotification(
+                        BleConstants.CHAR_AUTH_RESULT,
+                        byteArrayOf(BleConstants.AUTH_FAILED)
+                    )
                 }
             } else {
                 Log.w(TAG, "BLE Auth Failed! No symmetric key found for last connected device.")
-                sendNotification(BleConstants.CHAR_AUTH_RESULT, byteArrayOf(BleConstants.AUTH_FAILED))
+                sendNotification(
+                    BleConstants.CHAR_AUTH_RESULT,
+                    byteArrayOf(BleConstants.AUTH_FAILED)
+                )
             }
         }
     }
@@ -425,7 +555,8 @@ class BleGattServer(private val context: Context) {
             while (isActive && isAuthenticated) {
                 delay(5000)
                 if (connectedDevices.isNotEmpty()) {
-                    val level = com.sameerasw.airsync.utils.DeviceInfoUtil.getBatteryInfo(context).level
+                    val level =
+                        com.sameerasw.airsync.utils.DeviceInfoUtil.getBatteryInfo(context).level
                     sendNotification(BleConstants.CHAR_BATTERY_LEVEL, byteArrayOf(level.toByte()))
                 }
             }
@@ -469,7 +600,7 @@ class BleGattServer(private val context: Context) {
             val isMuted = parts[4] == "1"
             val likeStatus = parts[5]
             val albumArt = if (parts.size >= 7) parts[6] else null
-            
+
             Log.d(TAG, "Received Mac media state via BLE: $title by $artist (Playing: $isPlaying)")
             MacDeviceStatusManager.updateMusicStatus(
                 context, isPlaying, title, artist, volume, isMuted, likeStatus, albumArt
@@ -494,11 +625,11 @@ class BleGattServer(private val context: Context) {
      */
     fun sendNotification(characteristicUuid: UUID, data: ByteArray) {
         if (connectedDevices.isEmpty()) return
-        
+
         // Characteristic level queue to ensure order
         val queue = characteristicQueues.getOrPut(characteristicUuid) { ConcurrentLinkedQueue() }
         queue.add(data)
-        
+
         if (isSending[characteristicUuid] != true) {
             processNextInQueue(characteristicUuid)
         }
@@ -506,18 +637,18 @@ class BleGattServer(private val context: Context) {
 
     fun sendChunkedNotification(characteristicUuid: UUID, payload: String) {
         if (connectedDevices.isEmpty()) return
-        
+
         // Truncate notification text to conserve BLE bandwidth
         val truncatedPayload = if (characteristicUuid == BleConstants.CHAR_NOTIFICATION_DATA) {
-             payload.take(500)
+            payload.take(500)
         } else payload
 
         val mtu = negotiatedMtu
         val chunks = BleChunkUtil.splitIntoChunks(truncatedPayload, mtu)
-        
+
         val queue = characteristicQueues.getOrPut(characteristicUuid) { ConcurrentLinkedQueue() }
         chunks.forEach { queue.add(it) }
-        
+
         if (isSending[characteristicUuid] != true) {
             processNextInQueue(characteristicUuid)
         }
@@ -535,12 +666,12 @@ class BleGattServer(private val context: Context) {
     private fun processNextInQueue(uuid: UUID) {
         val queue = characteristicQueues[uuid] ?: return
         val data = queue.poll() ?: return
-        
+
         isSending[uuid] = true
-        
+
         val characteristic = findCharacteristic(uuid) ?: return
         characteristic.value = data
-        
+
         connectedDevices.forEach { device ->
             gattServer?.notifyCharacteristicChanged(device, characteristic, false)
         }
@@ -554,19 +685,32 @@ class BleGattServer(private val context: Context) {
     }
 
     private fun createReadCharacteristic(uuid: UUID): BluetoothGattCharacteristic {
-        return BluetoothGattCharacteristic(uuid, BluetoothGattCharacteristic.PROPERTY_READ, BluetoothGattCharacteristic.PERMISSION_READ)
+        return BluetoothGattCharacteristic(
+            uuid,
+            BluetoothGattCharacteristic.PROPERTY_READ,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
     }
 
     private fun createWriteCharacteristic(uuid: UUID): BluetoothGattCharacteristic {
-        return BluetoothGattCharacteristic(uuid, 
-            BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE, 
-            BluetoothGattCharacteristic.PERMISSION_WRITE)
+        return BluetoothGattCharacteristic(
+            uuid,
+            BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE
+        )
     }
 
     private fun createNotifyCharacteristic(uuid: UUID): BluetoothGattCharacteristic {
-        val char = BluetoothGattCharacteristic(uuid, BluetoothGattCharacteristic.PROPERTY_NOTIFY, BluetoothGattCharacteristic.PERMISSION_READ)
+        val char = BluetoothGattCharacteristic(
+            uuid,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
         // Add CCCD for notification support
-        val configDescriptor = BluetoothGattDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"), BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE)
+        val configDescriptor = BluetoothGattDescriptor(
+            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"),
+            BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
+        )
         char.addDescriptor(configDescriptor)
         return char
     }

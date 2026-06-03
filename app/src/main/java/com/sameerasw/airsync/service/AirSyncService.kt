@@ -50,12 +50,26 @@ class AirSyncService : Service() {
     // Network state tracking
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    private val connectionStatusListener: (Boolean) -> Unit = { _ ->
+        scope.launch {
+            updateNotification()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "AirSyncService created")
         createNotificationChannel()
         MacDeviceStatusManager.startMonitoring(this)
         registerNetworkCallback()
+        WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
+
+        // Monitor connection status, auto-reconnect, and battery status to update notification live
+        scope.launch {
+            MacDeviceStatusManager.macDeviceStatus.collect {
+                updateNotification()
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -205,7 +219,10 @@ class AirSyncService : Service() {
 
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    Log.d(TAG, "Network available, triggering burst broadcast and refreshing socket")
+                    Log.d(
+                        TAG,
+                        "Network available, triggering burst broadcast and refreshing socket"
+                    )
                     // Refresh UDP socket to bind to new network interface
                     UDPDiscoveryManager.refreshSocket()
                     // When network becomes available, do a burst to announce ourselves
@@ -237,6 +254,15 @@ class AirSyncService : Service() {
         }
     }
 
+    private fun updateNotification() {
+        try {
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_ID, buildNotification())
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating foreground notification", e)
+        }
+    }
+
     private fun buildNotification(): Notification {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
@@ -255,18 +281,49 @@ class AirSyncService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
-        if (isScanning && connectedDeviceName == null) {
+        val isConnected = WebSocketUtil.isConnected()
+        val isAuto = WebSocketUtil.isAutoReconnecting()
+        val isConnecting = WebSocketUtil.isConnecting()
+
+        val dataStoreManager = DataStoreManager.getInstance(applicationContext)
+        val lastDevice = runBlocking { dataStoreManager.getLastConnectedDevice().first() }
+        val macStatus = MacDeviceStatusManager.macDeviceStatus.value
+
+        if (isConnected && lastDevice != null) {
+            val name = lastDevice.name
             builder.setContentTitle(getString(R.string.app_name))
-            builder.setContentText(getString(R.string.no_device_connected))
-        } else {
-            val name = connectedDeviceName ?: "Mac"
-            builder.setContentTitle(getString(R.string.app_name))
-            builder.setContentText(getString(R.string.connected_to_device, name))
+            
+            val batteryText = macStatus?.let { status ->
+                val level = status.battery.level
+                if (level >= 0) {
+                    val pct = level.coerceIn(0, 100)
+                    if (status.battery.isCharging) " ($pct% Charging)" else " ($pct%)"
+                } else ""
+            } ?: ""
+
+            builder.setContentText(getString(R.string.connected_to_device, name) + batteryText)
             builder.addAction(
                 R.drawable.rounded_link_off_24,
                 getString(R.string.disconnect),
                 disconnectPendingIntent
             )
+        } else if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && lastDevice != null) {
+            builder.setContentTitle(getString(R.string.app_name))
+            builder.setContentText("Connected to ${lastDevice.name} via Bluetooth")
+            builder.addAction(
+                R.drawable.rounded_link_off_24,
+                getString(R.string.disconnect),
+                disconnectPendingIntent
+            )
+        } else if (isAuto) {
+            builder.setContentTitle("Reconnecting...")
+            builder.setContentText(if (isConnecting) "Trying to connect to Mac..." else "Waiting to retry connection...")
+        } else if (isConnecting) {
+            builder.setContentTitle("Connecting...")
+            builder.setContentText("Connecting to last device...")
+        } else {
+            builder.setContentTitle(getString(R.string.app_name))
+            builder.setContentText(getString(R.string.no_device_connected))
         }
 
         return builder.build()
@@ -276,6 +333,7 @@ class AirSyncService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "AirSyncService destroyed")
+        WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
 
         networkCallback?.let {
             try {
