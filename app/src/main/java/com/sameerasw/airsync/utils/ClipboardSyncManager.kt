@@ -172,7 +172,7 @@ object ClipboardSyncManager {
                 } catch (_: Exception) {
                     true
                 }
-                if (continueEnabled && isConnected && isLinkOnly(text)) {
+                if (continueEnabled && WebSocketUtil.isConnected() && isLinkOnly(text)) {
                     NotificationUtil.showContinueBrowsingLink(context, text.trim(), keepPrevious)
                 }
             }

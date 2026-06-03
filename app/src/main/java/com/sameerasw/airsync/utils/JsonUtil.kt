@@ -104,7 +104,11 @@ object JsonUtil {
         app: String,
         packageName: String,
         priority: String = "alerting",
-        actions: List<Pair<String, String>>
+        actions: List<Pair<String, String>>,
+        progress: Int? = null,
+        progressMax: Int? = null,
+        progressIndeterminate: Boolean? = null,
+        ongoing: Boolean? = null
     ): String {
         val actionsJson = if (actions.isNotEmpty()) {
             val items = actions.joinToString(",") { (name, type) ->
@@ -114,11 +118,15 @@ object JsonUtil {
         } else {
             ""
         }
+        val progressJson = if (progress != null) ",\"progress\":$progress" else ""
+        val progressMaxJson = if (progressMax != null) ",\"progressMax\":$progressMax" else ""
+        val progressIndeterminateJson = if (progressIndeterminate != null) ",\"progressIndeterminate\":$progressIndeterminate" else ""
+        val ongoingJson = if (ongoing != null) ",\"ongoing\":$ongoing" else ""
         return """{"type":"notification","data":{"id":"$id","title":"${escape(title)}","body":"${
             escape(
                 body
             )
-        }","app":"${escape(app)}","package":"${escape(packageName)}","priority":"$priority"$actionsJson}}"""
+        }","app":"${escape(app)}","package":"${escape(packageName)}","priority":"$priority"$actionsJson$progressJson$progressMaxJson$progressIndeterminateJson$ongoingJson}}"""
     }
 
     /**
