@@ -131,6 +131,17 @@ class AirSyncViewModel(
     }
 
     init {
+        // Initialize current connection state immediately
+        val isWsConnected = WebSocketUtil.isConnected()
+        val isBleConnected = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.isAuthenticated == true
+        val isGlobalConnected = isWsConnected || isBleConnected
+
+        _uiState.value = _uiState.value.copy(
+            isConnected = isGlobalConnected,
+            activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null,
+            macDeviceStatus = if (isGlobalConnected) MacDeviceStatusManager.macDeviceStatus.value else null
+        )
+
         // Register for WebSocket connection status updates
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
         try {
