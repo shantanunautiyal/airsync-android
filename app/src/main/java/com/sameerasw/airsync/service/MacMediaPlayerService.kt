@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -59,7 +61,11 @@ class MacMediaPlayerService : Service() {
                 putExtra(EXTRA_TIMESTAMP, timestamp)
                 putExtra(EXTRA_PLAYBACK_RATE, playbackRate)
             }
-            context.startForegroundService(intent)
+            if (serviceInstance != null) {
+                context.startService(intent)
+            } else {
+                context.startForegroundService(intent)
+            }
             serviceInstance?.updateAlbumArt(albumArt)
         }
 
@@ -146,7 +152,15 @@ class MacMediaPlayerService : Service() {
         val initialIsPlaying = intent?.getBooleanExtra(EXTRA_IS_PLAYING, false) ?: false
         val notification = createMediaNotification(initialTitle, initialArtist, initialIsPlaying)
         try {
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground in onStartCommand: ${e.message}")
         }
@@ -255,7 +269,15 @@ class MacMediaPlayerService : Service() {
             mediaSession?.isActive = true
 
             val notification = createMediaNotification(title, artist, isPlaying)
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
 
             Log.d(TAG, "Mac media session started as foreground service")
         } catch (e: Exception) {

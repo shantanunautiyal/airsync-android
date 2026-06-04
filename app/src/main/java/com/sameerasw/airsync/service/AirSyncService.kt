@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -58,6 +59,7 @@ class AirSyncService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        serviceInstance = this
         Log.d(TAG, "AirSyncService created")
         createNotificationChannel()
         MacDeviceStatusManager.startMonitoring(this)
@@ -103,7 +105,15 @@ class AirSyncService : Service() {
         Log.d(TAG, "Starting AirSync scanning mode")
         isScanning = true
         connectedDeviceName = null
-        startForeground(NOTIFICATION_ID, buildNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        }
 
         val dataStoreManager =
             DataStoreManager.getInstance(applicationContext)
@@ -161,7 +171,15 @@ class AirSyncService : Service() {
         if (isScanning) {
             Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
             UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
-            startForeground(NOTIFICATION_ID, buildNotification()) // Update notification if needed
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
         }
     }
 
@@ -169,7 +187,15 @@ class AirSyncService : Service() {
         if (isScanning) {
             Log.d(TAG, "App in background, switching to PASSIVE discovery")
             UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
-            startForeground(NOTIFICATION_ID, buildNotification()) // Update notification if needed
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
         }
     }
 
@@ -180,7 +206,15 @@ class AirSyncService : Service() {
         }
         Log.d(TAG, "Starting AirSync foreground service (connected)")
         isScanning = false
-        startForeground(NOTIFICATION_ID, buildNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        }
 
         val dataStoreManager =
             DataStoreManager.getInstance(applicationContext)
@@ -333,6 +367,7 @@ class AirSyncService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "AirSyncService destroyed")
+        serviceInstance = null
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
 
         networkCallback?.let {
@@ -365,6 +400,10 @@ class AirSyncService : Service() {
 
         const val EXTRA_DEVICE_NAME = "device_name"
 
+        private var serviceInstance: AirSyncService? = null
+
+        fun isRunning(): Boolean = serviceInstance != null
+
         fun startScanning(context: Context) {
             val intent = Intent(context, AirSyncService::class.java).apply {
                 action = ACTION_START_SCANNING
@@ -396,10 +435,14 @@ class AirSyncService : Service() {
 
         private fun startAction(context: Context, intent: Intent) {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
+                if (isRunning()) {
                     context.startService(intent)
+                } else {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting foreground service", e)
