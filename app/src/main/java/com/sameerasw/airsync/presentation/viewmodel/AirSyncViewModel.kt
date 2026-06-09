@@ -101,12 +101,21 @@ class AirSyncViewModel(
                 _uiState.value.bleConnectionState == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
             val isGlobalConnected = isWsConnected || isBleConnected
 
+            val deviceToShow = if (isGlobalConnected) {
+                val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+                val storedDevice = repository.getLastConnectedDevice().first()
+                networkAwareDevice ?: storedDevice
+            } else {
+                _uiState.value.lastConnectedDevice
+            }
+
             _uiState.value = _uiState.value.copy(
                 isConnected = isGlobalConnected,
                 isConnecting = false,
                 response = if (isGlobalConnected) "Connected successfully!" else "Disconnected",
                 activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null,
-                macDeviceStatus = if (isGlobalConnected) _uiState.value.macDeviceStatus else null
+                macDeviceStatus = if (isGlobalConnected) _uiState.value.macDeviceStatus else null,
+                lastConnectedDevice = deviceToShow
             )
 
             if (isGlobalConnected) {
@@ -136,10 +145,17 @@ class AirSyncViewModel(
         val isBleConnected = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.isAuthenticated == true
         val isGlobalConnected = isWsConnected || isBleConnected
 
+        val storedDevice = try {
+            kotlinx.coroutines.runBlocking { repository.getLastConnectedDevice().first() }
+        } catch (_: Exception) {
+            null
+        }
+
         _uiState.value = _uiState.value.copy(
             isConnected = isGlobalConnected,
             activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null,
-            macDeviceStatus = if (isGlobalConnected) MacDeviceStatusManager.macDeviceStatus.value else null
+            macDeviceStatus = if (isGlobalConnected) MacDeviceStatusManager.macDeviceStatus.value else null,
+            lastConnectedDevice = storedDevice
         )
 
         // Register for WebSocket connection status updates
@@ -985,6 +1001,10 @@ class AirSyncViewModel(
             e.printStackTrace()
             false
         }
+    }
+
+    fun getSymmetricKeyForDevice(deviceName: String): String? {
+        return _networkDevices.value.firstOrNull { it.deviceName == deviceName }?.symmetricKey
     }
 
     // Clipboard history management

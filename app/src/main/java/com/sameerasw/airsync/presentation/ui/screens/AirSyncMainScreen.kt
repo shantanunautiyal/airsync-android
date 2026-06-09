@@ -142,7 +142,11 @@ fun AirSyncMainScreen(
     onTitleChange: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
-
+    val viewModel: AirSyncViewModel = androidx.lifecycle.viewmodel.compose.viewModel {
+        AirSyncViewModel.create(context)
+    }
+    val uiState by viewModel.uiState.collectAsState()
+    val deviceInfo by viewModel.deviceInfo.collectAsState()
     val versionName = try {
         context.packageManager
             .getPackageInfo(context.packageName, 0)
@@ -150,9 +154,6 @@ fun AirSyncMainScreen(
     } catch (_: Exception) {
         "2.0.0"
     }
-    val viewModel: AirSyncViewModel = viewModel { AirSyncViewModel.create(context) }
-    val uiState by viewModel.uiState.collectAsState()
-    val deviceInfo by viewModel.deviceInfo.collectAsState()
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -263,7 +264,12 @@ fun AirSyncMainScreen(
 
     rememberNavController()
 
-    fun connect(deviceId: String? = null) {
+    fun connect(
+        deviceId: String? = null,
+        ipAddress: String = uiState.ipAddress,
+        port: String = uiState.port,
+        symmetricKey: String? = uiState.symmetricKey
+    ) {
         // Check if critical permissions are missing
         val criticalPermissions =
             com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
@@ -281,9 +287,9 @@ fun AirSyncMainScreen(
                 var connectionResult: Boolean? = null
                 WebSocketUtil.connect(
                     context = context,
-                    ipAddress = uiState.ipAddress,
-                    port = uiState.port.toIntOrNull() ?: 6996,
-                    symmetricKey = uiState.symmetricKey,
+                    ipAddress = ipAddress,
+                    port = port.toIntOrNull() ?: 6996,
+                    symmetricKey = symmetricKey,
                     manualAttempt = true,
                     onHandshakeTimeout = {
                         scope.launch(Dispatchers.Main) {
@@ -332,7 +338,7 @@ fun AirSyncMainScreen(
                 if (connected) {
                     viewModel.setResponse("Connected successfully!")
                     val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                    viewModel.saveLastConnectedDevice(pcName, plusStatus, uiState.symmetricKey)
+                    viewModel.saveLastConnectedDevice(pcName, plusStatus, symmetricKey)
                 } else {
                     viewModel.setResponse("Failed to connect")
                 }
@@ -817,13 +823,21 @@ fun AirSyncMainScreen(
                                                         // Use network-aware device IP for current network
                                                         viewModel.updateIpAddress(networkAwareDevice.ipAddress)
                                                         viewModel.updatePort(networkAwareDevice.port)
-                                                        connect()
+                                                        connect(
+                                                            ipAddress = networkAwareDevice.ipAddress,
+                                                            port = networkAwareDevice.port,
+                                                            symmetricKey = networkAwareDevice.symmetricKey
+                                                        )
                                                     } else {
                                                         // Fallback to legacy stored device
                                                         viewModel.updateIpAddress(device.ipAddress)
                                                         viewModel.updatePort(device.port)
                                                         viewModel.updateSymmetricKey(device.symmetricKey)
-                                                        connect()
+                                                        connect(
+                                                            ipAddress = device.ipAddress,
+                                                            port = device.port,
+                                                            symmetricKey = device.symmetricKey
+                                                        )
                                                     }
                                                 }
                                             )
@@ -923,14 +937,25 @@ fun AirSyncMainScreen(
                                                                         HapticUtil.performClick(
                                                                             haptics
                                                                         )
-                                                                        viewModel.updateIpAddress(
-                                                                            device.getBestIp()
+                                                                        val bestIp = device.getBestIp()
+                                                                        val devicePort = device.port.toString()
+                                                                        val deviceName = device.name
+                                                                        
+                                                                        viewModel.updateIpAddress(bestIp)
+                                                                        viewModel.updatePort(devicePort)
+                                                                        viewModel.updateManualPcName(deviceName)
+                                                                        
+                                                                        val savedKey = viewModel.getSymmetricKeyForDevice(deviceName)
+                                                                        if (savedKey != null) {
+                                                                            viewModel.updateSymmetricKey(savedKey)
+                                                                        }
+                                                                        
+                                                                        connect(
+                                                                            deviceId = device.id,
+                                                                            ipAddress = bestIp,
+                                                                            port = devicePort,
+                                                                            symmetricKey = savedKey ?: uiState.symmetricKey
                                                                         )
-                                                                        viewModel.updatePort(device.port.toString())
-                                                                        viewModel.updateManualPcName(
-                                                                            device.name
-                                                                        )
-                                                                        connect(device.id)
                                                                     }
                                                                     .padding(
                                                                         horizontal = 16.dp,

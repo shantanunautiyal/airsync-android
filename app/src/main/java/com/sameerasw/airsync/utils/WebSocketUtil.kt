@@ -681,12 +681,12 @@ object WebSocketUtil {
         // Set manual disconnect flag
         val ctx = context ?: appContext
         ctx?.let { c ->
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
+            try {
+                val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
+                kotlinx.coroutines.runBlocking {
                     ds.setUserManuallyDisconnected(true)
-                } catch (_: Exception) {
                 }
+            } catch (_: Exception) {
             }
 
             // Send manual disconnect signal over BLE before disconnecting BLE client
