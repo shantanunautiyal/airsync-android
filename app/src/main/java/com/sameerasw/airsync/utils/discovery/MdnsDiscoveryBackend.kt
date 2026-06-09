@@ -58,7 +58,7 @@ class MdnsDiscoveryBackend : DiscoveryBackend {
         _discoveredDevices.value = emptyList()
 
         startBrowsing()
-        if (currentMode == DiscoveryMode.ACTIVE) {
+        if (android.os.Build.VERSION.SDK_INT >= 32 || currentMode == DiscoveryMode.ACTIVE) {
             registerService(context)
         }
     }
@@ -81,10 +81,14 @@ class MdnsDiscoveryBackend : DiscoveryBackend {
         if (currentMode == mode) return
         currentMode = mode
         if (isRunning) {
-            if (mode == DiscoveryMode.PASSIVE) {
-                unregisterService()
-            } else {
+            if (android.os.Build.VERSION.SDK_INT >= 32) {
                 registerService(context)
+            } else {
+                if (mode == DiscoveryMode.PASSIVE) {
+                    unregisterService()
+                } else {
+                    registerService(context)
+                }
             }
         }
     }
