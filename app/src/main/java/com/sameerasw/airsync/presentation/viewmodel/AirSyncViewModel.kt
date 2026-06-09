@@ -432,8 +432,8 @@ class AirSyncViewModel(
             // Start observing device changes for real-time updates
             startObservingDeviceChanges(context)
 
-            // Register power save receiver
-            context.registerReceiver(
+            // Register power save receiver on application context to avoid leaking Activity context
+            context.applicationContext.registerReceiver(
                 powerSaveReceiver,
                 IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
             )
