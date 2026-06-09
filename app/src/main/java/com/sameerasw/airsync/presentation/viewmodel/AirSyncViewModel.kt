@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -109,11 +110,18 @@ class AirSyncViewModel(
                 _uiState.value.lastConnectedDevice
             }
 
+            val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
+            if (isWsConnected && activeIp != null) {
+                repository.saveIpAddress(activeIp)
+            }
+            val savedIp = if (isWsConnected && activeIp != null) activeIp else repository.getIpAddress().first()
+
             _uiState.value = _uiState.value.copy(
                 isConnected = isGlobalConnected,
                 isConnecting = false,
                 response = if (isGlobalConnected) "Connected successfully!" else "Disconnected",
-                activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null,
+                ipAddress = savedIp,
+                activeIp = activeIp,
                 macDeviceStatus = if (isGlobalConnected) _uiState.value.macDeviceStatus else null,
                 lastConnectedDevice = deviceToShow
             )
@@ -151,9 +159,27 @@ class AirSyncViewModel(
             null
         }
 
+        val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
+
+        val initialIp = if (isWsConnected && activeIp != null) {
+            runBlocking {
+                repository.saveIpAddress(activeIp)
+                activeIp
+            }
+        } else {
+            null
+        }
+
+        val savedIp = initialIp ?: try {
+            kotlinx.coroutines.runBlocking { repository.getIpAddress().first() }
+        } catch (_: Exception) {
+            ""
+        }
+
         _uiState.value = _uiState.value.copy(
             isConnected = isGlobalConnected,
-            activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null,
+            ipAddress = savedIp,
+            activeIp = activeIp,
             macDeviceStatus = if (isGlobalConnected) MacDeviceStatusManager.macDeviceStatus.value else null,
             lastConnectedDevice = storedDevice
         )
