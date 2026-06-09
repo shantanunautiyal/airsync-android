@@ -58,6 +58,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.sp
+import com.sameerasw.airsync.utils.discovery.DiscoverySource
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -982,11 +985,36 @@ fun AirSyncMainScreen(
                                                                             )
                                                                         }
                                                                     }
-                                                                    Text(
-                                                                        text = "${device.getBestIp()}:${device.port}",
-                                                                        style = MaterialTheme.typography.bodySmall,
-                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                                    )
+                                                                    Row(
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                    ) {
+                                                                        Text(
+                                                                            text = "${device.getBestIp()}:${device.port}",
+                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                        Box(
+                                                                            modifier = Modifier
+                                                                                .clip(RoundedCornerShape(4.dp))
+                                                                                .background(
+                                                                                    if (device.discoverySource == DiscoverySource.MDNS)
+                                                                                        MaterialTheme.colorScheme.primaryContainer
+                                                                                    else
+                                                                                        MaterialTheme.colorScheme.secondaryContainer
+                                                                                )
+                                                                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                        ) {
+                                                                            Text(
+                                                                                text = if (device.discoverySource == DiscoverySource.MDNS) "mDNS" else "UDP",
+                                                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                                                                color = if (device.discoverySource == DiscoverySource.MDNS)
+                                                                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                                                                else
+                                                                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                                                            )
+                                                                        }
+                                                                    }
                                                                 }
                                                                 Spacer(modifier = Modifier.weight(1f))
                                                                 if (uiState.isConnecting && uiState.connectingDeviceId == device.id) {

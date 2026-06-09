@@ -24,7 +24,7 @@ import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.ServiceManager
 import com.sameerasw.airsync.utils.ShortcutUtil
 import com.sameerasw.airsync.utils.SyncManager
-import com.sameerasw.airsync.utils.UDPDiscoveryManager
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,8 +55,8 @@ class AirSyncViewModel(
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
 
-    // Discovered devices from UDP
-    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = UDPDiscoveryManager.discoveredDevices
+    // Discovered devices from Orchestrator
+    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = DiscoveryOrchestrator.discoveredDevices
 
     // Notes Role state
     private val _stylusMode = MutableStateFlow(false)

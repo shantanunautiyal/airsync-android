@@ -6,6 +6,7 @@ import com.sameerasw.airsync.data.ble.BleConstants
 import com.sameerasw.airsync.data.ble.BleTransportBridge
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.widget.AirSyncWidgetProvider
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -936,7 +937,7 @@ object WebSocketUtil {
                 }
 
                 // 2. Discovery Monitoring (Listen for presence packets in case IP changed)
-                UDPDiscoveryManager.discoveredDevices.collect { discoveredList ->
+                DiscoveryOrchestrator.discoveredDevices.collect { discoveredList ->
                     if (!autoReconnectActive.get() || isConnected.get() || isConnecting.get()) return@collect
 
                     val last = ds.getLastConnectedDevice().first() ?: return@collect
