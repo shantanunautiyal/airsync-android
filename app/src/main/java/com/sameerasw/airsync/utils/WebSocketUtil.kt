@@ -6,6 +6,7 @@ import com.sameerasw.airsync.data.ble.BleConstants
 import com.sameerasw.airsync.data.ble.BleTransportBridge
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.widget.AirSyncWidgetProvider
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,6 +43,13 @@ object WebSocketUtil {
         isConnected.set(status)
         _connectionStateFlow.value = status
         notifyConnectionStatusListeners(status)
+        if (status) {
+            appContext?.let { acquireWifiLock(it) }
+        } else {
+            if (!autoReconnectActive.get()) {
+                releaseWifiLock()
+            }
+        }
     }
 
     // Transport state: true after OkHttp onOpen, false after closing/failure/disconnect
@@ -74,9 +82,10 @@ object WebSocketUtil {
 
     private fun createClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // Keep connection alive
+            .pingInterval(20, TimeUnit.SECONDS)
             .build()
     }
 
@@ -371,7 +380,7 @@ object WebSocketUtil {
                                 reason: String
                             ) {
                                 if (webSocket == WebSocketUtil.webSocket) {
-                                    if (code != 1000) {
+                                    if (code != 1000 || reason != "Manual disconnection") {
                                         if (com.sameerasw.airsync.AirSyncApp.isAppForeground()) {
                                             CoroutineScope(Dispatchers.Main).launch {
                                                 val msg =
@@ -406,8 +415,8 @@ object WebSocketUtil {
                                     onConnectionStatusChanged?.invoke(false)
                                     notifyConnectionStatusListeners(false)
 
-                                    // Only auto-reconnect if it wasn't a manual close (1000)
-                                    if (code != 1000) {
+                                    // Only auto-reconnect if it wasn't a manual close
+                                    if (code != 1000 || reason != "Manual disconnection") {
                                         tryStartAutoReconnect(context)
                                     }
 
@@ -680,12 +689,12 @@ object WebSocketUtil {
         // Set manual disconnect flag
         val ctx = context ?: appContext
         ctx?.let { c ->
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
+            try {
+                val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
+                kotlinx.coroutines.runBlocking {
                     ds.setUserManuallyDisconnected(true)
-                } catch (_: Exception) {
                 }
+            } catch (_: Exception) {
             }
 
             // Send manual disconnect signal over BLE before disconnecting BLE client
@@ -770,6 +779,10 @@ object WebSocketUtil {
         appContext = null
     }
 
+    fun isWifiConnected(): Boolean {
+        return isConnected.get()
+    }
+
     fun isConnected(): Boolean {
         return isConnected.get() || com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()
     }
@@ -822,6 +835,9 @@ object WebSocketUtil {
         autoReconnectJob = null
         autoReconnectAttempts = 0
         autoReconnectStartTime = 0L
+        if (!isConnected.get()) {
+            releaseWifiLock()
+        }
         notifyConnectionStatusListeners(false)
     }
 
@@ -839,13 +855,13 @@ object WebSocketUtil {
                 val wm =
                     context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
                 wifiLock = wm.createWifiLock(
-                    android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
-                    "AirSync:ReconnectLock"
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY,
+                    "AirSync:WifiLock"
                 )
             }
             if (wifiLock?.isHeld == false) {
                 wifiLock?.acquire()
-                Log.d(TAG, "WifiLock acquired for reconnection")
+                Log.d(TAG, "WifiLock acquired")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to acquire WifiLock: ${e.message}")
@@ -920,7 +936,6 @@ object WebSocketUtil {
                                         manualAttempt = false,
                                         onConnectionStatus = { connected ->
                                             if (connected) {
-                                                releaseWifiLock()
                                                 cancelAutoReconnect()
                                             }
                                         }
@@ -930,13 +945,13 @@ object WebSocketUtil {
                         }
 
                         delay(backoffMs)
-                        // Exponential backoff capped at 1 minute
-                        backoffMs = (backoffMs * 2).coerceAtMost(60_000L)
+                        // Exponential backoff capped at 10 seconds
+                        backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(10_000L)
                     }
                 }
 
                 // 2. Discovery Monitoring (Listen for presence packets in case IP changed)
-                UDPDiscoveryManager.discoveredDevices.collect { discoveredList ->
+                DiscoveryOrchestrator.discoveredDevices.collect { discoveredList ->
                     if (!autoReconnectActive.get() || isConnected.get() || isConnecting.get()) return@collect
 
                     val last = ds.getLastConnectedDevice().first() ?: return@collect
@@ -961,7 +976,6 @@ object WebSocketUtil {
                                 manualAttempt = false,
                                 onConnectionStatus = { connected ->
                                     if (connected) {
-                                        releaseWifiLock()
                                         cancelAutoReconnect()
                                     }
                                 }

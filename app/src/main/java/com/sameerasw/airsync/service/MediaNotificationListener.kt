@@ -760,18 +760,20 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun isDuplicateNotification(packageName: String, body: String?): Boolean {
         if (body == null) return false
 
-        // Check if the notification is already in the cache
-        val isDuplicate = notificationCache.any { it.first == packageName && it.second == body }
+        synchronized(notificationCache) {
+            // Check if the notification is already in the cache
+            val isDuplicate = notificationCache.any { it.first == packageName && it.second == body }
 
-        // If not a duplicate, add it to the cache
-        if (!isDuplicate) {
-            if (notificationCache.size >= maxCache) {
-                notificationCache.removeFirst() // Remove the oldest notification
+            // If not a duplicate, add it to the cache
+            if (!isDuplicate) {
+                if (notificationCache.size >= maxCache) {
+                    notificationCache.removeFirst() // Remove the oldest notification
+                }
+                notificationCache.add(Pair(packageName, body))
             }
-            notificationCache.add(Pair(packageName, body))
-        }
 
-        return isDuplicate
+            return isDuplicate
+        }
     }
 
     private fun getNotificationPriority(sbn: StatusBarNotification): String {

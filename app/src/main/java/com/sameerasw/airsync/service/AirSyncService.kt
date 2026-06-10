@@ -22,7 +22,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.DiscoveryMode
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.ShortcutUtil
-import com.sameerasw.airsync.utils.UDPDiscoveryManager
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import com.sameerasw.airsync.utils.WebDavServer
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
@@ -123,9 +123,9 @@ class AirSyncService : Service() {
 
         // Default to PASSIVE mode to save battery
         // But do a burst to check for devices immediately
-        UDPDiscoveryManager.start(this, isDiscoveryEnabled)
-        UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
-        UDPDiscoveryManager.burstBroadcast(this)
+        DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
+        DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+        DiscoveryOrchestrator.burstBroadcast(this)
 
         // Start WakeupService for HTTP wakeups
         WakeupService.startService(this)
@@ -170,7 +170,7 @@ class AirSyncService : Service() {
     private fun handleAppForeground() {
         if (isScanning) {
             Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
-            UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
@@ -186,7 +186,7 @@ class AirSyncService : Service() {
     private fun handleAppBackground() {
         if (isScanning) {
             Log.d(TAG, "App in background, switching to PASSIVE discovery")
-            UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
@@ -224,8 +224,8 @@ class AirSyncService : Service() {
 
         // Keep discovery manager running for wake-ups even when connected
         // But stay in Passive mode mostly
-        UDPDiscoveryManager.start(this, isDiscoveryEnabled)
-        UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+        DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
+        DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
 
         WakeupService.startService(this)
         monitorWebDavRequirements()
@@ -237,7 +237,7 @@ class AirSyncService : Service() {
         webDavJob = null
         stopWebDavServer()
         ShortcutUtil.refreshShortcuts(this, false)
-        UDPDiscoveryManager.stop(this)
+        DiscoveryOrchestrator.stop(this)
         WakeupService.stopService(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -258,10 +258,10 @@ class AirSyncService : Service() {
                         "Network available, triggering burst broadcast and refreshing socket"
                     )
                     // Refresh UDP socket to bind to new network interface
-                    UDPDiscoveryManager.refreshSocket()
+                    DiscoveryOrchestrator.refreshSocket()
                     // When network becomes available, do a burst to announce ourselves
                     if (isScanning) {
-                        UDPDiscoveryManager.burstBroadcast(applicationContext)
+                        DiscoveryOrchestrator.burstBroadcast(applicationContext)
                         WebSocketUtil.requestAutoReconnect(applicationContext)
                     }
                 }
