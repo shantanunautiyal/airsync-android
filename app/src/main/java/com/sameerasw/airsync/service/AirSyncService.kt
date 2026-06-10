@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -21,7 +22,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.DiscoveryMode
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.ShortcutUtil
-import com.sameerasw.airsync.utils.UDPDiscoveryManager
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import com.sameerasw.airsync.utils.WebDavServer
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +59,7 @@ class AirSyncService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        serviceInstance = this
         Log.d(TAG, "AirSyncService created")
         createNotificationChannel()
         MacDeviceStatusManager.startMonitoring(this)
@@ -103,7 +105,15 @@ class AirSyncService : Service() {
         Log.d(TAG, "Starting AirSync scanning mode")
         isScanning = true
         connectedDeviceName = null
-        startForeground(NOTIFICATION_ID, buildNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        }
 
         val dataStoreManager =
             DataStoreManager.getInstance(applicationContext)
@@ -113,9 +123,9 @@ class AirSyncService : Service() {
 
         // Default to PASSIVE mode to save battery
         // But do a burst to check for devices immediately
-        UDPDiscoveryManager.start(this, isDiscoveryEnabled)
-        UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
-        UDPDiscoveryManager.burstBroadcast(this)
+        DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
+        DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+        DiscoveryOrchestrator.burstBroadcast(this)
 
         // Start WakeupService for HTTP wakeups
         WakeupService.startService(this)
@@ -160,16 +170,32 @@ class AirSyncService : Service() {
     private fun handleAppForeground() {
         if (isScanning) {
             Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
-            UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
-            startForeground(NOTIFICATION_ID, buildNotification()) // Update notification if needed
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
         }
     }
 
     private fun handleAppBackground() {
         if (isScanning) {
             Log.d(TAG, "App in background, switching to PASSIVE discovery")
-            UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
-            startForeground(NOTIFICATION_ID, buildNotification()) // Update notification if needed
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
         }
     }
 
@@ -180,7 +206,15 @@ class AirSyncService : Service() {
         }
         Log.d(TAG, "Starting AirSync foreground service (connected)")
         isScanning = false
-        startForeground(NOTIFICATION_ID, buildNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        }
 
         val dataStoreManager =
             DataStoreManager.getInstance(applicationContext)
@@ -190,8 +224,8 @@ class AirSyncService : Service() {
 
         // Keep discovery manager running for wake-ups even when connected
         // But stay in Passive mode mostly
-        UDPDiscoveryManager.start(this, isDiscoveryEnabled)
-        UDPDiscoveryManager.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+        DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
+        DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
 
         WakeupService.startService(this)
         monitorWebDavRequirements()
@@ -203,7 +237,7 @@ class AirSyncService : Service() {
         webDavJob = null
         stopWebDavServer()
         ShortcutUtil.refreshShortcuts(this, false)
-        UDPDiscoveryManager.stop(this)
+        DiscoveryOrchestrator.stop(this)
         WakeupService.stopService(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -224,10 +258,10 @@ class AirSyncService : Service() {
                         "Network available, triggering burst broadcast and refreshing socket"
                     )
                     // Refresh UDP socket to bind to new network interface
-                    UDPDiscoveryManager.refreshSocket()
+                    DiscoveryOrchestrator.refreshSocket()
                     // When network becomes available, do a burst to announce ourselves
                     if (isScanning) {
-                        UDPDiscoveryManager.burstBroadcast(applicationContext)
+                        DiscoveryOrchestrator.burstBroadcast(applicationContext)
                         WebSocketUtil.requestAutoReconnect(applicationContext)
                     }
                 }
@@ -333,6 +367,7 @@ class AirSyncService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "AirSyncService destroyed")
+        serviceInstance = null
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
 
         networkCallback?.let {
@@ -365,6 +400,10 @@ class AirSyncService : Service() {
 
         const val EXTRA_DEVICE_NAME = "device_name"
 
+        private var serviceInstance: AirSyncService? = null
+
+        fun isRunning(): Boolean = serviceInstance != null
+
         fun startScanning(context: Context) {
             val intent = Intent(context, AirSyncService::class.java).apply {
                 action = ACTION_START_SCANNING
@@ -396,10 +435,14 @@ class AirSyncService : Service() {
 
         private fun startAction(context: Context, intent: Intent) {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
+                if (isRunning()) {
                     context.startService(intent)
+                } else {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting foreground service", e)

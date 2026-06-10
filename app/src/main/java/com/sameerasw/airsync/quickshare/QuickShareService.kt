@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -62,7 +63,15 @@ class QuickShareService : Service() {
         super.onCreate()
         createNotificationChannel()
 
-        startForeground(NOTIFICATION_ID, createNotification("Quick Share is active"))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Quick Share is active"),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification("Quick Share is active"))
+        }
 
         server = QuickShareServer(this) { connection ->
             val id = java.util.UUID.randomUUID().toString()
@@ -229,8 +238,15 @@ class QuickShareService : Service() {
     private fun startDiscoveryWithTimeout() {
         discoveryJob?.cancel()
 
-        // Ensure service is in foreground with a notification while active
-        startForeground(NOTIFICATION_ID, createNotification("Searching for files..."))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Searching for files..."),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification("Searching for files..."))
+        }
 
         server.start()
         val port = server.port
