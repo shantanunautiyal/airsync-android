@@ -1,7 +1,14 @@
 package com.sameerasw.airsync.presentation.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -13,18 +20,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.presentation.ui.models.AirSyncTab
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -33,82 +41,122 @@ fun AirSyncFloatingToolbar(
     currentPage: Int,
     tabs: List<AirSyncTab>,
     onTabSelected: (Int) -> Unit,
-    scrollBehavior: FloatingToolbarScrollBehavior,
+    scrollBehavior: FloatingToolbarScrollBehavior? = null,
     floatingActionButton: @Composable () -> Unit = {}
 ) {
-    var interactionCount by remember { mutableStateOf(0) }
+    // Persistent visibility
+    var expanded by remember { mutableStateOf(true) }
+    val configuration = LocalConfiguration.current
+    val fontScale = LocalDensity.current.fontScale
+    val screenWidth = configuration.screenWidthDp
 
-    // Track which tab was just selected for bump animation
-    var bumpingTab by remember { mutableIntStateOf(-1) }
-    var bumpKey by remember { mutableIntStateOf(0) }
+    // Hide label if font scale is large or screen width is too small
+    val isLargeFont = fontScale > 1.25f
+    val isCompactScreen = screenWidth < 400
 
-    // Reset bump animation after delay
-    LaunchedEffect(bumpKey) {
-        if (bumpingTab >= 0) {
-            delay(200)
-            bumpingTab = -1
-        }
-    }
+    val shouldHideLabel = isLargeFont || (isCompactScreen && tabs.size > 3)
 
     HorizontalFloatingToolbar(
-        modifier = modifier,
-        expanded = true,
+//        modifier = modifier
+//            .windowInsetsPadding(
+//                androidx.compose.foundation.layout.WindowInsets.navigationBars
+//            ),
+        expanded = expanded,
         floatingActionButton = floatingActionButton,
         scrollBehavior = scrollBehavior,
         colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(
-            toolbarContentColor = MaterialTheme.colorScheme.onPrimary,
-            toolbarContainerColor = MaterialTheme.colorScheme.primary
+            toolbarContentColor = MaterialTheme.colorScheme.onSurface,
+            toolbarContainerColor = MaterialTheme.colorScheme.primary,
         ),
         content = {
             // FIXED ORDER LOOP to prevent shifting
             tabs.forEachIndexed { index, tab ->
                 val isSelected = currentPage == index
 
-                // Animate alpha for smooth fade
-                val itemAlpha = 1f
-
                 // Animate width for spacing
-                val itemWidth = 48.dp
+                val itemWidth by animateDpAsState(
+                    targetValue = if (expanded || isSelected) 48.dp else 0.dp,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "item_width_$index"
+                )
+
+                // Animate label width for active tab
+                val labelWidth by animateDpAsState(
+                    targetValue = if (isSelected && !shouldHideLabel) 80.dp else 0.dp,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "label_width_$index"
+                )
 
                 // Animate spacer width
-                val spacerWidth = if (index < tabs.size - 1) 16.dp else 0.dp
+                val spacerWidth by animateDpAsState(
+                    targetValue = if (index < tabs.size - 1) 8.dp else 0.dp,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "spacer_width_$index"
+                )
 
-                // Always render the button
-                IconButton(
-                    onClick = {
-                        interactionCount++
-                        onTabSelected(index)
-                    },
-                    modifier = Modifier
-                        .width(itemWidth)
-                        .height(48.dp)
-                        .graphicsLayer {
-                            scaleX = 1f
-                            scaleY = 1f
-                            alpha = itemAlpha
+                // Always render the button, but animate its visibility
+                if (itemWidth > 0.dp || isSelected) {
+                    IconButton(
+                        onClick = {
+                            onTabSelected(index)
                         },
-                    colors = if (isSelected) {
-                        IconButtonDefaults.filledIconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary,
-                            containerColor = MaterialTheme.colorScheme.background
-                        )
-                    } else {
-                        IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.background,
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        modifier = Modifier
+                            .width(itemWidth + labelWidth)
+                            .height(48.dp),
+                        colors = if (isSelected) {
+                            IconButtonDefaults.filledIconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary,
+                                containerColor = MaterialTheme.colorScheme.background
+                            )
+                        } else {
+                            IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.background,
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        ) {
+                            Box {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = stringResource(id = tab.title),
+                                    tint = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.background
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            if (isSelected && !shouldHideLabel) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(id = tab.title),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
-                ) {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.title,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
 
-                // Spacing between buttons
-                if (index < tabs.size - 1) {
-                    Spacer(modifier = Modifier.width(spacerWidth))
+                    // Animated spacing between buttons
+                    if (index < tabs.size - 1) {
+                        Spacer(modifier = Modifier.width(spacerWidth))
+                    }
                 }
             }
         }

@@ -89,9 +89,25 @@ interface AirSyncRepository {
     suspend fun setMacMediaControlsEnabled(enabled: Boolean)
     fun getMacMediaControlsEnabled(): Flow<Boolean>
 
+    // Blur settings
+    suspend fun setUseBlurEnabled(enabled: Boolean)
+    fun getUseBlurEnabled(): Flow<Boolean>
+
+    // Pitch Black Theme settings
+    suspend fun setPitchBlackThemeEnabled(enabled: Boolean)
+    fun getPitchBlackThemeEnabled(): Flow<Boolean>
+
     // Default tab settings
     suspend fun setDefaultTab(tab: String)
     fun getDefaultTab(): Flow<String>
+
+    // Sentry reporting settings
+    suspend fun setSentryReportingEnabled(enabled: Boolean)
+    fun getSentryReportingEnabled(): Flow<Boolean>
+
+    // Widget specific settings
+    suspend fun setWidgetTransparency(alpha: Float)
+    fun getWidgetTransparency(): Flow<Float>
 
     // Essentials Bridge
     suspend fun setEssentialsConnectionEnabled(enabled: Boolean)
@@ -112,4 +128,12 @@ interface AirSyncRepository {
     fun getLastPromptDismissedVersion(): Flow<Int>
     suspend fun setHasRatedApp(hasRated: Boolean)
     fun hasRatedApp(): Flow<Boolean>
+
+    // Quick Share (receiving)
+    suspend fun setQuickShareEnabled(enabled: Boolean)
+    fun isQuickShareEnabled(): Flow<Boolean>
+
+    // File Access (WebDAV Server)
+    suspend fun setFileAccessEnabled(enabled: Boolean)
+    fun isFileAccessEnabled(): Flow<Boolean>
 }

@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,16 +32,22 @@ import com.sameerasw.airsync.utils.HapticUtil
 @Composable
 fun DefaultTabCard(
     currentDefaultTab: String,
-    onDefaultTabChange: (String) -> Unit
+    onDefaultTabChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraSmall,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceBright
+        )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
             Text(
                 text = "Default tab",
@@ -62,7 +68,7 @@ fun DefaultTabCard(
             ) {
                 TabOption(
                     title = "Connect",
-                    icon = Icons.Filled.Phonelink,
+                    iconRes = R.drawable.rounded_devices_24,
                     isSelected = currentDefaultTab == "connect",
                     onClick = {
                         HapticUtil.performClick(haptics)
@@ -101,6 +107,7 @@ fun DefaultTabCard(
     }
 }
 
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TabOption(
@@ -124,7 +131,7 @@ private fun TabOption(
                 )
             } else {
                 IconButtonDefaults.iconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },

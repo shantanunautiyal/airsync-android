@@ -138,18 +138,6 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
-            isConnected && !macStatus.title.isNullOrBlank() -> {
-                // Show media info only if no battery
-                if (!macStatus.artist.isNullOrBlank()) {
-                    "${macStatus.title} — ${macStatus.artist}"
-                } else {
-                    macStatus.title
-                }
-            }
-
-            isConnected -> "Connected"
-            deviceModel != null -> "Disconnected • $deviceModel"
-            else -> "Disconnected • Tap to reconnect"
         }
     }
 

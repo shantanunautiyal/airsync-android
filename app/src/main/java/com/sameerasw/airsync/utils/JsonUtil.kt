@@ -29,9 +29,6 @@ object JsonUtil {
     /**
      * Creates a single-line JSON string for device info with ADB ports
      */
-    /**
-     * Creates a single-line JSON string for device info with ADB ports
-     */
     fun createDeviceInfoJson(
         id: String,
         name: String,
@@ -50,9 +47,6 @@ object JsonUtil {
     /**
      * Creates a single-line JSON string for device info with wallpaper
      */
-    /**
-     * Creates a single-line JSON string for device info with wallpaper
-     */
     fun createDeviceInfoJson(
         id: String,
         name: String,
@@ -61,6 +55,7 @@ object JsonUtil {
         version: String,
         wallpaperBase64: String?,
         adbPorts: List<String>,
+        bleAuthToken: String? = null,
         targetIpAddress: String? = null
     ): String {
         val wallpaperJson = if (wallpaperBase64 != null) {
@@ -68,10 +63,15 @@ object JsonUtil {
         } else {
             ""
         }
+        val bleTokenJson = if (bleAuthToken != null) {
+            ""","bleAuthToken":"$bleAuthToken""""
+        } else {
+            ""
+        }
         val portsJson = adbPorts.joinToString(",") { "\"$it\"" }
         val targetIpJson =
             if (targetIpAddress != null) """, "targetIpAddress": "$targetIpAddress" """ else ""
-        return """{"type":"device","data":{"id":"$id","name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version","adbPorts":[$portsJson]$wallpaperJson$targetIpJson}}"""
+        return """{"type":"device","data":{"id":"$id","name":"$name","ipAddress":"$ipAddress","port":$port,"version":"$version","adbPorts":[$portsJson]$wallpaperJson$bleTokenJson$targetIpJson}}"""
     }
 
     /**
@@ -98,7 +98,11 @@ object JsonUtil {
         app: String,
         packageName: String,
         priority: String = "alerting",
-        actions: List<Pair<String, String>>
+        actions: List<Pair<String, String>>,
+        progress: Int? = null,
+        progressMax: Int? = null,
+        progressIndeterminate: Boolean? = null,
+        ongoing: Boolean? = null
     ): String {
         val actionsJson = if (actions.isNotEmpty()) {
             val items = actions.joinToString(",") { (name, type) ->
@@ -108,11 +112,15 @@ object JsonUtil {
         } else {
             ""
         }
+        val progressJson = if (progress != null) ",\"progress\":$progress" else ""
+        val progressMaxJson = if (progressMax != null) ",\"progressMax\":$progressMax" else ""
+        val progressIndeterminateJson = if (progressIndeterminate != null) ",\"progressIndeterminate\":$progressIndeterminate" else ""
+        val ongoingJson = if (ongoing != null) ",\"ongoing\":$ongoing" else ""
         return """{"type":"notification","data":{"id":"$id","title":"${escape(title)}","body":"${
             escape(
                 body
             )
-        }","app":"${escape(app)}","package":"${escape(packageName)}","priority":"$priority"$actionsJson}}"""
+        }","app":"${escape(app)}","package":"${escape(packageName)}","priority":"$priority"$actionsJson$progressJson$progressMaxJson$progressIndeterminateJson$ongoingJson}}"""
     }
 
     /**
@@ -150,10 +158,17 @@ object JsonUtil {
         volume: Int,
         isMuted: Boolean,
         albumArt: String?,
+        albumArtLite: String? = null,
+        duration: Long = 0L,
+        position: Long = 0L,
+        positionTimestamp: Long = 0L,
+        isBuffering: Boolean = false,
         likeStatus: String
     ): String {
         val albumArtJson = if (albumArt != null) ",\"albumArt\":\"$albumArt\"" else ""
-        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson,"likeStatus":"$likeStatus"}}}"""
+        val albumArtLiteJson =
+            if (albumArtLite != null) ",\"albumArtLite\":\"$albumArtLite\"" else ""
+        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"$title","artist":"$artist","volume":$volume,"isMuted":$isMuted$albumArtJson$albumArtLiteJson,"duration":$duration,"position":$position,"positionTimestamp":$positionTimestamp,"isBuffering":$isBuffering,"likeStatus":"$likeStatus"}}}"""
     }
 
     /**
@@ -258,7 +273,6 @@ object JsonUtil {
             )
         }"}}"""
     }
-
     /**
      * Creates a JSON for a mirror request to start or stop screen mirroring.
      */

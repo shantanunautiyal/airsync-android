@@ -1,6 +1,10 @@
 package com.sameerasw.airsync.presentation.viewmodel
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.PowerManager
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,15 +21,19 @@ import com.sameerasw.airsync.utils.DiscoveredDevice
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.ServiceManager
+import com.sameerasw.airsync.utils.ShortcutUtil
 import com.sameerasw.airsync.utils.SyncManager
-import com.sameerasw.airsync.utils.UDPDiscoveryManager
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import com.sameerasw.airsync.utils.WebSocketUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class AirSyncViewModel(
     private val repository: AirSyncRepository
@@ -48,8 +56,8 @@ class AirSyncViewModel(
     // Network-aware device connections state
     private val _networkDevices = MutableStateFlow<List<NetworkDeviceConnection>>(emptyList())
 
-    // Discovered devices from UDP
-    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = UDPDiscoveryManager.discoveredDevices
+    // Discovered devices from Orchestrator
+    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = DiscoveryOrchestrator.discoveredDevices
 
     // Notes Role state
     private val _stylusMode = MutableStateFlow(false)
@@ -70,6 +78,14 @@ class AirSyncViewModel(
 
     private var appContext: Context? = null
 
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == PowerManager.ACTION_POWER_SAVE_MODE_CHANGED) {
+                context?.let { updateBlurState(it) }
+            }
+        }
+    }
+
     // Manual connect canceller reference (set in init) for unregistering
     private val manualConnectCanceler: () -> Unit = {
         // Cancel any active auto-reconnect when user starts manual connection
@@ -80,18 +96,44 @@ class AirSyncViewModel(
     }
 
     // Connection status listener for WebSocket updates
-    private val connectionStatusListener: (Boolean) -> Unit = { isConnected ->
+    private val connectionStatusListener: (Boolean) -> Unit = { isWsConnected ->
         viewModelScope.launch {
+            val isBleConnected =
+                _uiState.value.bleConnectionState == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
+            val isGlobalConnected = isWsConnected || isBleConnected
+
+            val deviceToShow = if (isGlobalConnected) {
+                val networkAwareDevice = getNetworkAwareLastConnectedDevice()
+                val storedDevice = repository.getLastConnectedDevice().first()
+                networkAwareDevice ?: storedDevice
+            } else {
+                _uiState.value.lastConnectedDevice
+            }
+
+            val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
+            if (isWsConnected && activeIp != null) {
+                repository.saveIpAddress(activeIp)
+            }
+            val savedIp = if (isWsConnected && activeIp != null) activeIp else repository.getIpAddress().first()
+
             _uiState.value = _uiState.value.copy(
-                isConnected = isConnected,
+                isConnected = isGlobalConnected,
                 isConnecting = false,
-                response = if (isConnected) "Connected successfully!" else "Disconnected",
-                activeIp = if (isConnected) WebSocketUtil.currentIpAddress else null
+                response = if (isGlobalConnected) "Connected successfully!" else "Disconnected",
+                ipAddress = savedIp,
+                activeIp = activeIp,
+                macDeviceStatus = if (isGlobalConnected) _uiState.value.macDeviceStatus else null,
+                lastConnectedDevice = deviceToShow
             )
 
-            if (isConnected) {
+            if (isGlobalConnected) {
                 repository.setFirstMacConnectionTime(System.currentTimeMillis())
                 updateRatingPromptDisplay()
+            }
+
+            // Update dynamic shortcuts
+            appContext?.let { ctx ->
+                ShortcutUtil.refreshShortcuts(ctx, isGlobalConnected)
             }
 
             // Notify Smartspacer of connection status change
@@ -106,6 +148,42 @@ class AirSyncViewModel(
     }
 
     init {
+        // Initialize current connection state immediately
+        val isWsConnected = WebSocketUtil.isConnected()
+        val isBleConnected = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.isAuthenticated == true
+        val isGlobalConnected = isWsConnected || isBleConnected
+
+        val storedDevice = try {
+            kotlinx.coroutines.runBlocking { repository.getLastConnectedDevice().first() }
+        } catch (_: Exception) {
+            null
+        }
+
+        val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
+
+        val initialIp = if (isWsConnected && activeIp != null) {
+            runBlocking {
+                repository.saveIpAddress(activeIp)
+                activeIp
+            }
+        } else {
+            null
+        }
+
+        val savedIp = initialIp ?: try {
+            kotlinx.coroutines.runBlocking { repository.getIpAddress().first() }
+        } catch (_: Exception) {
+            ""
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isConnected = isGlobalConnected,
+            ipAddress = savedIp,
+            activeIp = activeIp,
+            macDeviceStatus = if (isGlobalConnected) MacDeviceStatusManager.macDeviceStatus.value else null,
+            lastConnectedDevice = storedDevice
+        )
+
         // Register for WebSocket connection status updates
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
         try {
@@ -125,15 +203,85 @@ class AirSyncViewModel(
                 // No device status notification to update
             }
         }
+
+        // Observe pitch black theme preference
+        viewModelScope.launch {
+            repository.getPitchBlackThemeEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isPitchBlackThemeEnabled = enabled)
+            }
+        }
+
+        // Observe sentry reporting preference
+        viewModelScope.launch {
+            repository.getSentryReportingEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isSentryReportingEnabled = enabled)
+            }
+        }
+
+        // Observe widget transparency preference
+        viewModelScope.launch {
+            repository.getWidgetTransparency().collect { trans ->
+                _uiState.value = _uiState.value.copy(widgetTransparency = trans)
+            }
+        }
+
+        // Observe first run preference for onboarding status
+        viewModelScope.launch {
+            repository.getFirstRun().collect { firstRun ->
+                _uiState.value = _uiState.value.copy(isOnboardingCompleted = !firstRun)
+            }
+        }
+
+        // Observe Quick Share preference
+        viewModelScope.launch {
+            repository.isQuickShareEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isQuickShareEnabled = enabled)
+            }
+        }
+
+        // Observe File Access preference
+        viewModelScope.launch {
+            repository.isFileAccessEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isFileAccessEnabled = enabled)
+            }
+        }
+
+        // Observe BLE connection status
+        viewModelScope.launch {
+            com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.connectionState?.collect { state ->
+                Log.d("AirSyncViewModel", "BLE connection state changed: $state")
+                val isBleAuthenticated =
+                    state == com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.AUTHENTICATED
+                val isWsConnected = WebSocketUtil.isConnected()
+
+                _uiState.value = _uiState.value.copy(
+                    bleConnectionState = state,
+                    isConnected = isWsConnected || isBleAuthenticated
+                )
+
+                if (isBleAuthenticated && !isWsConnected) {
+                    // Refresh shortcuts and other side effects if this is the only connection
+                    appContext?.let { ctx ->
+                        ShortcutUtil.refreshShortcuts(ctx, true)
+                    }
+                    updateRatingPromptDisplay()
+                }
+            }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
-        // Unregister the connection status listener when ViewModel is cleared
+        // Unregister listeners
         WebSocketUtil.unregisterConnectionStatusListener(connectionStatusListener)
         try {
             WebSocketUtil.unregisterManualConnectListener(manualConnectCanceler)
         } catch (_: Exception) {
+        }
+        try {
+            appContext?.unregisterReceiver(powerSaveReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver was not registered
         }
     }
 
@@ -218,6 +366,16 @@ class AirSyncViewModel(
             repository.getDefaultTab().first()
             val isEssentialsConnectionEnabled = repository.getEssentialsConnectionEnabled().first()
             val isDeviceDiscoveryEnabled = repository.getDeviceDiscoveryEnabled().first()
+            val isBlurEnabledSetting = repository.getUseBlurEnabled().first()
+            val isPitchBlackThemeEnabled = repository.getPitchBlackThemeEnabled().first()
+            val isSentryReportingEnabled = repository.getSentryReportingEnabled().first()
+            val isFirstRun = repository.getFirstRun().first()
+            val isPowerSaveMode = DeviceInfoUtil.isPowerSaveMode(context)
+            val isBlurProblematic = DeviceInfoUtil.isBlurProblematicDevice()
+            val isQuickShareEnabled = repository.isQuickShareEnabled().first()
+
+            // Replicate Essentials logic for initial state
+            val isBlurEnabled = isBlurEnabledSetting && !isPowerSaveMode && !isBlurProblematic
 
             // Rating tracking
             repository.getFirstMacConnectionTime().first()
@@ -270,7 +428,14 @@ class AirSyncViewModel(
                 isMacMediaControlsEnabled = isMacMediaControlsEnabled,
                 isClipboardHistoryEnabled = isClipboardHistoryEnabled,
                 isEssentialsConnectionEnabled = isEssentialsConnectionEnabled,
-                isDeviceDiscoveryEnabled = isDeviceDiscoveryEnabled
+                isDeviceDiscoveryEnabled = isDeviceDiscoveryEnabled,
+                isBlurSettingEnabled = isBlurEnabledSetting,
+                isPowerSaveMode = isPowerSaveMode,
+                isPitchBlackThemeEnabled = isPitchBlackThemeEnabled,
+                isBlurEnabled = isBlurEnabled,
+                isSentryReportingEnabled = isSentryReportingEnabled,
+                isOnboardingCompleted = !isFirstRun,
+                isQuickShareEnabled = isQuickShareEnabled
             )
 
             updateRatingPromptDisplay()
@@ -293,8 +458,17 @@ class AirSyncViewModel(
             // Start observing device changes for real-time updates
             startObservingDeviceChanges(context)
 
-            // Start AirSync Service in scanning mode (which handles UDP Discovery and WakeupService)
-            com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+            // Register power save receiver on application context to avoid leaking Activity context
+            context.applicationContext.registerReceiver(
+                powerSaveReceiver,
+                IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            )
+
+            // Start AirSync Service conditionally
+            ServiceManager.updateServiceState(context)
+
+            // Initial shortcut state
+            ShortcutUtil.refreshShortcuts(context, WebSocketUtil.isConnected())
             isNetworkMonitoringActive = true
         }
     }
@@ -501,6 +675,57 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
         viewModelScope.launch {
             repository.setAutoReconnectEnabled(enabled)
+            appContext?.let { ServiceManager.updateServiceState(it) }
+        }
+    }
+
+    fun setUseBlurEnabled(enabled: Boolean, context: Context) {
+        viewModelScope.launch {
+            repository.setUseBlurEnabled(enabled)
+            updateBlurState(context)
+        }
+    }
+
+    private fun updateBlurState(context: Context) {
+        viewModelScope.launch {
+            val isBlurEnabledSetting = repository.getUseBlurEnabled().first()
+            val isPowerSaveMode = DeviceInfoUtil.isPowerSaveMode(context)
+            val isBlurProblematic = DeviceInfoUtil.isBlurProblematicDevice()
+
+            // 1:1 Logic from Essentials: turned off if power saving is on or device is problematic
+            val isBlurEnabled = isBlurEnabledSetting && !isPowerSaveMode && !isBlurProblematic
+
+            _uiState.value = _uiState.value.copy(
+                isBlurSettingEnabled = isBlurEnabledSetting,
+                isPowerSaveMode = isPowerSaveMode,
+                isBlurEnabled = isBlurEnabled
+            )
+        }
+    }
+
+    fun setSentryReportingEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isSentryReportingEnabled = enabled)
+        viewModelScope.launch {
+            repository.setSentryReportingEnabled(enabled)
+            // Note: Changes typically take effect on next launch as Sentry is initialized in Application.onCreate
+        }
+    }
+
+    fun setPitchBlackThemeEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isPitchBlackThemeEnabled = enabled)
+        viewModelScope.launch {
+            repository.setPitchBlackThemeEnabled(enabled)
+            // Note: Currently theme changes check via MainActivity collection instead of restart
+        }
+    }
+
+    fun setWidgetTransparency(alpha: Float) {
+        _uiState.value = _uiState.value.copy(widgetTransparency = alpha)
+        viewModelScope.launch {
+            repository.setWidgetTransparency(alpha)
+            appContext?.let { context ->
+                com.sameerasw.airsync.widget.AirSyncWidgetProvider.updateAllWidgets(context)
+            }
         }
     }
 
@@ -508,15 +733,33 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isDeviceDiscoveryEnabled = enabled)
         viewModelScope.launch {
             repository.setDeviceDiscoveryEnabled(enabled)
+            ServiceManager.updateServiceState(context)
+        }
+    }
+
+    fun setQuickShareEnabled(context: Context, enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isQuickShareEnabled = enabled)
+        viewModelScope.launch {
+            repository.setQuickShareEnabled(enabled)
+            val intent =
+                Intent(context, com.sameerasw.airsync.quickshare.QuickShareService::class.java)
             if (enabled) {
-                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             } else {
-                // When disabling discovery, we should stop discovery broadcasts
-                // If a connection exists, the service continues but discovery stops.
-                // If no connection, the service should still run for WakeupService but maybe without scanning?
-                // For now, let's just trigger a service update that checks the new flag.
-                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+                context.stopService(intent)
             }
+        }
+    }
+
+    fun setFileAccessEnabled(context: Context, enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isFileAccessEnabled = enabled)
+        viewModelScope.launch {
+            repository.setFileAccessEnabled(enabled)
+            ServiceManager.updateServiceState(context)
         }
     }
 
@@ -612,20 +855,14 @@ class AirSyncViewModel(
                                 WebSocketUtil.disconnect(context)
                             } catch (_: Exception) {
                             }
-                            // Stop service when no WiFi
-                            try {
-                                com.sameerasw.airsync.service.AirSyncService.stop(context)
-                            } catch (_: Exception) {
-                            }
+                            // Stop service if needed
+                            ServiceManager.updateServiceState(context)
                             _uiState.value =
                                 _uiState.value.copy(isConnected = false, isConnecting = false)
                             return@collect
                         } else {
-                            // Ensure service is running when WiFi is available
-                            try {
-                                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
-                            } catch (_: Exception) {
-                            }
+                            // Ensure service state is updated
+                            ServiceManager.updateServiceState(context)
                         }
 
                         if (target != null) {
@@ -792,6 +1029,10 @@ class AirSyncViewModel(
         }
     }
 
+    fun getSymmetricKeyForDevice(deviceName: String): String? {
+        return _networkDevices.value.firstOrNull { it.deviceName == deviceName }?.symmetricKey
+    }
+
     // Clipboard history management
     fun addClipboardEntry(text: String, isFromPc: Boolean) {
         if (!_uiState.value.isClipboardHistoryEnabled) return
@@ -927,6 +1168,14 @@ class AirSyncViewModel(
         }
     }
 
+    fun setUseBlurEnabled(enabled: Boolean) {
+        val finalEnabled = if (DeviceInfoUtil.isBlurProblematicDevice()) false else enabled
+        _uiState.value = _uiState.value.copy(isBlurEnabled = finalEnabled)
+        viewModelScope.launch {
+            repository.setUseBlurEnabled(enabled)
+        }
+    }
+
     fun resetOnboarding() {
         viewModelScope.launch {
             repository.setFirstRun(true)
@@ -934,6 +1183,60 @@ class AirSyncViewModel(
             repository.setLastPromptDismissedVersion(-1)
             repository.setHasRatedApp(false)
             updateRatingPromptDisplay()
+        }
+    }
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        _uiState.value = _uiState.value.copy(isOnboardingCompleted = completed)
+        viewModelScope.launch {
+            repository.setFirstRun(!completed)
+        }
+    }
+
+    private val _notificationApps =
+        MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())
+    val notificationApps: StateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>> =
+        _notificationApps.asStateFlow()
+
+    fun loadNotificationApps(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val installed = com.sameerasw.airsync.utils.AppUtil.getInstalledApps(context)
+                val saved = repository.getNotificationApps().first()
+                val merged =
+                    com.sameerasw.airsync.utils.AppUtil.mergeWithSavedApps(installed, saved)
+                _notificationApps.value = merged
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to load notification apps: ${e.message}")
+            }
+        }
+    }
+
+    fun toggleNotificationApp(context: Context, packageName: String, enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val current = _notificationApps.value.map {
+                    if (it.packageName == packageName) it.copy(isEnabled = enabled) else it
+                }
+                _notificationApps.value = current
+                repository.saveNotificationApps(current)
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to toggle notification app: ${e.message}")
+            }
+        }
+    }
+
+    fun saveAllNotificationApps(
+        context: Context,
+        apps: List<com.sameerasw.airsync.domain.model.NotificationApp>
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                _notificationApps.value = apps
+                repository.saveNotificationApps(apps)
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to save all notification apps: ${e.message}")
+            }
         }
     }
 

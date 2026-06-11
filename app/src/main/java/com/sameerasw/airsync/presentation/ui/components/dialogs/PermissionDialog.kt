@@ -1,5 +1,7 @@
 package com.sameerasw.airsync.presentation.ui.components.dialogs
 
+import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,7 +38,9 @@ enum class PermissionType {
     CALL_LOG,
     CONTACTS,
     PHONE,
-    ANSWER_PHONE_CALLS
+    BLUETOOTH,
+    LOCAL_NETWORK,
+    ANSWER_CALLS
 }
 
 data class PermissionInfo(
@@ -52,7 +57,8 @@ fun PermissionExplanationDialog(
     onDismiss: () -> Unit,
     onGrantPermission: () -> Unit
 ) {
-    val permissionInfo = getPermissionInfo(permissionType)
+    val context = LocalContext.current
+    val permissionInfo = getPermissionInfo(context, permissionType)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -71,6 +77,7 @@ fun PermissionExplanationDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(18.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -118,12 +125,10 @@ fun PermissionExplanationDialog(
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
                             text = permissionInfo.whyNeeded,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
@@ -156,7 +161,7 @@ fun PermissionExplanationDialog(
     }
 }
 
-private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
+private fun getPermissionInfo(context: Context, permissionType: PermissionType): PermissionInfo {
     return when (permissionType) {
         PermissionType.NOTIFICATION_ACCESS -> PermissionInfo(
             title = "Notification Access",
@@ -214,12 +219,28 @@ private fun getPermissionInfo(permissionType: PermissionType): PermissionInfo {
             buttonText = "Grant Phone Access"
         )
 
-        PermissionType.ANSWER_PHONE_CALLS -> PermissionInfo(
-            title = "Answer Calls",
-            icon = R.drawable.outline_call_end_24,
-            description = "AirSync needs this permission to end or reject calls from your Mac.",
-            whyNeeded = "To allow you to decline or hang up calls directly from your Mac, Android requires this specific permission. \n\nWithout it, the 'End Call' button on your Mac will not work. This permission is strictly used for call control actions you initiate.",
-            buttonText = "Grant Call Control"
+        PermissionType.BLUETOOTH -> PermissionInfo(
+            title = "Bluetooth Access",
+            icon = R.drawable.rounded_sync_desktop_24,
+            description = "AirSync uses Bluetooth Low Energy (BLE) as a secondary transport to sync notifications and media controls with your Mac when Wi-Fi is unavailable.",
+            whyNeeded = "To discover and connect to your Mac via Bluetooth, Android requires Bluetooth permissions (Scan, Connect, and Advertise). \n\nThis enables a low-power background connection that keeps your devices synced even when they aren't on the same Wi-Fi network. AirSync only uses Bluetooth to communicate with your authorized Mac devices.",
+            buttonText = "Grant Bluetooth Access"
+        )
+
+        PermissionType.LOCAL_NETWORK -> PermissionInfo(
+            title = context.getString(R.string.permission_local_network_title),
+            icon = R.drawable.rounded_sync_desktop_24,
+            description = context.getString(R.string.permission_local_network_explain),
+            whyNeeded = context.getString(R.string.permission_local_network_why),
+            buttonText = context.getString(R.string.permission_local_network_button)
+        )
+
+        PermissionType.ANSWER_CALLS -> PermissionInfo(
+            title = context.getString(R.string.permission_answer_calls_title),
+            icon = R.drawable.rounded_settings_phone_24,
+            description = context.getString(R.string.permission_answer_calls_explain),
+            whyNeeded = context.getString(R.string.permission_answer_calls_why),
+            buttonText = context.getString(R.string.permission_answer_calls_button)
         )
     }
 }

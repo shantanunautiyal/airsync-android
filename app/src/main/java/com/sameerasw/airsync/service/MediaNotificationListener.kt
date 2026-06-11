@@ -61,6 +61,19 @@ class MediaNotificationListener : NotificationListenerService() {
             SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
         }
 
+        fun hasSignificantMediaChange(old: MediaInfo?, new: MediaInfo?): Boolean {
+            if (old == null && new == null) return false
+            if (old == null || new == null) return true
+            return old.isPlaying != new.isPlaying ||
+                   old.title != new.title ||
+                   old.artist != new.artist ||
+                   old.albumArt != new.albumArt ||
+                   old.albumArtLite != new.albumArtLite ||
+                   old.durationMs != new.durationMs ||
+                   old.isBuffering != new.isBuffering ||
+                   old.likeStatus != new.likeStatus
+        }
+
         // In-memory cache of like status per track key
         private val likeStatusCache = LinkedHashMap<String, String>(32, 0.75f, true)
 
@@ -86,7 +99,7 @@ class MediaNotificationListener : NotificationListenerService() {
         fun getMediaInfo(context: Context): MediaInfo {
             // Respect global toggle; if disabled, return empty media
             if (!isNowPlayingEnabled) {
-                return MediaInfo(false, "", "", null, "none")
+                return MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
             }
             return try {
                 val mediaSessionManager =
@@ -119,6 +132,16 @@ class MediaNotificationListener : NotificationListenerService() {
                         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
                         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
                         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
+                        val durationMs =
+                            metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+                        val positionMs = playbackState?.position ?: 0L
+                        val positionTimestampMs = System.currentTimeMillis()
+                        val isBuffering = when (playbackState?.state) {
+                            PlaybackState.STATE_BUFFERING,
+                            PlaybackState.STATE_CONNECTING -> true
+
+                            else -> false
+                        }
 
                         val albumArtBitmap =
                             metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
@@ -129,6 +152,18 @@ class MediaNotificationListener : NotificationListenerService() {
                             // Compress to a smaller size to avoid large payloads
                             it.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
                             Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                        }
+
+                        val albumArtLiteBase64 = albumArtBitmap?.let {
+                            try {
+                                val outputStream = ByteArrayOutputStream()
+                                // Scale down to 80x80 and lower quality for BLE
+                                val scaled = Bitmap.createScaledBitmap(it, 80, 80, true)
+                                scaled.compress(Bitmap.CompressFormat.JPEG, 30, outputStream)
+                                Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                            } catch (e: Exception) {
+                                null
+                            }
                         }
 
 
@@ -153,6 +188,11 @@ class MediaNotificationListener : NotificationListenerService() {
                                 title = title,
                                 artist = artist,
                                 albumArt = albumArtBase64,
+                                albumArtLite = albumArtLiteBase64,
+                                durationMs = durationMs,
+                                positionMs = positionMs,
+                                positionTimestampMs = positionTimestampMs,
+                                isBuffering = isBuffering,
                                 likeStatus = likeStatus
                             )
                         }
@@ -168,10 +208,10 @@ class MediaNotificationListener : NotificationListenerService() {
                 }
 
                 // Log.d(TAG, "No media info found")
-                MediaInfo(false, "", "", null, "none")
+                MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting media info: ${e.message}")
-                MediaInfo(false, "", "", null, "none")
+                MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
             }
         }
 
@@ -427,6 +467,9 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         sbn?.let { notification ->
             Log.d(
                 TAG,
@@ -442,7 +485,7 @@ class MediaNotificationListener : NotificationListenerService() {
                 updateMediaInfo()
 
                 // If media info changed, trigger sync
-                if (previousMediaInfo != currentMediaInfo) {
+                if (hasSignificantMediaChange(previousMediaInfo, currentMediaInfo)) {
                     Log.d(TAG, "Media info changed, triggering sync")
                     SyncManager.onMediaStateChanged(this)
                 }
@@ -460,12 +503,18 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         if (sbn != null) handleNotificationRemoval(sbn)
     }
 
     // API level variants call the same handler to ensure we catch swipe-away removals
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap) {
         super.onNotificationRemoved(sbn, rankingMap)
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         handleNotificationRemoval(sbn)
     }
 
@@ -475,6 +524,9 @@ class MediaNotificationListener : NotificationListenerService() {
         reason: Int
     ) {
         super.onNotificationRemoved(sbn, rankingMap, reason)
+        if (!WebSocketUtil.isConnected()) {
+            return
+        }
         handleNotificationRemoval(sbn)
     }
 
@@ -488,7 +540,7 @@ class MediaNotificationListener : NotificationListenerService() {
             updateMediaInfo()
 
             // If media info changed, trigger sync
-            if (previousMediaInfo != currentMediaInfo) {
+            if (hasSignificantMediaChange(previousMediaInfo, currentMediaInfo)) {
                 Log.d(TAG, "Media info changed after notification removal, triggering sync")
                 SyncManager.onMediaStateChanged(this)
             }
@@ -499,41 +551,35 @@ class MediaNotificationListener : NotificationListenerService() {
             )
         }
 
-        // Send dismissal update to Mac for real removals
+        // Sync dismissal to Mac
         serviceScope.launch {
             try {
-                val id = NotificationDismissalUtil.getIdForSbn(sbn)
-                if (id.isNullOrEmpty()) {
-                    // Skip if we cannot map to a known id
-                    return@launch
-                }
+                val id = NotificationDismissalUtil.getIdForSbn(sbn) ?: sbn.key
+
                 // If this dismissal was initiated by our own dismiss request, skip echo
                 val wasSuppressed = NotificationDismissalUtil.consumeSuppressed(id)
                 if (wasSuppressed) {
-                    // Clean local caches and ignore
+                    Log.d(TAG, "Dismissal for $id was suppressed (originated from Mac)")
                     NotificationDismissalUtil.removeFromCaches(id)
                     return@launch
                 }
 
-                // Build and send update
-                if (WebSocketUtil.isConnected()) {
-                    val update = JsonUtil.toSingleLine(
-                        JsonUtil.createNotificationUpdateJson(
-                            id,
-                            dismissed = true,
-                            action = "dismiss"
-                        )
+                // Build and send update via WebSocket
+                val updateJson = JsonUtil.toSingleLine(
+                    JsonUtil.createNotificationUpdateJson(
+                        id,
+                        dismissed = true,
+                        action = "dismiss"
                     )
-                    val sent = WebSocketUtil.sendMessage(update)
-                    Log.d(TAG, "Sent notificationUpdate for $id: $sent")
-                } else {
-                    Log.d(TAG, "WebSocket not connected; skipping notificationUpdate for $id")
-                }
+                )
+                WebSocketUtil.sendMessage(updateJson)
+
+                Log.d(TAG, "Sent notification removal sync for $id")
 
                 // Remove from caches since it's gone now
                 NotificationDismissalUtil.removeFromCaches(id)
             } catch (e: Exception) {
-                Log.e(TAG, "Error sending notificationUpdate: ${e.message}")
+                Log.e(TAG, "Error syncing notification removal: ${e.message}")
             }
         }
     }
@@ -610,12 +656,13 @@ class MediaNotificationListener : NotificationListenerService() {
                         return@launch
                     }
 
-                    // Generate unique notification ID
-                    val notificationId = NotificationDismissalUtil.generateNotificationId(
-                        sbn.packageName,
-                        title,
-                        sbn.postTime
-                    )
+                    // Retrieve existing notification ID or generate a new one
+                    val notificationId = NotificationDismissalUtil.getIdBySystemKey(sbn.key)
+                        ?: NotificationDismissalUtil.generateNotificationId(
+                            sbn.packageName,
+                            title,
+                            sbn.postTime
+                        )
 
                     // Store notification for potential dismissal or actions
                     NotificationDismissalUtil.storeNotification(notificationId, sbn)
@@ -637,10 +684,37 @@ class MediaNotificationListener : NotificationListenerService() {
                         Log.w(TAG, "Failed to extract actions: ${e.message}")
                     }
 
-                    // Get notification priority (alerting vs silent)
-                    val priority = getNotificationPriority(sbn)
+                    // Check for progress bar extras
+                    var progress: Int? = null
+                    var progressMax: Int? = null
+                    var progressIndeterminate: Boolean? = null
+                    val ongoing = (notification.flags and Notification.FLAG_ONGOING_EVENT) != 0
 
-                    // Create notification JSON with actions
+                    try {
+                        val hasProgress = extras.containsKey(Notification.EXTRA_PROGRESS) ||
+                                extras.containsKey(Notification.EXTRA_PROGRESS_MAX)
+                        if (hasProgress) {
+                            val maxVal = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
+                            val progressVal = extras.getInt(Notification.EXTRA_PROGRESS, 0)
+                            val indeterminateVal = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+
+                            if (maxVal > 0 || indeterminateVal) {
+                                progress = progressVal
+                                progressMax = maxVal
+                                progressIndeterminate = indeterminateVal
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to parse notification progress: ${e.message}")
+                    }
+
+                    // Get notification priority (alerting vs silent)
+                    var priority = getNotificationPriority(sbn)
+                    if (progressMax != null || progressIndeterminate == true) {
+                        priority = "silent"
+                    }
+
+                    // Create notification JSON with actions and progress details
                     val notificationJson = JsonUtil.toSingleLine(
                         JsonUtil.createNotificationJson(
                             id = notificationId,
@@ -649,25 +723,25 @@ class MediaNotificationListener : NotificationListenerService() {
                             app = appName,
                             packageName = sbn.packageName,
                             priority = priority,
-                            actions = actions
+                            actions = actions,
+                            progress = progress,
+                            progressMax = progressMax,
+                            progressIndeterminate = progressIndeterminate,
+                            ongoing = ongoing
                         )
                     )
 
                     Log.d(TAG, "Preparing to send notification: $notificationJson")
 
-                    if (WebSocketUtil.isConnected()) {
-                        Log.d(TAG, "Sending notification via WebSocket")
-                        val success = WebSocketUtil.sendMessage(notificationJson)
-                        if (success) {
-                            Log.d(
-                                TAG,
-                                "Notification sent successfully via existing WebSocket connection"
-                            )
-                        } else {
-                            Log.e(TAG, "Failed to send notification via WebSocket")
-                        }
+                    Log.d(TAG, "Sending notification via WS/BLE")
+                    val success = WebSocketUtil.sendMessage(notificationJson)
+                    if (success) {
+                        Log.d(
+                            TAG,
+                            "Notification sent successfully"
+                        )
                     } else {
-                        Log.d(TAG, "WebSocket not connected, skipping notification sync")
+                        Log.e(TAG, "Failed to send notification")
                     }
                 } else {
                     Log.d(TAG, "Skipping empty notification from ${sbn.packageName}")
@@ -686,18 +760,20 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun isDuplicateNotification(packageName: String, body: String?): Boolean {
         if (body == null) return false
 
-        // Check if the notification is already in the cache
-        val isDuplicate = notificationCache.any { it.first == packageName && it.second == body }
+        synchronized(notificationCache) {
+            // Check if the notification is already in the cache
+            val isDuplicate = notificationCache.any { it.first == packageName && it.second == body }
 
-        // If not a duplicate, add it to the cache
-        if (!isDuplicate) {
-            if (notificationCache.size >= maxCache) {
-                notificationCache.removeFirst() // Remove the oldest notification
+            // If not a duplicate, add it to the cache
+            if (!isDuplicate) {
+                if (notificationCache.size >= maxCache) {
+                    notificationCache.removeFirst() // Remove the oldest notification
+                }
+                notificationCache.add(Pair(packageName, body))
             }
-            notificationCache.add(Pair(packageName, body))
-        }
 
-        return isDuplicate
+            return isDuplicate
+        }
     }
 
     private fun getNotificationPriority(sbn: StatusBarNotification): String {

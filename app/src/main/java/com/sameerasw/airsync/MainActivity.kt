@@ -12,36 +12,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.NavHost
@@ -59,6 +38,8 @@ import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.KeyguardHelper
 import com.sameerasw.airsync.utils.NotesRoleManager
 import com.sameerasw.airsync.utils.PermissionUtil
+import com.sameerasw.airsync.utils.ShortcutUtil
+import com.sameerasw.airsync.utils.UDPDiscoveryManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -73,6 +54,17 @@ object AdbDiscoveryHolder {
             discovery = AdbMdnsDiscovery(context.applicationContext)
             discovery?.startDiscovery()
         }
+    }
+
+    fun restartDiscovery(context: android.content.Context) {
+        Log.d("AdbDiscoveryHolder", "Restarting ADB discovery")
+        discovery?.stopDiscovery()
+        discovery = null
+        initialize(context)
+    }
+
+    fun isDiscoveryActive(): Boolean {
+        return discovery != null
     }
 
     fun getDiscoveredServices(): List<AdbMdnsDiscovery.AdbServiceInfo> {
@@ -180,7 +172,7 @@ class MainActivity : ComponentActivity() {
         // Install and configure the splash screen before any UI rendering
         val splashScreen = installSplashScreen()
 
-        // Make activity draw behind system bars - let the theme handles the colors
+        // Make activity draw behind system bars - let the theme handle the colors
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
         super.onCreate(savedInstanceState)
@@ -189,7 +181,11 @@ class MainActivity : ComponentActivity() {
         splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
             try {
                 val splashScreenView = splashScreenViewProvider.view
-                val splashIcon = splashScreenViewProvider.iconView
+                val splashIcon = try {
+                    splashScreenViewProvider.iconView
+                } catch (e: Exception) {
+                    null
+                }
 
                 // Retrieve last connected device in background while showing splash
                 var deviceIconRes: Int? = null
@@ -217,31 +213,38 @@ class MainActivity : ComponentActivity() {
                 if (splashIcon is ImageView && deviceIconRes != null) {
                     // Fade out the original app icon
                     val fadeOutIcon = ObjectAnimator.ofFloat(splashIcon, "alpha", 1f, 0f).apply {
-                        duration = 150 // 0.5 seconds
+                        duration = 150 // 0.15 seconds
                     }
 
                     fadeOutIcon.doOnEnd {
                         // Switch to device icon - with null check for OEM device compatibility
                         try {
                             splashIcon.setImageResource(deviceIconRes)
-                            Log.d("MainActivity", "Switched to device icon")
+                            // Apply Material You primary color tint
+                            val colorPrimary = androidx.core.content.ContextCompat.getColor(
+                                this@MainActivity,
+                                R.color.material_primary
+                            )
+                            splashIcon.imageTintList =
+                                android.content.res.ColorStateList.valueOf(colorPrimary)
+                            Log.d("MainActivity", "Switched to device icon with primary tint")
 
                             // Fade in the new device icon
                             val fadeInIcon =
                                 ObjectAnimator.ofFloat(splashIcon, "alpha", 0f, 1f).apply {
-                                    duration = 350 // 0.5 seconds
+                                    duration = 350 // 0.35 seconds
                                 }
 
                             fadeInIcon.doOnEnd {
                                 // Hold on device icon for 0.5s, then start outro animation
                                 try {
-                                    splashIcon.postDelayed({
+                                    splashScreenView.postDelayed({
                                         startOutroAnimation(
                                             splashScreenView,
                                             splashIcon,
                                             splashScreenViewProvider
                                         )
-                                    }, 250) // 0.5 second hold
+                                    }, 250) // 0.25 second hold
                                 } catch (e: Exception) {
                                     Log.e(
                                         "MainActivity",
@@ -276,32 +279,9 @@ class MainActivity : ComponentActivity() {
                     fadeOutIcon.start()
                 } else {
                     // No device icon found, or splashIcon is null/not ImageView (OEM device compatibility)
-                    when {
-                        splashIcon == null -> {
-                            Log.w(
-                                "SplashScreen",
-                                "iconView is null - OEM device detected, skipping crossfade"
-                            )
-                        }
-
-                        deviceIconRes == null -> {
-                            Log.d(
-                                "MainActivity",
-                                "No device icon resource, proceeding with app icon"
-                            )
-                        }
-
-                        else -> {
-                            Log.w(
-                                "SplashScreen",
-                                "iconView is not an ImageView - OEM device detected"
-                            )
-                        }
-                    }
-
                     // Proceed directly to outro after a brief hold
                     try {
-                        splashIcon?.postDelayed({
+                        splashScreenView.postDelayed({
                             startOutroAnimation(
                                 splashScreenView,
                                 splashIcon,
@@ -315,7 +295,11 @@ class MainActivity : ComponentActivity() {
                             e
                         )
                         // Fallback: start outro immediately
-                        startOutroAnimation(splashScreenView, splashIcon, splashScreenViewProvider)
+                        startOutroAnimation(
+                            splashScreenView,
+                            splashIcon,
+                            splashScreenViewProvider
+                        )
                     }
                 }
             } catch (e: Exception) {
@@ -336,8 +320,15 @@ class MainActivity : ComponentActivity() {
         handleNotesRoleIntent(intent)
 
         // Start ADB discovery once at app startup and keep it running
-        AdbDiscoveryHolder.initialize(this)
-        Log.d("MainActivity", "Started persistent ADB discovery at app startup")
+        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+            AdbDiscoveryHolder.initialize(this)
+            Log.d("MainActivity", "Started persistent ADB discovery at app startup")
+        } else {
+            Log.d(
+                "MainActivity",
+                "Skipping persistent ADB discovery at startup: ACCESS_LOCAL_NETWORK permission not granted"
+            )
+        }
 
         // Check if this is a QS tile long-press intent and device is not connected
         if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
@@ -378,18 +369,18 @@ class MainActivity : ComponentActivity() {
         val isFromQrScan = data != null
 
         setContent {
-            AirSyncTheme {
+            val viewModel: com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel =
+                androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel.create(this@MainActivity)
+                }
+            val uiState by viewModel.uiState.collectAsState()
+
+            AirSyncTheme(pitchBlackTheme = uiState.isPitchBlackThemeEnabled) {
                 val navController = rememberNavController()
-                var showAboutDialog by remember { mutableStateOf(false) }
-                var showHelpSheet by remember { mutableStateOf(false) }
-                val scrollBehavior =
-                    TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-                var topBarTitle by remember { mutableStateOf("AirSync") }
 
                 Scaffold(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        .fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(
                         0,
@@ -397,72 +388,6 @@ class MainActivity : ComponentActivity() {
                         0,
                         0
                     ),
-                    topBar = {
-                        LargeTopAppBar(
-                            colors = TopAppBarDefaults.largeTopAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            title = {
-                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                    // Dynamic icon based on last connected device category
-                                    val ctx = androidx.compose.ui.platform.LocalContext.current
-                                    val ds = remember(ctx) { DataStoreManager(ctx) }
-                                    val lastDevice by ds.getLastConnectedDevice()
-                                        .collectAsState(initial = null)
-                                    val iconRes =
-                                        com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(
-                                            lastDevice
-                                        )
-                                    Image(
-                                        painter = painterResource(id = iconRes),
-                                        contentDescription = "AirSync Logo",
-                                        modifier = Modifier.size(32.dp),
-                                        contentScale = ContentScale.Fit,
-                                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        topBarTitle,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                    )
-                                }
-                            },
-                            actions = {
-                                IconButton(
-                                    onClick = { showHelpSheet = true },
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceBright
-                                    ),
-                                    modifier = Modifier.size(48.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = androidx.compose.material.icons.Icons.Rounded.HelpOutline,
-                                        contentDescription = "Help",
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(
-                                    onClick = { showAboutDialog = true },
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceBright
-                                    ),
-                                    modifier = Modifier.size(48.dp)
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.rounded_info_24),
-                                        contentDescription = "About",
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            },
-                            scrollBehavior = scrollBehavior
-                        )
-                    }
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
@@ -470,6 +395,8 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         composable("main") {
+                            val initialPage =
+                                if (intent?.action == ShortcutUtil.DASH_ACTION_REMOTE) 1 else 0
                             AirSyncMainScreen(
                                 initialIp = ip,
                                 initialPort = port,
@@ -477,13 +404,9 @@ class MainActivity : ComponentActivity() {
                                 pcName = pcName,
                                 isPlus = isPlus,
                                 symmetricKey = symmetricKey,
-                                showAboutDialog = showAboutDialog,
-                                onDismissAbout = { showAboutDialog = false },
+                                initialPage = initialPage,
                                 onNavigateToHealth = { navController.navigate("health") },
-                                onNavigateToFileTransfer = { navController.navigate("fileTransfer") },
-                                showHelpSheet = showHelpSheet,
-                                onDismissHelp = { showHelpSheet = false },
-                                onTitleChange = { topBarTitle = it }
+                                onNavigateToFileTransfer = { navController.navigate("fileTransfer") }
                             )
                         }
                         composable("health") {
@@ -640,6 +563,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
 
         // Handle Notes Role intent
         handleNotesRoleIntent(intent)
@@ -658,11 +582,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+            AdbDiscoveryHolder.initialize(this)
+            val ds = DataStoreManager.getInstance(applicationContext)
+            val isDiscoveryEnabled = runBlocking {
+                ds.getDeviceDiscoveryEnabled().first()
+            }
+            UDPDiscoveryManager.start(this, isDiscoveryEnabled)
+            UDPDiscoveryManager.burstBroadcast(this)
+        }
+    }
+
     /**
      * Ensure ADB discovery is running (started at app startup, this just verifies it's active).
      */
     fun initializeAdbDiscovery() {
-        AdbDiscoveryHolder.initialize(this)
+        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+            AdbDiscoveryHolder.initialize(this)
+        }
     }
 
     /**

@@ -1,30 +1,43 @@
-import org.gradle.api.JavaVersion.VERSION_17
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     id("kotlin-parcelize")
+    alias(libs.plugins.wire)
 }
 
 android {
     namespace = "com.sameerasw.airsync"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
-        targetSdk = 36
-        versionCode = 22
-        versionName = "2.5.1"
+        versionCode = 29
+        versionName = "4.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+//        optimized dev build
+//          debug {
+//             isMinifyEnabled = true
+//             isShrinkResources = true
+//             isDebuggable = false
+//
+//             proguardFiles(
+//                 getDefaultProguardFile("proguard-android-optimize.txt"),
+//                 "proguard-rules.pro"
+//             )
+//          }
+// end
+
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -32,24 +45,27 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = VERSION_17
-        targetCompatibility = VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
     }
     buildFeatures {
         compose = true
         buildConfig = true
     }
+    compileSdkMinor = 0
 
     defaultConfig {
-        buildConfigField("String", "MIN_MAC_APP_VERSION", "\"2.5.0\"")
+        targetSdk = 37
+        buildConfigField("String", "MIN_MAC_APP_VERSION", "\"4.0.0\"")
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
+
 
 dependencies {
 
@@ -71,7 +87,7 @@ dependencies {
     // Android 12+ SplashScreen API with backward compatibility attributes
     implementation(libs.androidx.core.splashscreen)
 
-    implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material3:material3:1.5.0-alpha10")
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
 
@@ -132,6 +148,11 @@ dependencies {
     // Google Play Review
     implementation(libs.play.review)
     implementation(libs.play.review.ktx)
+    implementation(libs.sentry.android)
+
+    // Coil for image and GIF loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-gif:2.6.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -140,4 +161,21 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    implementation(libs.wire.runtime)
+    implementation(libs.bouncycastle)
+
+    // Ktor Server for WebDAV
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.host.common)
+    implementation(libs.ktor.server.status.pages)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.gson)
+}
+
+wire {
+    kotlin {
+        // Wire defaults to current project's proto directory
+    }
 }

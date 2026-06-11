@@ -61,11 +61,13 @@ object WebSocketMessageHandler {
      * @param context Application context for performing actions.
      * @param message Raw JSON message string.
      */
-    fun handleIncomingMessage(context: Context, message: String) {
+    fun handleIncomingMessage(context: Context, json: String) {
+        Log.d(TAG, "Received WebSocket message: $json")
         try {
-            val json = JSONObject(message)
-            val type = json.optString("type")
-            val data = json.optJSONObject("data")
+            val jsonObject = JSONObject(json)
+            val type = jsonObject.optString("type")
+            Log.d(TAG, "Processing message type: $type")
+            val data = jsonObject.optJSONObject("data") ?: JSONObject()
 
             if (type != "ping") {
                 Log.d(TAG, "Handling message type: $type")
@@ -73,9 +75,6 @@ object WebSocketMessageHandler {
 
             when (type) {
                 "clipboardUpdate" -> handleClipboardUpdate(context, data)
-                "fileTransferInit" -> handleFileTransferInit(context, data)
-                "fileChunk" -> handleFileChunk(context, data)
-                "fileTransferComplete" -> handleFileTransferComplete(context, data)
                 "volumeControl" -> handleVolumeControl(context, data)
                 "mediaControl" -> handleMediaControl(context, data)
                 "macMediaControl" -> handleMacMediaControl(context, data)
@@ -176,11 +175,9 @@ object WebSocketMessageHandler {
                     MirrorRequestHelper.stopMirroring(context)
                 }
                 "refreshAdbPorts" -> handleRefreshAdbPorts(context)
-                "fileChunkAck" -> handleFileChunkAck(data)
-                "transferVerified" -> handleTransferVerified(data)
-                "fileTransferCancel" -> handleFileTransferCancel(context, data)
                 "browseLs" -> handleBrowseLs(context, data)
-                "filePull" -> handleFilePull(context, data)
+                "startQuickShare" -> handleStartQuickShare(context)
+                "callControl" -> handleCallControl(context, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -652,7 +649,7 @@ object WebSocketMessageHandler {
     }
 
     /**
-     * Handles media control commands (play/pause, next, previous, like).
+     * Handles media control commands (play/pause, seek, next, previous, like).
      * Sends a response back to Mac and updates local media state after a short delay.
      */
     private fun handleMediaControl(context: Context, data: JSONObject?) {
@@ -681,6 +678,13 @@ object WebSocketMessageHandler {
                 "pause" -> {
                     success = MediaControlUtil.playPause(context)
                     message = if (success) "Playback paused" else "Failed to pause playback"
+                }
+
+                "seekTo" -> {
+                    val positionMs = data.optLong("positionMs", -1L)
+                    success = positionMs >= 0L && MediaControlUtil.seekTo(context, positionMs)
+                    message =
+                        if (success) "Seeked to ${positionMs}ms" else "Failed to seek playback"
                 }
 
                 "next" -> {
@@ -732,6 +736,7 @@ object WebSocketMessageHandler {
                 // For track skip actions (next/previous), add a delay to allow media player to update
                 CoroutineScope(Dispatchers.IO).launch {
                     val delayMs = when (action) {
+                        "seekTo" -> 650L
                         "next", "previous" -> 1200L
                         else -> 400L // smaller delay for like/others
                     }
@@ -825,6 +830,28 @@ object WebSocketMessageHandler {
     }
 
     /**
+     * Handles call control actions (accept, end, decline) from the Mac.
+     */
+    private fun handleCallControl(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) {
+                Log.e(TAG, "Call control data is null")
+                return
+            }
+
+            val action = data.optString("action")
+            Log.d(TAG, "Handling call control action: $action")
+            when (action) {
+                "accept" -> CallControlUtil.acceptCall(context)
+                "end", "decline" -> CallControlUtil.endCall(context)
+                else -> Log.w(TAG, "Unknown call control action: $action")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling call control command: ${e.message}")
+        }
+    }
+
+    /**
      * Attempts to dismiss a notification on the Android device by ID.
      */
     private fun handleNotificationDismissal(data: JSONObject?) {
@@ -847,7 +874,7 @@ object WebSocketMessageHandler {
 
             val success = NotificationDismissalUtil.dismissNotification(notificationId)
             val message =
-                if (success) "Notification dismissed" else "Failed to dismiss notification or notification not found"
+                if (success) "Notification dismissed" else "Failed to dismiss notification or not found"
 
             sendNotificationDismissalResponse(notificationId, success, message)
         } catch (e: Exception) {
@@ -913,6 +940,10 @@ object WebSocketMessageHandler {
 
     private fun handlePing(context: Context) {
         try {
+            // Reply immediately with lightweight pong message to keep session active
+            val pongJson = "{\"type\":\"pong\",\"data\":{}}"
+            WebSocketUtil.sendMessage(pongJson)
+
             // Respond to ping with current device status to keep connection alive
             // We must force sync here because the server expects a response to every ping
             SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
@@ -968,13 +999,14 @@ object WebSocketMessageHandler {
             val volume = music?.optInt("volume", 50) ?: 50
             val isMuted = music?.optBoolean("isMuted", false) ?: false
             // Limit albumArt size to prevent OOM - only use if reasonable size
-            val albumArtRaw = music?.optString("albumArt", "") ?: ""
-            val albumArt = if (albumArtRaw.length > 500_000) "" else albumArtRaw // Skip if > 500KB
-
-            val albumArt =
-                if (music?.has("albumArt") == true) music.optString("albumArt", "") else null
+            val albumArtRaw = if (music?.has("albumArt") == true) music.optString("albumArt", "") else null
+            val albumArt = if (albumArtRaw != null && albumArtRaw.length > 500_000) "" else albumArtRaw
 
             val likeStatus = music?.optString("likeStatus", "none") ?: "none"
+            val elapsedTime = ((music?.optDouble("elapsedTime", 0.0) ?: 0.0) * 1000).toLong()
+            val duration = ((music?.optDouble("duration", 0.0) ?: 0.0) * 1000).toLong()
+            val timestamp = music?.optString("timestamp")
+            val playbackRate = music?.optDouble("playbackRate", 1.0) ?: 1.0
 
             val isPaired = data.optBoolean("isPaired", true)
 
@@ -990,6 +1022,10 @@ object WebSocketMessageHandler {
             // Update the Mac device status manager with all media info
             MacDeviceStatusManager.updateStatus(
                 context = context,
+                name = data.optString(
+                    "name",
+                    MacDeviceStatusManager.macDeviceStatus.value?.name ?: "Unknown"
+                ),
                 batteryLevel = batteryLevel,
                 isCharging = isCharging,
                 isPaired = isPaired,
@@ -999,7 +1035,11 @@ object WebSocketMessageHandler {
                 volume = volume,
                 isMuted = isMuted,
                 albumArt = albumArt,
-                likeStatus = likeStatus
+                likeStatus = likeStatus,
+                elapsedTime = elapsedTime,
+                duration = duration,
+                timestamp = timestamp,
+                playbackRate = playbackRate
             )
 
             // Persist a lightweight snapshot for widget consumption and throttle widget refresh
@@ -1039,7 +1079,7 @@ object WebSocketMessageHandler {
 
                 val macName = data.optString("name", "")
                 val isPlus = data.optBoolean("isPlusSubscription", false)
-                val macVersion = data.optString("version", "2.0.0")
+                val macVersion = data.optString("version", "3.0.0")
 
                 Log.d(
                     TAG,
@@ -1049,12 +1089,14 @@ object WebSocketMessageHandler {
                 // Version compatibility check
                 val minVersion = BuildConfig.MIN_MAC_APP_VERSION
                 if (isVersionOutdated(macVersion, minVersion)) {
-                    launch(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            "Mac app is outdated ($macVersion < $minVersion). Please update the mac app and reconnect.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                    if (com.sameerasw.airsync.AirSyncApp.isAppForeground()) {
+                        launch(Dispatchers.Main) {
+                            Toast.makeText(
+                                context,
+                                "Mac app is outdated ($macVersion < $minVersion). Please update the mac app and reconnect.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
 
@@ -2112,43 +2154,6 @@ object WebSocketMessageHandler {
         }
     }
 
-    private fun handleFileChunkAck(data: JSONObject?) {
-        try {
-            if (data == null) return
-            val id = data.optString("id")
-            val index = data.optInt("index")
-            FileSender.handleAck(id, index)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling fileChunkAck: ${e.message}")
-        }
-    }
-
-    private fun handleTransferVerified(data: JSONObject?) {
-        try {
-            if (data == null) return
-            val id = data.optString("id")
-            val verified = data.optBoolean("verified")
-            FileSender.handleVerified(id, verified)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling transferVerified: ${e.message}")
-        }
-    }
-
-    private fun handleFileTransferCancel(context: Context, data: JSONObject?) {
-        try {
-            if (data == null) return
-            val id = data.optString("id")
-            if (id.isNotEmpty()) {
-                Log.d(TAG, "Received transfer cancel request for $id")
-                // Try cancelling both directions
-                FileReceiver.cancelTransfer(context, id)
-                FileSender.cancelTransfer(id)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling fileTransferCancel: ${e.message}")
-        }
-    }
-
     private fun handleBrowseLs(context: Context, data: JSONObject?) {
         try {
             val path = data?.optString("path")
@@ -2161,25 +2166,15 @@ object WebSocketMessageHandler {
         }
     }
 
-    private fun handleFilePull(context: Context, data: JSONObject?) {
-        try {
-            val path = data?.optString("path")
-            if (path.isNullOrEmpty()) return
-            Log.d(TAG, "File pull request for path: $path")
-            val file = java.io.File(path)
-            if (file.exists() && file.isFile) {
-                FileSender.sendFile(context, android.net.Uri.fromFile(file))
-            } else {
-                Log.e(TAG, "File pull failed: File does not exist or is not a file: $path")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling filePull: ${e.message}")
-        }
-    }
-
     private fun handleRefreshAdbPorts(context: Context) {
-        Log.d(TAG, "Request to refresh ADB ports received")
-        SyncManager.sendDeviceInfoNow(context)
+        Log.d(TAG, "Request to refresh ADB ports received. Restarting discovery...")
+        com.sameerasw.airsync.AdbDiscoveryHolder.restartDiscovery(context)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(2500)
+            Log.d(TAG, "Sending refreshed device info with ADB ports after delay")
+            SyncManager.sendDeviceInfoNow(context)
+        }
     }
 
     private fun isVersionOutdated(current: String, min: String): Boolean {
@@ -2198,6 +2193,34 @@ object WebSocketMessageHandler {
             false
         } catch (e: Exception) {
             false
+        }
+    }
+
+    private fun handleStartQuickShare(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val ds = DataStoreManager.getInstance(context)
+                val enabled = ds.isQuickShareEnabled().first()
+                if (!enabled) {
+                    return@launch
+                }
+
+                Log.d(TAG, "Triggering Quick Share receiving mode via WebSocket")
+                val intent = Intent(
+                    context,
+                    com.sameerasw.airsync.quickshare.QuickShareService::class.java
+                ).apply {
+                    action =
+                        com.sameerasw.airsync.quickshare.QuickShareService.ACTION_START_DISCOVERY
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting Quick Share service: ${e.message}")
+            }
         }
     }
 }

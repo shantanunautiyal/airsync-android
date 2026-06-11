@@ -2,6 +2,7 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.provider.ContactsContract
 import android.util.Log
 import com.google.i18n.phonenumbers.PhoneNumberUtil
@@ -80,7 +81,13 @@ class ContactLookupHelper(private val context: Context) {
             }
             
             // Fallback to device locale
-            context.resources.configuration.locales[0].country.takeIf { it.isNotEmpty() } ?: "US"
+            val locale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                context.resources.configuration.locales.get(0)
+            } else {
+                @Suppress("DEPRECATION")
+                context.resources.configuration.locale
+            }
+            locale?.country?.takeIf { it.isNotEmpty() } ?: "US"
         } catch (e: Exception) {
             // Final fallback - try deprecated locale method
             try {

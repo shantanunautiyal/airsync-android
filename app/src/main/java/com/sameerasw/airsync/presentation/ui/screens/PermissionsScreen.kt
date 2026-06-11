@@ -43,7 +43,9 @@ fun PermissionsScreen(
     onRequestCallLogPermission: (() -> Unit)? = null,
     onRequestContactsPermission: (() -> Unit)? = null,
     onRequestPhonePermission: (() -> Unit)? = null,
-    onRequestAnswerCallPermission: (() -> Unit)? = null,
+    onRequestBluetoothPermission: (() -> Unit)? = null,
+    onRequestLocalNetworkPermission: (() -> Unit)? = null,
+    onRequestAnswerCallsPermission: (() -> Unit)? = null,
     refreshTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -136,99 +138,6 @@ fun PermissionsScreen(
 
                     // Show critical permissions first
                     if (criticalPermissions.isNotEmpty()) {
-
-                            criticalPermissions.forEach { permission ->
-                                when (permission) {
-                                    "Notification Access" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Required for syncing notifications",
-                                            onExplainClick = {
-                                                showDialog = PermissionType.NOTIFICATION_ACCESS
-                                            },
-                                            isCritical = true
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Show optional permissions
-                        if (optionalPermissions.isNotEmpty()) {
-                            optionalPermissions.forEach { permission ->
-                                when (permission) {
-                                    "Post Notifications" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Show connection status and alerts",
-                                            onExplainClick = {
-                                                showDialog = PermissionType.POST_NOTIFICATIONS
-                                            },
-                                            isCritical = false
-                                        )
-                                    }
-
-                                    "Background App Usage" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Keep the app alive when inactive",
-                                            onExplainClick = {
-                                                showDialog = PermissionType.BACKGROUND_USAGE
-                                            },
-                                            isCritical = false
-                                        )
-                                    }
-
-                                    "Wallpaper Access" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Enables wallpaper sync",
-                                            onExplainClick = {
-                                                showDialog = PermissionType.WALLPAPER_ACCESS
-                                            },
-                                            isCritical = false
-                                        )
-                                    }
-
-                                    "Call Log Access" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Enables call log sync",
-                                            onExplainClick = {
-                                                showDialog = PermissionType.CALL_LOG
-                                            },
-                                            isCritical = false
-                                        )
-                                    }
-
-                                    "Contacts Access" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Enables contacts sync",
-                                            onExplainClick = {
-                                                showDialog = PermissionType.CONTACTS
-                                            },
-                                            isCritical = false
-                                        )
-                                    }
-
-                                    "Phone Access" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Enables phone state access",
-                                            onExplainClick = { showDialog = PermissionType.PHONE },
-                                            isCritical = false
-                                        )
-                                    }
-
-                                    "Answer Calls" -> {
-                                        PermissionButton(
-                                            permissionName = permission,
-                                            description = "Enables ending calls from Mac",
-                                            onExplainClick = { showDialog = PermissionType.ANSWER_PHONE_CALLS },
-                                            isCritical = false
-                                        )
-                                    }
                         criticalPermissions.forEach { permission ->
                             when (permission) {
                                 "Notification Access" -> {
@@ -285,7 +194,7 @@ fun PermissionsScreen(
                                 "Call Log Access" -> {
                                     PermissionButton(
                                         permissionName = permission,
-                                        description = "Enables call log sync",
+                                        description = "Necessary for mapping the caller info",
                                         onExplainClick = {
                                             showDialog = PermissionType.CALL_LOG
                                         },
@@ -296,7 +205,7 @@ fun PermissionsScreen(
                                 "Contacts Access" -> {
                                     PermissionButton(
                                         permissionName = permission,
-                                        description = "Enables contacts sync",
+                                        description = "Necessary for displaying known contacts in calls",
                                         onExplainClick = {
                                             showDialog = PermissionType.CONTACTS
                                         },
@@ -307,8 +216,39 @@ fun PermissionsScreen(
                                 "Phone Access" -> {
                                     PermissionButton(
                                         permissionName = permission,
-                                        description = "Enables phone state access",
+                                        description = "Detects call state changes",
                                         onExplainClick = { showDialog = PermissionType.PHONE },
+                                        isCritical = false
+                                    )
+                                }
+
+                                "Bluetooth Access" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Enables background BLE sync",
+                                        onExplainClick = { showDialog = PermissionType.BLUETOOTH },
+                                        isCritical = false
+                                    )
+                                }
+
+                                "Local Network Access" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Discover nearby Mac devices on Wi-Fi",
+                                        onExplainClick = {
+                                            showDialog = PermissionType.LOCAL_NETWORK
+                                        },
+                                        isCritical = false
+                                    )
+                                }
+
+                                "Answer Calls" -> {
+                                    PermissionButton(
+                                        permissionName = permission,
+                                        description = "Accept and end calls from Mac",
+                                        onExplainClick = {
+                                            showDialog = PermissionType.ANSWER_CALLS
+                                        },
                                         isCritical = false
                                     )
                                 }
@@ -356,8 +296,16 @@ fun PermissionsScreen(
                     PermissionType.PHONE -> {
                         onRequestPhonePermission?.invoke()
                     }
-                    PermissionType.ANSWER_PHONE_CALLS -> {
-                        onRequestAnswerCallPermission?.invoke()
+                    PermissionType.BLUETOOTH -> {
+                        onRequestBluetoothPermission?.invoke()
+                    }
+
+                    PermissionType.LOCAL_NETWORK -> {
+                        onRequestLocalNetworkPermission?.invoke()
+                    }
+
+                    PermissionType.ANSWER_CALLS -> {
+                        onRequestAnswerCallsPermission?.invoke()
                     }
                 }
             }

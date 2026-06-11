@@ -127,7 +127,7 @@ class AirSyncTileService : TileService() {
                     manualAttempt = true,
                     onHandshakeTimeout = {
                         try {
-                            val v = getSystemService(VIBRATOR_SERVICE) as android.os.Vibrator
+                            val v = getSystemService(android.os.Vibrator::class.java)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 v.vibrate(
                                     android.os.VibrationEffect.createOneShot(
@@ -184,15 +184,10 @@ class AirSyncTileService : TileService() {
 
             qsTile?.apply {
                 val dynamicIcon =
-                    com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(lastDevice)
+                    com.sameerasw.airsync.utils.DeviceIconResolver.getTileIconRes(lastDevice)
                 icon = Icon.createWithResource(this@AirSyncTileService, dynamicIcon)
 
-                if (isAuto) {
-                    // Auto-reconnect in progress or waiting
-                    state = if (isConnecting) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-                    label = "Trying to reconnect"
-                    subtitle = "Tap to stop"
-                } else if (isConnected && lastDevice != null) {
+                if (isConnected && lastDevice != null) {
                     // Connected state
                     state = Tile.STATE_ACTIVE
                     label = lastDevice.name
@@ -207,6 +202,16 @@ class AirSyncTileService : TileService() {
                             "Connected"
                         }
                     } ?: "Connected"
+                } else if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && lastDevice != null) {
+                    // BLE Connected state
+                    state = Tile.STATE_ACTIVE
+                    label = lastDevice.name
+                    subtitle = "Connected BT"
+                } else if (isAuto) {
+                    // Auto-reconnect in progress or waiting
+                    state = if (isConnecting) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+                    label = "Trying to reconnect"
+                    subtitle = "Tap to stop"
                 } else if (lastDevice != null) {
                     // Disconnected but has last device
                     state = Tile.STATE_INACTIVE
@@ -229,7 +234,8 @@ class AirSyncTileService : TileService() {
                 state = Tile.STATE_INACTIVE
                 label = "AirSync"
                 subtitle = "Error"
-                val dynamicIcon = com.sameerasw.airsync.utils.DeviceIconResolver.getIconRes(null)
+                val dynamicIcon =
+                    com.sameerasw.airsync.utils.DeviceIconResolver.getTileIconRes(null)
                 icon = Icon.createWithResource(this@AirSyncTileService, dynamicIcon)
                 updateTile()
             }

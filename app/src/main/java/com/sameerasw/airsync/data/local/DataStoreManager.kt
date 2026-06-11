@@ -88,6 +88,20 @@ class DataStoreManager(private val context: Context) {
         private val DEVICE_DISCOVERY_ENABLED = booleanPreferencesKey("device_discovery_enabled")
         private val LAST_CALL_SYNC_TIMESTAMP = longPreferencesKey("last_call_sync_timestamp")
         private val DEVICE_ID = stringPreferencesKey("device_id")
+        private val USE_BLUR = booleanPreferencesKey("use_blur")
+        private val PITCH_BLACK_THEME = booleanPreferencesKey("pitch_black_theme")
+        private val SENTRY_REPORTING_ENABLED = booleanPreferencesKey("sentry_reporting_enabled")
+        private val QUICK_SHARE_ENABLED = booleanPreferencesKey("quick_share_enabled")
+        private val FILE_ACCESS_ENABLED = booleanPreferencesKey("file_access_enabled")
+
+        // Widget preferences
+        private val WIDGET_TRANSPARENCY =
+            androidx.datastore.preferences.core.floatPreferencesKey("widget_transparency")
+
+        private val REMOTE_FLIPPED = booleanPreferencesKey("remote_flipped")
+
+        private val BLE_SYNC_ENABLED = booleanPreferencesKey("ble_sync_enabled")
+        private val BLE_AUTO_CONNECT_ENABLED = booleanPreferencesKey("ble_auto_connect_enabled")
 
         private const val NETWORK_DEVICES_PREFIX = "network_device_"
         private const val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
@@ -283,6 +297,66 @@ class DataStoreManager(private val context: Context) {
     fun getMacMediaControlsEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { prefs ->
             prefs[MAC_MEDIA_CONTROLS_ENABLED] ?: true // Default to true
+        }
+    }
+
+    suspend fun setUseBlurEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[USE_BLUR] = enabled
+        }
+    }
+
+    fun getUseBlurEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[USE_BLUR] ?: true // Default to enabled
+        }
+    }
+
+    suspend fun setPitchBlackThemeEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PITCH_BLACK_THEME] = enabled
+        }
+    }
+
+    fun getPitchBlackThemeEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[PITCH_BLACK_THEME] ?: false // Default to disabled
+        }
+    }
+
+    suspend fun setSentryReportingEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SENTRY_REPORTING_ENABLED] = enabled
+        }
+    }
+
+    fun getSentryReportingEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[SENTRY_REPORTING_ENABLED] ?: true // Default to enabled
+        }
+    }
+
+    suspend fun setQuickShareEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[QUICK_SHARE_ENABLED] = enabled
+        }
+    }
+
+    fun isQuickShareEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[QUICK_SHARE_ENABLED] ?: false // Default to disabled
+        }
+    }
+
+    suspend fun setFileAccessEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FILE_ACCESS_ENABLED] = enabled
+        }
+    }
+
+    fun isFileAccessEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[FILE_ACCESS_ENABLED] != false // Default to enabled
         }
     }
 
@@ -537,6 +611,30 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
+    suspend fun setWidgetTransparency(alpha: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[WIDGET_TRANSPARENCY] = alpha
+        }
+    }
+
+    fun getWidgetTransparency(): Flow<Float> {
+        return context.dataStore.data.map { preferences ->
+            preferences[WIDGET_TRANSPARENCY] ?: 1f
+        }
+    }
+
+    suspend fun setRemoteFlipped(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[REMOTE_FLIPPED] = enabled
+        }
+    }
+
+    fun isRemoteFlipped(): Flow<Boolean> {
+        return context.dataStore.data.map { preferences ->
+            preferences[REMOTE_FLIPPED] ?: false
+        }
+    }
+
     // Network-aware device connections
     suspend fun saveNetworkDeviceConnection(
         deviceName: String,
@@ -731,9 +829,6 @@ class DataStoreManager(private val context: Context) {
 
         prefs.asMap().forEach { (key, value) ->
             try {
-                // Skip nulls
-                if (value == null) return@forEach
-
                 // If string looks like an embedded image or is very large, skip
                 if (value is String) {
                     val lower = value.lowercase()
@@ -948,4 +1043,18 @@ class DataStoreManager(private val context: Context) {
             prefs[ESSENTIALS_CONNECTION_ENABLED] ?: false
         }
     }
+
+    suspend fun setBleSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[BLE_SYNC_ENABLED] = enabled }
+    }
+
+    fun getBleSyncEnabled(): Flow<Boolean> =
+        context.dataStore.data.map { it[BLE_SYNC_ENABLED] ?: false }
+
+    suspend fun setBleAutoConnectEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[BLE_AUTO_CONNECT_ENABLED] = enabled }
+    }
+
+    fun getBleAutoConnectEnabled(): Flow<Boolean> =
+        context.dataStore.data.map { it[BLE_AUTO_CONNECT_ENABLED] ?: true }
 }

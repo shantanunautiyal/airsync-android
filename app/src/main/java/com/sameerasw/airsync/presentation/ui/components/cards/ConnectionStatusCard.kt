@@ -2,35 +2,35 @@ package com.sameerasw.airsync.presentation.ui.components.cards
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.domain.model.ConnectedDevice
 import com.sameerasw.airsync.domain.model.UiState
+import com.sameerasw.airsync.presentation.ui.components.SlowlyRotatingAppIcon
 import com.sameerasw.airsync.utils.DevicePreviewResolver
 import com.sameerasw.airsync.utils.HapticUtil
 
@@ -42,36 +42,22 @@ fun ConnectionStatusCard(
     connectedDevice: ConnectedDevice? = null,
     lastConnected: Boolean,
     uiState: UiState,
+    modifier: Modifier = Modifier
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
 
-    // Determine gradient color
-    val gradientColor = when {
-        isConnected -> MaterialTheme.colorScheme.primary
-        isConnecting -> Color(0xFFFFC107) // Yellow
-        else -> Color(0xFFF44336) // Red
-    }
-
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = if (isConnected) 160.dp else 50.dp)
-            .animateContentSize(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraSmall,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceBright
+        )
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            gradientColor.copy(alpha = 0.3f),
-                            Color.Transparent
-                        ),
-                        start = Offset(0f, 1f),
-                        end = Offset.Infinite
-                    )
-                )
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = if (isConnected) 160.dp else 50.dp)
+                .animateContentSize()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -82,9 +68,9 @@ fun ConnectionStatusCard(
                 Image(
                     painter = painterResource(id = previewRes),
                     contentDescription = "Connected Mac preview",
-                    modifier = Modifier
-                        .fillMaxWidth(0.75f),
-                    contentScale = ContentScale.Fit
+                    modifier = Modifier.fillMaxWidth(0.75f),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)
                 )
             }
 
@@ -97,23 +83,22 @@ fun ConnectionStatusCard(
                 ) {
                     Text(
                         "${connectedDevice.name}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
 
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (connectedDevice.isPlus)
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant
-                        ),
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (connectedDevice.isPlus)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.padding(start = 16.dp)
                     ) {
                         Text(
                             text = if (connectedDevice.isPlus) "PLUS" else "FREE",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (connectedDevice.isPlus)
                                 MaterialTheme.colorScheme.onPrimaryContainer
@@ -166,14 +151,11 @@ fun ConnectionStatusCard(
                 }
 
                 if (isConnected) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp)) }
-//                    Icon(
-//                        painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_24),
-//                        contentDescription = "Connected",
-//                        modifier = Modifier.padding(end = 8.dp),
-//                        tint = MaterialTheme.colorScheme.primary
-//                    )
-
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        SlowlyRotatingAppIcon(
+                            modifier = Modifier.size(54.dp)
+                        )
+                    }
                 } else if (!isConnecting) {
                     Icon(
                         painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
@@ -190,16 +172,31 @@ fun ConnectionStatusCard(
                 )
 
                 if (isConnected) {
-                    OutlinedButton(onClick = {
-                        HapticUtil.performClick(haptics)
-                        onDisconnect()
-                    }) {
-                        Text("Disconnect")
+                    Button(
+                        onClick = {
+                            HapticUtil.performClick(haptics)
+                            onDisconnect()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = com.sameerasw.airsync.R.drawable.rounded_devices_off_24),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(
+                            text = "Disconnect",
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1
+                        )
                     }
                 }
             }
         }
     }
-
-
 }

@@ -200,12 +200,44 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getMacMediaControlsEnabled()
     }
 
+    override suspend fun setUseBlurEnabled(enabled: Boolean) {
+        dataStoreManager.setUseBlurEnabled(enabled)
+    }
+
+    override fun getUseBlurEnabled(): Flow<Boolean> {
+        return dataStoreManager.getUseBlurEnabled()
+    }
+
+    override suspend fun setPitchBlackThemeEnabled(enabled: Boolean) {
+        dataStoreManager.setPitchBlackThemeEnabled(enabled)
+    }
+
+    override fun getPitchBlackThemeEnabled(): Flow<Boolean> {
+        return dataStoreManager.getPitchBlackThemeEnabled()
+    }
+
     override suspend fun setDefaultTab(tab: String) {
         dataStoreManager.setDefaultTab(tab)
     }
 
     override fun getDefaultTab(): Flow<String> {
         return dataStoreManager.getDefaultTab()
+    }
+
+    override suspend fun setSentryReportingEnabled(enabled: Boolean) {
+        dataStoreManager.setSentryReportingEnabled(enabled)
+    }
+
+    override fun getSentryReportingEnabled(): Flow<Boolean> {
+        return dataStoreManager.getSentryReportingEnabled()
+    }
+
+    override suspend fun setWidgetTransparency(alpha: Float) {
+        dataStoreManager.setWidgetTransparency(alpha)
+    }
+
+    override fun getWidgetTransparency(): Flow<Float> {
+        return dataStoreManager.getWidgetTransparency()
     }
 
     override suspend fun setEssentialsConnectionEnabled(enabled: Boolean) {
@@ -254,5 +286,21 @@ class AirSyncRepositoryImpl(
 
     override fun hasRatedApp(): Flow<Boolean> {
         return dataStoreManager.hasRatedApp()
+    }
+
+    override suspend fun setQuickShareEnabled(enabled: Boolean) {
+        dataStoreManager.setQuickShareEnabled(enabled)
+    }
+
+    override fun isQuickShareEnabled(): Flow<Boolean> {
+        return dataStoreManager.isQuickShareEnabled()
+    }
+
+    override suspend fun setFileAccessEnabled(enabled: Boolean) {
+        dataStoreManager.setFileAccessEnabled(enabled)
+    }
+
+    override fun isFileAccessEnabled(): Flow<Boolean> {
+        return dataStoreManager.isFileAccessEnabled()
     }
 }

@@ -2,11 +2,17 @@ package com.sameerasw.airsync.utils
 
 import android.content.Context
 import android.util.Log
+import com.sameerasw.airsync.data.ble.BleConstants
+import com.sameerasw.airsync.data.ble.BleTransportBridge
+import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.widget.AirSyncWidgetProvider
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -14,11 +20,9 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.selects.select
 
 /**
  * Singleton utility for managing the WebSocket connection to the AirSync Mac server.
@@ -34,6 +38,19 @@ object WebSocketUtil {
     private var currentSymmetricKey: javax.crypto.SecretKey? = null
     private val isConnected = AtomicBoolean(false)
     private val isConnecting = AtomicBoolean(false)
+
+    private fun updateConnectedStatus(status: Boolean) {
+        isConnected.set(status)
+        _connectionStateFlow.value = status
+        notifyConnectionStatusListeners(status)
+        if (status) {
+            appContext?.let { acquireWifiLock(it) }
+        } else {
+            if (!autoReconnectActive.get()) {
+                releaseWifiLock()
+            }
+        }
+    }
 
     // Transport state: true after OkHttp onOpen, false after closing/failure/disconnect
     private val isSocketOpen = AtomicBoolean(false)
@@ -60,20 +77,15 @@ object WebSocketUtil {
     // Global connection status listeners for UI updates
     private val connectionStatusListeners = mutableSetOf<(Boolean) -> Unit>()
 
-    // Message Queues
-    private val highPriorityQueue = Channel<String>(Channel.UNLIMITED)
-    private val lowPriorityQueue = Channel<String>(10, BufferOverflow.DROP_OLDEST)
-    private var messageProcessorJob: Job? = null
+    private val _connectionStateFlow = MutableStateFlow(false)
+    val connectionState = _connectionStateFlow.asStateFlow()
 
     private fun createClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // Keep connection alive
-            .pingInterval(
-                5,
-                TimeUnit.SECONDS
-            ) // Send ping every 5 seconds for fast disconnect detection
+            .pingInterval(20, TimeUnit.SECONDS)
             .build()
     }
 
@@ -112,35 +124,15 @@ object WebSocketUtil {
     ) {
         // Cache application context for future cleanup even if callers don't pass context on disconnect
         appContext = context.applicationContext
-        
-        // Initialize Bluetooth sync manager for fallback/parallel sync
-        try {
-            BluetoothSyncManager.initialize(context.applicationContext)
-            BluetoothSyncManager.onMessageReceived = { message ->
-                // Forward Bluetooth messages to the same handler as WebSocket
-                CoroutineScope(Dispatchers.Main).launch {
-                    try {
-                        WebSocketMessageHandler.handleIncomingMessage(context.applicationContext, message)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error handling Bluetooth message: ${e.message}")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to initialize Bluetooth sync: ${e.message}")
-        }
 
-        // If user initiates a manual attempt, force reset connection state and stop auto-reconnect
-        if (manualAttempt) {
-            // Force reset connection state for manual attempts to override stuck states
-            isConnecting.set(false)
-            isConnected.set(false)
-            isSocketOpen.set(false)
-            handshakeCompleted.set(false)
-            cancelAutoReconnect()
-        } else if (isConnecting.get() || isConnected.get()) {
+        if (isConnecting.get() || isConnected.get()) {
             Log.d(TAG, "Already connected or connecting")
             return
+        }
+
+        // If user initiates a manual attempt, stop any auto-reconnect loop
+        if (manualAttempt) {
+            cancelAutoReconnect()
         }
 
         // Validate local network IP
@@ -165,6 +157,17 @@ object WebSocketUtil {
 
             isConnecting.set(true)
             handshakeCompleted.set(false)
+            notifyConnectionStatusListeners(false)
+
+            // Reset manual disconnect flag on manual attempt
+            if (manualAttempt) {
+                try {
+                    val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
+                    ds.setUserManuallyDisconnected(false)
+                } catch (_: Exception) {
+                }
+            }
+
             // Update widgets to show "Connecting…" immediately
             try {
                 AirSyncWidgetProvider.updateAllWidgets(context)
@@ -196,8 +199,7 @@ object WebSocketUtil {
                 connectionStarted.set(false)
                 failedAttempts.set(0)
 
-                startMessageProcessor()
-
+                // Overall timeout for all parallel connection attempts
                 connectionAttemptJob = CoroutineScope(Dispatchers.IO).launch {
                     delay(15000) // 15 seconds global timeout
                     if (isConnecting.get() && !isSocketOpen.get()) {
@@ -205,10 +207,12 @@ object WebSocketUtil {
                         isConnecting.set(false)
                         onConnectionStatusChanged?.invoke(false)
                         notifyConnectionStatusListeners(false)
-                        // Attempt auto-reconnect if allowed
-                        tryStartAutoReconnect(context)
-                        try { AirSyncWidgetProvider.updateAllWidgets(context) } catch (_: Exception) {}
+                        try {
+                            AirSyncWidgetProvider.updateAllWidgets(context)
+                        } catch (_: Exception) {
+                        }
                     }
+                }
 
                 // Try each IP in parallel
                 ipList.forEach { ip ->
@@ -246,7 +250,7 @@ object WebSocketUtil {
                                 WebSocketUtil.webSocket = webSocket
                                 currentIpAddress = ip // Store the successful IP
                                 isSocketOpen.set(true)
-                                isConnected.set(false)
+                                updateConnectedStatus(false)
                                 isConnecting.set(true)
 
                                 try {
@@ -260,7 +264,7 @@ object WebSocketUtil {
                                         delay(HANDSHAKE_TIMEOUT_MS)
                                         if (!handshakeCompleted.get()) {
                                             Log.w(TAG, "Handshake timed out")
-                                            isConnected.set(false)
+                                            updateConnectedStatus(false)
                                             isConnecting.set(false)
                                             try {
                                                 webSocket.close(4001, "Handshake timeout")
@@ -290,8 +294,14 @@ object WebSocketUtil {
                             }
 
                             override fun onMessage(webSocket: WebSocket, text: String) {
+                                Log.d(TAG, "RAW WebSocket message received: ${text}...")
                                 val decryptedMessage = currentSymmetricKey?.let { key ->
-                                    CryptoUtil.decryptMessage(text, key)
+                                    val decrypted = CryptoUtil.decryptMessage(text, key)
+                                    if (decrypted == null) Log.e(
+                                        TAG,
+                                        "FAILED TO DECRYPT WebSocket message!"
+                                    )
+                                    decrypted
                                 } ?: text
 
                                 if (!handshakeCompleted.get()) {
@@ -307,7 +317,7 @@ object WebSocketUtil {
                                             AirSyncWidgetProvider.updateAllWidgets(context)
                                         } catch (_: Exception) {
                                         }
-                                        isConnected.set(true)
+                                        updateConnectedStatus(true)
                                         isConnecting.set(false)
                                         handshakeTimeoutJob?.cancel()
                                         try {
@@ -348,6 +358,7 @@ object WebSocketUtil {
 
                                         onConnectionStatusChanged?.invoke(true)
                                         notifyConnectionStatusListeners(true)
+                                        cancelAutoReconnect()
                                         try {
                                             AirSyncWidgetProvider.updateAllWidgets(context)
                                         } catch (_: Exception) {
@@ -369,25 +380,46 @@ object WebSocketUtil {
                                 reason: String
                             ) {
                                 if (webSocket == WebSocketUtil.webSocket) {
-                                    isConnected.set(false)
+                                    if (code != 1000 || reason != "Manual disconnection") {
+                                        if (com.sameerasw.airsync.AirSyncApp.isAppForeground()) {
+                                            CoroutineScope(Dispatchers.Main).launch {
+                                                val msg =
+                                                    reason.ifEmpty { "Unknown Server Disconnect" }
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "Disconnected: $msg",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                    updateConnectedStatus(false)
                                     isSocketOpen.set(false)
                                     isConnecting.set(false)
                                     handshakeCompleted.set(false)
                                     handshakeTimeoutJob?.cancel()
                                     currentIpAddress = null
-                                    try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
-                                    try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
-                                    try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
-                                    try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
                                     try {
-                                        com.sameerasw.airsync.service.AirSyncService.stop(
+                                        ServiceManager.updateServiceState(context)
+                                    } catch (_: Exception) {
+                                    }
+                                    try {
+                                        com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(
+                                            context
+                                        )
+                                        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(
                                             context
                                         )
                                     } catch (_: Exception) {
                                     }
                                     onConnectionStatusChanged?.invoke(false)
                                     notifyConnectionStatusListeners(false)
-                                    tryStartAutoReconnect(context)
+
+                                    // Only auto-reconnect if it wasn't a manual close
+                                    if (code != 1000 || reason != "Manual disconnection") {
+                                        tryStartAutoReconnect(context)
+                                    }
+
                                     try {
                                         AirSyncWidgetProvider.updateAllWidgets(context)
                                     } catch (_: Exception) {
@@ -402,28 +434,68 @@ object WebSocketUtil {
                             ) {
                                 val totalToTry = ipList.size
                                 val failedCount = failedAttempts.incrementAndGet()
+                                val wasActive = webSocket == WebSocketUtil.webSocket
+                                val isFinalManualAttempt =
+                                    manualAttempt && !connectionStarted.get() && failedCount >= totalToTry
 
-                                if (webSocket == WebSocketUtil.webSocket || (!connectionStarted.get() && failedCount >= totalToTry)) {
-                                    isConnected.set(false)
+                                if (wasActive || isFinalManualAttempt) {
+                                    if (manualAttempt || isSocketOpen.get()) {
+                                        if (com.sameerasw.airsync.AirSyncApp.isAppForeground()) {
+                                            CoroutineScope(Dispatchers.Main).launch {
+                                                val msg = when (t) {
+                                                    is java.net.ConnectException -> "Connection Refused (Is AirSync Mac running?)"
+                                                    is java.net.SocketTimeoutException -> "Could not discover your mac"
+                                                    is java.net.UnknownHostException -> "Could not reach your mac"
+                                                    is java.io.EOFException, is java.net.SocketException -> "Lost connection to your mac"
+                                                    else -> t.message ?: "Unknown connection error"
+                                                }
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "AirSync: $msg",
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                    updateConnectedStatus(false)
                                     isConnecting.set(false)
                                     isSocketOpen.set(false)
                                     handshakeCompleted.set(false)
                                     handshakeTimeoutJob?.cancel()
                                     connectionAttemptJob?.cancel()
                                     currentIpAddress = null
-                                    try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
-                                    try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
-                                    try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
-                                    try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
                                     try {
-                                        com.sameerasw.airsync.service.AirSyncService.stop(
+                                        ServiceManager.updateServiceState(context)
+                                    } catch (_: Exception) {
+                                    }
+                                    try {
+                                        com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(
+                                            context
+                                        )
+                                        com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(
                                             context
                                         )
                                     } catch (_: Exception) {
                                     }
                                     onConnectionStatusChanged?.invoke(false)
                                     notifyConnectionStatusListeners(false)
-                                    tryStartAutoReconnect(context)
+
+                                    // Check manual disconnect flag before auto-reconnecting on failure
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        try {
+                                            val ds =
+                                                com.sameerasw.airsync.data.local.DataStoreManager.getInstance(
+                                                    context
+                                                )
+                                            val manual = ds.getUserManuallyDisconnected().first()
+                                            if (!manual) {
+                                                tryStartAutoReconnect(context)
+                                            }
+                                        } catch (_: Exception) {
+                                            tryStartAutoReconnect(context)
+                                        }
+                                    }
+
                                     try {
                                         AirSyncWidgetProvider.updateAllWidgets(context)
                                     } catch (_: Exception) {
@@ -483,39 +555,122 @@ object WebSocketUtil {
      * @return True if the message was enqueued, false if not connected.
      */
     fun sendMessage(message: String): Boolean {
-        // Try WebSocket first (primary connection)
+        // Allow sending as soon as the socket is open (even before handshake completes)
         if (isSocketOpen.get() && webSocket != null) {
-            // Determine priority
-            if (message.contains("\"type\":\"mirrorFrame\"") || message.contains("\"type\":\"fileChunk\"") || message.contains("\"type\":\"audioFrame\"")) {
-                val result = lowPriorityQueue.trySend(message)
-                if (result.isFailure) {
-                    // Log only occasionally to avoid spam
-                    // Log.v(TAG, "Dropped low priority message")
-                }
-                return true
-            } else {
-                highPriorityQueue.trySend(message)
-                return true
+            Log.d(TAG, "Sending message via WebSocket: $message")
+            val messageToSend = currentSymmetricKey?.let { key ->
+                CryptoUtil.encryptMessage(message, key)
+            } ?: message
+
+            return webSocket!!.send(messageToSend)
+        } else {
+            // Fallback to BLE if authenticated
+            val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
+            if (ble != null && ble.isAuthenticated) {
+                Log.d(TAG, "WebSocket not connected, falling back to BLE: $message")
+                return sendOverBLE(message)
             }
+
+            Log.w(TAG, "Neither WebSocket nor BLE connected, cannot send message")
+            return false
         }
-        
-        // Fallback to Bluetooth if WebSocket not available
-        if (BluetoothSyncManager.isAvailable()) {
-            if (!message.contains("\"type\":\"mirrorFrame\"")) {
-                Log.d(TAG, "Sending message via Bluetooth: ${message.take(100)}...")
-            }
-            return BluetoothSyncManager.sendMessage(message)
-        }
-        
-        Log.w(TAG, "No connection available (WebSocket or Bluetooth), cannot send message")
-        return false
     }
-    
-    /**
-     * Check if any connection (WebSocket or Bluetooth) is available
-     */
-    fun isAnyConnectionAvailable(): Boolean {
-        return (isSocketOpen.get() && webSocket != null) || BluetoothSyncManager.isAvailable()
+
+    private fun sendOverBLE(message: String): Boolean {
+        val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager() ?: return false
+        try {
+            val json = JSONObject(message)
+            val type = json.optString("type")
+            val data = json.optJSONObject("data") ?: JSONObject()
+
+            when (type) {
+                "notificationAction" -> {
+                    val pkg = data.optString("package")
+                    val actionId = data.optString("actionId")
+                    val payload = "$pkg|$actionId"
+                    ble.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_ACTION, payload)
+                    return true
+                }
+
+                "mediaControl" -> {
+                    val action = data.optString("action")
+                    // Protocol: type|action
+                    val payload = "media|$action"
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
+                    return true
+                }
+
+                "volumeControl" -> {
+                    val action = data.optString("action")
+                    // Protocol: type|action
+                    val payload = "volume|$action"
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
+                    return true
+                }
+
+                "clipboard", "clipboardUpdate" -> {
+                    val content = data.optString("text", data.optString("content"))
+                    ble.sendChunkedNotification(BleConstants.CHAR_CLIPBOARD_DATA_NOTIFY, content)
+                    return true
+                }
+
+                "dismissNotification" -> {
+                    val id = data.optString("id")
+                    ble.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_DISMISS_NOTIFY, id)
+                    return true
+                }
+
+                "remoteControl" -> {
+                    val action = data.optString("action")
+                    // Filter out high-frequency cursor controls over BLE
+                    if (action == "mouse_move" || action == "mouse_click" || action == "mouse_scroll") {
+                        return false
+                    }
+                    // Include value if present (e.g. vol_set needs level)
+                    val value = if (data.has("value")) data.opt("value")?.toString() else null
+                    val payload = if (value != null) "remote|$action|$value" else "remote|$action"
+                    ble.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, payload)
+                    return true
+                }
+
+                "notification" -> {
+                    val pkg = data.optString("package")
+                    val appName = data.optString("app")
+                    val title = data.optString("title")
+                    val body = data.optString("body")
+                    BleTransportBridge.sendNotification(pkg, appName, title, body)
+                    return true
+                }
+
+                "status" -> {
+                    val battery = data.optJSONObject("battery")
+                    if (battery != null) {
+                        val level = battery.optInt("level")
+                        ble.sendNotification(
+                            BleConstants.CHAR_BATTERY_LEVEL,
+                            byteArrayOf(level.toByte())
+                        )
+                    }
+                    val music = data.optJSONObject("music")
+                    if (music != null) {
+                        val audio = AudioInfo(
+                            isPlaying = music.optBoolean("isPlaying"),
+                            title = music.optString("title"),
+                            artist = music.optString("artist"),
+                            volume = music.optInt("volume"),
+                            isMuted = music.optBoolean("isMuted"),
+                            likeStatus = music.optString("likeStatus"),
+                            albumArtLite = music.optString("albumArtLite")
+                        )
+                        BleTransportBridge.sendMediaState(audio)
+                    }
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending over BLE fallback: ${e.message}")
+        }
+        return false
     }
 
     /**
@@ -524,48 +679,59 @@ object WebSocketUtil {
      */
     fun disconnect(context: Context? = null) {
         Log.d(TAG, "Disconnecting WebSocket")
-        isConnected.set(false)
+        updateConnectedStatus(false)
         isConnecting.set(false)
         isSocketOpen.set(false)
         handshakeCompleted.set(false)
         handshakeTimeoutJob?.cancel()
         currentIpAddress = null
-        try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
-        try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
-        try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
-        try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
 
-        // Stop periodic sync when disconnecting
-        SyncManager.stopPeriodicSync()
+        // Set manual disconnect flag
+        val ctx = context ?: appContext
+        ctx?.let { c ->
+            try {
+                val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
+                kotlinx.coroutines.runBlocking {
+                    ds.setUserManuallyDisconnected(true)
+                }
+            } catch (_: Exception) {
+            }
+
+            // Send manual disconnect signal over BLE before disconnecting BLE client
+            try {
+                val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
+                if (ble != null && ble.isAuthenticated) {
+                    Log.d(TAG, "Sending manual disconnect signal over BLE before disconnecting")
+                    ble.sendChunkedNotification(
+                        BleConstants.CHAR_MAC_CONTROL,
+                        "remote|manual_disconnect"
+                    )
+
+                    CoroutineScope(Dispatchers.IO).launch {
+                        delay(300)
+                        ble.disconnectAllConnectedDevices()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending manual disconnect signal over BLE: ${e.message}")
+            }
+        }
 
         webSocket?.close(1000, "Manual disconnection")
         webSocket = null
 
-        // Resolve a context for side-effects (try provided one, fall back to appContext)
         // Transition back to scanning on disconnect
-        val ctx = context ?: appContext
-        
-        // Cancel all ongoing file transfers on disconnect
         ctx?.let { c ->
             try {
-                FileReceiver.cancelAllTransfers(c)
-                Log.d(TAG, "Cancelled all file transfers on disconnect")
+                ServiceManager.updateServiceState(c)
             } catch (e: Exception) {
-                Log.e(TAG, "Error cancelling file transfers: ${e.message}")
-            }
-        }
-
-        // Stop AirSync service on disconnect
-        ctx?.let { c ->
-            try {
-                com.sameerasw.airsync.service.AirSyncService.stop(c)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error stopping AirSyncService on disconnect: ${e.message}")
+                Log.e(TAG, "Error updating service state on disconnect: ${e.message}")
             }
         }
 
         onConnectionStatusChanged?.invoke(false)
 
+        // Resolve a context for side-effects (try provided one, fall back to appContext)
         // Clear continue browsing notifications if possible
         ctx?.let { c ->
             try {
@@ -604,10 +770,6 @@ object WebSocketUtil {
         client?.dispatcher?.executorService?.shutdown()
         client = null
         currentIpAddress = null
-        try { FileReceiver.cancelAllTransfers(context) } catch (_: Exception) {}
-        try { MirrorRequestHelper.stopMirroring(context) } catch (_: Exception) {}
-        try { NotificationUtil.clearContinueBrowsingNotifications(context) } catch (_: Exception) {}
-        try { com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(context) } catch (_: Exception) {}
         currentPort = null
         currentSymmetricKey = null
         onConnectionStatusChanged = null
@@ -617,8 +779,12 @@ object WebSocketUtil {
         appContext = null
     }
 
-    fun isConnected(): Boolean {
+    fun isWifiConnected(): Boolean {
         return isConnected.get()
+    }
+
+    fun isConnected(): Boolean {
+        return isConnected.get() || com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()
     }
 
     fun isConnecting(): Boolean {
@@ -669,6 +835,10 @@ object WebSocketUtil {
         autoReconnectJob = null
         autoReconnectAttempts = 0
         autoReconnectStartTime = 0L
+        if (!isConnected.get()) {
+            releaseWifiLock()
+        }
+        notifyConnectionStatusListeners(false)
     }
 
     fun isAutoReconnecting(): Boolean = autoReconnectActive.get()
@@ -677,42 +847,119 @@ object WebSocketUtil {
         cancelAutoReconnect()
     }
 
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
+    private fun acquireWifiLock(context: Context) {
+        try {
+            if (wifiLock == null) {
+                val wm =
+                    context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                wifiLock = wm.createWifiLock(
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY,
+                    "AirSync:WifiLock"
+                )
+            }
+            if (wifiLock?.isHeld == false) {
+                wifiLock?.acquire()
+                Log.d(TAG, "WifiLock acquired")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire WifiLock: ${e.message}")
+        }
+    }
+
+    private fun releaseWifiLock() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+                Log.d(TAG, "WifiLock released")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to release WifiLock: ${e.message}")
+        }
+    }
+
     /**
      * Internal logic to attempt auto-reconnection to the last known device.
-     * Uses discovery-triggered strategy.
+     * Uses a dual strategy: proactive exponential backoff AND discovery-triggered.
      */
     private fun tryStartAutoReconnect(context: Context) {
         if (autoReconnectActive.get()) return // already running
         autoReconnectActive.set(true)
         autoReconnectStartTime = System.currentTimeMillis()
+        notifyConnectionStatusListeners(false)
+        Log.d(TAG, "Starting Smart Auto-Reconnect strategy")
 
         autoReconnectJob?.cancel()
         autoReconnectJob = CoroutineScope(Dispatchers.IO).launch {
             try {
                 val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
+                acquireWifiLock(context)
 
-                // Monitor discovered devices
-                UDPDiscoveryManager.discoveredDevices.collect { discoveredList ->
+                // 1.  Retry Loop (Try last known IPs immediately and periodically)
+                launch {
+                    var backoffMs = 2000L
+                    while (autoReconnectActive.get() && !isConnected.get()) {
+                        val manual = ds.getUserManuallyDisconnected().first()
+                        val autoEnabled = ds.getAutoReconnectEnabled().first()
+
+                        if (manual || !autoEnabled) {
+                            Log.d(
+                                TAG,
+                                "Auto-reconnect cancelled: manual=$manual, enabled=$autoEnabled"
+                            )
+                            cancelAutoReconnect()
+                            break
+                        }
+
+                        if (!isConnecting.get()) {
+                            val last = ds.getLastConnectedDevice().first()
+                            if (last != null) {
+                                val all = ds.getAllNetworkDeviceConnections().first()
+                                val targetConnection =
+                                    all.firstOrNull { it.deviceName == last.name }
+
+                                if (targetConnection != null) {
+                                    val ips =
+                                        targetConnection.networkConnections.values.joinToString(",")
+                                    val port = targetConnection.port.toIntOrNull() ?: 6996
+
+                                    Log.d(
+                                        TAG,
+                                        "Proactive retry to $ips:$port (backoff: ${backoffMs}ms)"
+                                    )
+                                    connect(
+                                        context = context,
+                                        ipAddress = ips,
+                                        port = port,
+                                        symmetricKey = targetConnection.symmetricKey,
+                                        manualAttempt = false,
+                                        onConnectionStatus = { connected ->
+                                            if (connected) {
+                                                cancelAutoReconnect()
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        delay(backoffMs)
+                        // Exponential backoff capped at 10 seconds
+                        backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(10_000L)
+                    }
+                }
+
+                // 2. Discovery Monitoring (Listen for presence packets in case IP changed)
+                DiscoveryOrchestrator.discoveredDevices.collect { discoveredList ->
                     if (!autoReconnectActive.get() || isConnected.get() || isConnecting.get()) return@collect
 
-                    val manual = ds.getUserManuallyDisconnected().first()
-                    val autoEnabled = ds.getAutoReconnectEnabled().first()
-                    if (manual || !autoEnabled) {
-                        cancelAutoReconnect()
-                        return@collect
-                    }
-
                     val last = ds.getLastConnectedDevice().first() ?: return@collect
-                    DeviceInfoUtil.getWifiIpAddress(context)
-                        ?: return@collect
 
                     // Match by name within the discovery list
                     val discoveryMatch = discoveredList.find { it.name == last.name }
                     if (discoveryMatch != null) {
-                        Log.d(
-                            TAG,
-                            "Discovery found target device: ${discoveryMatch.name} with IPs: ${discoveryMatch.ips}"
-                        )
+                        Log.d(TAG, "Discovery-triggered reconnect for: ${discoveryMatch.name}")
 
                         val all = ds.getAllNetworkDeviceConnections().first()
                         val targetConnection = all.firstOrNull { it.deviceName == last.name }
@@ -721,10 +968,6 @@ object WebSocketUtil {
                             val ips = discoveryMatch.ips.joinToString(",")
                             val port = targetConnection.port.toIntOrNull() ?: 6996
 
-                            Log.d(
-                                TAG,
-                                "Smart Auto-reconnect attempting parallel connections to $ips:$port"
-                            )
                             connect(
                                 context = context,
                                 ipAddress = ips,
@@ -733,16 +976,7 @@ object WebSocketUtil {
                                 manualAttempt = false,
                                 onConnectionStatus = { connected ->
                                     if (connected) {
-                                        CoroutineScope(Dispatchers.IO).launch {
-                                            try {
-                                                ds.updateNetworkDeviceLastConnected(
-                                                    targetConnection.deviceName,
-                                                    System.currentTimeMillis()
-                                                )
-                                            } catch (_: Exception) {
-                                            }
-                                            cancelAutoReconnect()
-                                        }
+                                        cancelAutoReconnect()
                                     }
                                 }
                             )
@@ -750,7 +984,8 @@ object WebSocketUtil {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in discovery auto-reconnect: ${e.message}")
+                Log.e(TAG, "Error in smart auto-reconnect: ${e.message}")
+                releaseWifiLock()
             }
         }
     }
@@ -760,34 +995,5 @@ object WebSocketUtil {
         // Only if not already connected or connecting
         if (isConnected.get() || isConnecting.get()) return
         tryStartAutoReconnect(context)
-    }
-    private fun startMessageProcessor() {
-        messageProcessorJob?.cancel()
-        messageProcessorJob = CoroutineScope(Dispatchers.IO).launch {
-            while (true) {
-                try {
-                    // Prioritize high priority queue
-                    val message = select<String> {
-                        highPriorityQueue.onReceive { it }
-                        lowPriorityQueue.onReceive { it }
-                    }
-
-                    if (isSocketOpen.get() && webSocket != null) {
-                        if (!message.contains("\"type\":\"mirrorFrame\"")) {
-                            Log.d(TAG, "Sending message via WebSocket: ${message.take(100)}...")
-                        }
-                        
-                        val messageToSend = currentSymmetricKey?.let { key ->
-                            CryptoUtil.encryptMessage(message, key)
-                        } ?: message
-                        
-                        webSocket?.send(messageToSend)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error in message processor: ${e.message}")
-                    delay(1000)
-                }
-            }
-        }
     }
 }

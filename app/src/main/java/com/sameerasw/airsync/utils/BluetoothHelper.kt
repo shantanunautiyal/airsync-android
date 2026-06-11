@@ -1068,6 +1068,7 @@ class BluetoothHelper(private val context: Context) {
             offset: Int,
             characteristic: BluetoothGattCharacteristic?
         ) {
+            if (device == null) return
             try {
                 val value = characteristic?.value ?: ByteArray(0)
                 val response = if (offset < value.size) {
@@ -1090,11 +1091,12 @@ class BluetoothHelper(private val context: Context) {
             offset: Int,
             value: ByteArray?
         ) {
+            if (device == null) return
             try {
                 value?.let { data ->
                     when (characteristic?.uuid) {
-                        DATA_TRANSFER_CHAR_UUID -> handleReceivedData(device?.address ?: "", data)
-                        COMMAND_CHAR_UUID -> handleReceivedCommand(device?.address ?: "", data)
+                        DATA_TRANSFER_CHAR_UUID -> handleReceivedData(device.address, data)
+                        COMMAND_CHAR_UUID -> handleReceivedCommand(device.address, data)
                     }
                 }
                 
@@ -1115,6 +1117,7 @@ class BluetoothHelper(private val context: Context) {
             offset: Int,
             value: ByteArray?
         ) {
+            if (device == null) return
             try {
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)

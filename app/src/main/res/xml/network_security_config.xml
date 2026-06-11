@@ -13,7 +13,7 @@
     <!-- Allow cleartext for any IP in common local ranges -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
-            <certificates src="system"/>
+            <certificates src="system" />
         </trust-anchors>
     </base-config>
 </network-security-config>

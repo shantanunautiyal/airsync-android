@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -49,6 +50,18 @@ class PermissionsActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { refreshUI() }
 
+    private val bluetoothPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { refreshUI() }
+
+    private val localNetworkPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshUI() }
+
+    private val answerCallsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshUI() }
+
     private var refreshCounter by mutableStateOf(0)
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -69,11 +82,16 @@ class PermissionsActivity : ComponentActivity() {
         // Disable scrim on 3-button navigation (API 29+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
-            window.isStatusBarContrastEnforced = false
         }
 
         setContent {
-            AirSyncTheme {
+            val viewModel: com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel =
+                androidx.lifecycle.viewmodel.compose.viewModel {
+                    com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel.create(this@PermissionsActivity)
+                }
+            val uiState by viewModel.uiState.collectAsState()
+
+            AirSyncTheme(pitchBlackTheme = uiState.isPitchBlackThemeEnabled) {
                 val scrollBehavior =
                     TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
@@ -113,8 +131,14 @@ class PermissionsActivity : ComponentActivity() {
                         onRequestPhonePermission = {
                             requestPhonePermission()
                         },
-                        onRequestAnswerCallPermission = {
-                            requestAnswerCallPermission()
+                        onRequestBluetoothPermission = {
+                            requestBluetoothPermission()
+                        },
+                        onRequestLocalNetworkPermission = {
+                            requestLocalNetworkPermission()
+                        },
+                        onRequestAnswerCallsPermission = {
+                            requestAnswerCallsPermission()
                         },
                         refreshTrigger = refreshCounter
                     )
@@ -153,14 +177,32 @@ class PermissionsActivity : ComponentActivity() {
         }
     }
 
-    private val answerCallPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { refreshUI() }
+    private fun requestBluetoothPermission() {
+        if (!PermissionUtil.isBluetoothPermissionsGranted(this)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                bluetoothPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_ADVERTISE
+                    )
+                )
+            }
+        }
+    }
 
-    private fun requestAnswerCallPermission() {
+    private fun requestLocalNetworkPermission() {
+        if (Build.VERSION.SDK_INT >= 37) {
+            if (!PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+                localNetworkPermissionLauncher.launch("android.permission.ACCESS_LOCAL_NETWORK")
+            }
+        }
+    }
+
+    private fun requestAnswerCallsPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!PermissionUtil.isAnswerPhoneCallsPermissionGranted(this)) {
-                answerCallPermissionLauncher.launch(Manifest.permission.ANSWER_PHONE_CALLS)
+            if (!PermissionUtil.isAnswerCallsPermissionGranted(this)) {
+                answerCallsPermissionLauncher.launch(Manifest.permission.ANSWER_PHONE_CALLS)
             }
         }
     }
