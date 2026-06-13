@@ -14,9 +14,15 @@ object CryptoUtil {
     private const val NONCE_SIZE_BYTES = 12
     private const val TAG_SIZE_BITS = 128
 
-    fun decodeKey(base64Key: String): SecretKey {
-        val keyBytes = Base64.decode(base64Key, Base64.DEFAULT)
-        return SecretKeySpec(keyBytes, "AES")
+    fun decodeKey(base64Key: String): SecretKey? {
+        return try {
+            val sanitized = base64Key.replace(" ", "+")
+            val keyBytes = Base64.decode(sanitized, Base64.DEFAULT)
+            SecretKeySpec(keyBytes, "AES")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     fun decryptMessage(base64Combined: String, key: SecretKey): String? {

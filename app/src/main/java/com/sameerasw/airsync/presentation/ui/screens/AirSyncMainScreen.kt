@@ -340,8 +340,9 @@ fun AirSyncMainScreen(
                 viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
                 if (connected) {
                     viewModel.setResponse("Connected successfully!")
+                    val resolvedPcName = uiState.lastConnectedDevice?.name ?: pcName
                     val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                    viewModel.saveLastConnectedDevice(pcName, plusStatus, symmetricKey)
+                    viewModel.saveLastConnectedDevice(resolvedPcName, plusStatus, symmetricKey)
                 } else {
                     viewModel.setResponse("Failed to connect")
                 }
@@ -461,7 +462,7 @@ fun AirSyncMainScreen(
 
                     val queryPart = uri.toString().substringAfter('?', "")
                     if (queryPart.isNotEmpty()) {
-                        val params = queryPart.split('?')
+                        val params = queryPart.split('&', '?')
                         val paramMap = params.associate { param ->
                             val parts = param.split('=', limit = 2)
                             val key = parts.getOrNull(0) ?: ""
@@ -470,7 +471,7 @@ fun AirSyncMainScreen(
                         }
                         pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
                         isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
-                        symmetricKey = paramMap["key"]
+                        symmetricKey = paramMap["key"]?.let { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }
                     }
 
                     if (ip.isNotEmpty() && port.isNotEmpty()) {
@@ -1338,7 +1339,7 @@ fun AirSyncMainScreen(
                 localIp = deviceInfo.localIp,
                 desktopIp = uiState.ipAddress,
                 port = uiState.port,
-                pcName = pcName ?: uiState.lastConnectedDevice?.name,
+                pcName = uiState.lastConnectedDevice?.name ?: pcName,
                 isPlus = uiState.lastConnectedDevice?.isPlus ?: isPlus,
                 onDismiss = { viewModel.setDialogVisible(false) },
                 onConnect = {

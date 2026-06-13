@@ -20,8 +20,9 @@ object BleTransportBridge {
 
     fun deriveAuthToken(symmetricKey: String): String {
         return try {
+            val sanitized = symmetricKey.replace(" ", "+")
             val md = MessageDigest.getInstance("SHA-256")
-            val hash = md.digest(symmetricKey.toByteArray(Charsets.UTF_8))
+            val hash = md.digest(sanitized.toByteArray(Charsets.UTF_8))
             Base64.getEncoder().encodeToString(hash.copyOf(16))
         } catch (e: Exception) {
             Log.e(TAG, "Error deriving auth token: ${e.message}")

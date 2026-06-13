@@ -280,22 +280,27 @@ class ScreenMirroringManager(
         Log.d(TAG, "Original SPS Params - Profile: 0x${profileIdc.toString(16)}, " +
                 "Constraints: 0x${constraintFlags.toString(16)}, Level: 0x${levelIdc.toString(16)}")
 
+        // 1. Coerce profile (DISABLED to prevent SPS corruption and kVTParameterErr on macOS)
+        /*
         val baselineProfileIdc = 66 // 0x42
         if (profileIdc != baselineProfileIdc) {
             sanitized[profileIndex] = baselineProfileIdc.toByte()
             Log.i(TAG, "Sanitized profile: 0x${profileIdc.toString(16)} -> 0x42 (Baseline)")
             modified = true
         }
+        */
 
         // 2. Constraint flag sanitization (SKIPPED)
         Log.d(TAG, "Constraint flag sanitization skipped. Using original flags: 0x${constraintFlags.toString(16)}")
 
-        // 3. Fix Level to 3.1 (0x1F = 31) if it's currently higher
+        // 3. Fix Level (DISABLED to prevent SPS corruption)
+        /*
         if (levelIdc > 0x1F) {
             sanitized[levelIndex] = 0x1F.toByte() // 31 corresponds to Level 3.1
             Log.i(TAG, "Sanitized level: 0x${levelIdc.toString(16)} -> 0x1F (Level 3.1)")
             modified = true
         }
+        */
 
         if (modified) {
             Log.i(TAG, "✅ SPS profile/level possibly modified.")

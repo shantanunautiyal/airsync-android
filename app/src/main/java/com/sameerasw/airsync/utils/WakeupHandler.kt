@@ -118,17 +118,30 @@ object WakeupHandler {
 
             if (ourIp != null) {
                 val networkDevice = networkDevices.firstOrNull { device ->
-                    device.deviceName == macName && device.getClientIpForNetwork(ourIp) == macIp
+                    device.deviceName.equals(macName, ignoreCase = true) &&
+                        device.getClientIpForNetwork(ourIp) == macIp
                 }
                 if (networkDevice?.symmetricKey != null) return networkDevice.symmetricKey
             }
 
             val lastConnectedDevice = dataStoreManager.getLastConnectedDevice().first()
-            if (lastConnectedDevice?.name == macName && lastConnectedDevice.symmetricKey != null) {
-                return lastConnectedDevice.symmetricKey
+            if (lastConnectedDevice?.symmetricKey != null) {
+                if (lastConnectedDevice.name.equals(macName, ignoreCase = true) ||
+                    lastConnectedDevice.port == macPort.toString() ||
+                    lastConnectedDevice.ipAddress == macIp
+                ) {
+                    return lastConnectedDevice.symmetricKey
+                }
             }
 
-            return networkDevices.firstOrNull { it.deviceName == macName }?.symmetricKey
+            val networkDeviceByName = networkDevices.firstOrNull {
+                it.deviceName.equals(macName, ignoreCase = true)
+            }
+            if (networkDeviceByName?.symmetricKey != null) return networkDeviceByName.symmetricKey
+
+            return networkDevices.firstOrNull {
+                it.port == macPort.toString() && it.symmetricKey != null
+            }?.symmetricKey
         } catch (e: Exception) {
             return null
         }

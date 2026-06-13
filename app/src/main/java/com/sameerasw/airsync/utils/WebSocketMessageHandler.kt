@@ -91,7 +91,7 @@ object WebSocketMessageHandler {
                 "requestWallpaper" -> handleRequestWallpaper(context)
                 "inputEvent" -> handleInputEvent(context, data)
                 "navAction" -> handleNavAction(context, data)
-                "stopMirroring" -> handleStopMirroring(context)
+                "stopMirroring" -> MirrorRequestHelper.stopMirroring(context)
                 "setScreenState" -> handleSetScreenState(context, data)
                 // SMS and Messaging
                 "requestSmsThreads" -> handleRequestSmsThreads(context, data)
@@ -123,7 +123,9 @@ object WebSocketMessageHandler {
                         Log.w(TAG, "FPS value $rawFps out of range, clamped to $fps")
                     }
                     
-                    val quality = (options?.optDouble("quality", 0.6) ?: 0.6).toFloat().coerceIn(0.3f, 1.0f)
+                    val rawQuality = options?.optDouble("quality", 0.6) ?: 0.6
+                    val normalizedQuality = if (rawQuality > 1.0) rawQuality / 100.0 else rawQuality
+                    val quality = normalizedQuality.toFloat().coerceIn(0.3f, 1.0f)
                     val maxWidth = options?.optInt("maxWidth", 1280) ?: 1280
                     val rawBitrate = options?.optInt("bitrateKbps", 4000) ?: 4000
                     // Clamp bitrate to reasonable range (1-8 Mbps)
@@ -137,12 +139,14 @@ object WebSocketMessageHandler {
                     
                     // Check for audio mirroring flag
                     val enableAudio = options?.optBoolean("enableAudio", false) ?: false
+                    val useRawFrames = options?.optBoolean("useRawFrames", false) ?: false
 
                     val mirroringOptions = MirroringOptions(
                         fps = fps,
                         quality = quality,
                         maxWidth = maxWidth,
                         bitrateKbps = bitrateKbps,
+                        useRawFrames = useRawFrames,
                         enableAudio = enableAudio
                     )
 
@@ -170,9 +174,14 @@ object WebSocketMessageHandler {
                         }
                     }
                 }
-                "stopMirroring" -> {
-                    Log.d(TAG, "🛑 Stop mirroring request from Mac")
-                    MirrorRequestHelper.stopMirroring(context)
+                "mirrorResponse" -> {
+                    val action = data.optString("action")
+                    val ok = data.optBoolean("ok")
+                    Log.d(TAG, "mirrorResponse: action=$action, ok=$ok")
+                    if (action == "stop" && ok) {
+                        Log.d(TAG, "Stopping mirroring from mirrorResponse ack")
+                        MirrorRequestHelper.stopMirroring(context)
+                    }
                 }
                 "refreshAdbPorts" -> handleRefreshAdbPorts(context)
                 "browseLs" -> handleBrowseLs(context, data)
@@ -2080,21 +2089,6 @@ object WebSocketMessageHandler {
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling request health data", e)
             }
-        }
-    }
-
-    private fun handleStopMirroring(context: Context) {
-        Log.d(TAG, "Received stop mirroring request from Mac")
-        try {
-            val service = ScreenCaptureService.instance
-            if (service != null) {
-                service.stopMirroring()
-                Log.d(TAG, "Screen mirroring stopped successfully")
-            } else {
-                Log.w(TAG, "ScreenCaptureService not running")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping mirroring", e)
         }
     }
 

@@ -44,6 +44,9 @@ import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.net.URLDecoder
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 
 object AdbDiscoveryHolder {
     private var discovery: AdbMdnsDiscovery? = null
@@ -75,6 +78,8 @@ object AdbDiscoveryHolder {
 class MainActivity : ComponentActivity() {
     // Flag to keep splash screen visible during app initialization
     private var isAppReady = false
+
+    private var viewModel: AirSyncViewModel? = null
 
     // Permission launcher for Android 13+ notification permission
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -353,7 +358,7 @@ class MainActivity : ComponentActivity() {
             val urlString = uri.toString()
             val queryPart = urlString.substringAfter('?', "")
             if (queryPart.isNotEmpty()) {
-                val params = queryPart.split('?')
+                val params = queryPart.split('&', '?')
                 val paramMap = params.associate {
                     val parts = it.split('=', limit = 2)
                     val key = parts.getOrNull(0) ?: ""
@@ -362,17 +367,22 @@ class MainActivity : ComponentActivity() {
                 }
                 pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
                 isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
-                symmetricKey = paramMap["key"]
+                symmetricKey = paramMap["key"]?.let { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }
             }
         }
 
         val isFromQrScan = data != null
 
+        val viewModelInstance = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return AirSyncViewModel.create(this@MainActivity) as T
+            }
+        })[AirSyncViewModel::class.java]
+        viewModel = viewModelInstance
+
         setContent {
-            val viewModel: com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel =
-                androidx.lifecycle.viewmodel.compose.viewModel {
-                    com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel.create(this@MainActivity)
-                }
+            val viewModel = viewModelInstance
             val uiState by viewModel.uiState.collectAsState()
 
             AirSyncTheme(pitchBlackTheme = uiState.isPitchBlackThemeEnabled) {
@@ -525,7 +535,6 @@ class MainActivity : ComponentActivity() {
                     "Invalid QR code format",
                     Toast.LENGTH_SHORT
                 ).show()
-                finish()
                 return
             }
 
@@ -539,17 +548,35 @@ class MainActivity : ComponentActivity() {
                     "Invalid QR code format",
                     Toast.LENGTH_SHORT
                 ).show()
-                finish()
                 return
             }
 
-            // Valid QR code, proceed with connection
-            val mainIntent = Intent(this, MainActivity::class.java).apply {
-                data = uri
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            var pcName: String? = null
+            var isPlus = false
+            var symmetricKey: String? = null
+
+            val urlString = uri.toString()
+            val queryPart = urlString.substringAfter('?', "")
+            if (queryPart.isNotEmpty()) {
+                val params = queryPart.split('&', '?')
+                val paramMap = params.associate {
+                    val parts = it.split('=', limit = 2)
+                    val key = parts.getOrNull(0) ?: ""
+                    val value = parts.getOrNull(1) ?: ""
+                    key to value
+                }
+                pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
+                isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
+                symmetricKey = paramMap["key"]?.let { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }
             }
-            startActivity(mainIntent)
-            finish()
+
+            viewModel?.showConnectionRequest(
+                ip = host,
+                port = port.toString(),
+                pcName = pcName,
+                isPlus = isPlus,
+                symmetricKey = symmetricKey
+            )
         } catch (e: Exception) {
             Log.e("MainActivity", "Error handling QR code result: ${e.message}", e)
             Toast.makeText(
@@ -557,7 +584,6 @@ class MainActivity : ComponentActivity() {
                 "Invalid QR code format",
                 Toast.LENGTH_SHORT
             ).show()
-            finish()
         }
     }
 
@@ -567,6 +593,11 @@ class MainActivity : ComponentActivity() {
 
         // Handle Notes Role intent
         handleNotesRoleIntent(intent)
+
+        // Handle deep link if present
+        if (intent.data != null && intent.data?.scheme == "airsync") {
+            handleConnectionIntent(intent)
+        }
 
         // Check if this is a QS tile long-press intent
         if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
@@ -580,6 +611,41 @@ class MainActivity : ComponentActivity() {
                 finish()
             }
         }
+    }
+
+    private fun handleConnectionIntent(intent: Intent) {
+        val data = intent.data ?: return
+        if (data.scheme != "airsync") return
+
+        val ip = data.host ?: return
+        val port = data.port.takeIf { it != -1 }?.toString() ?: return
+
+        var pcName: String? = null
+        var isPlus = false
+        var symmetricKey: String? = null
+
+        val urlString = data.toString()
+        val queryPart = urlString.substringAfter('?', "")
+        if (queryPart.isNotEmpty()) {
+            val params = queryPart.split('&', '?')
+            val paramMap = params.associate {
+                val parts = it.split('=', limit = 2)
+                val key = parts.getOrNull(0) ?: ""
+                val value = parts.getOrNull(1) ?: ""
+                key to value
+            }
+            pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
+            isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
+            symmetricKey = paramMap["key"]?.let { URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }
+        }
+
+        viewModel?.showConnectionRequest(
+            ip = ip,
+            port = port,
+            pcName = pcName,
+            isPlus = isPlus,
+            symmetricKey = symmetricKey
+        )
     }
 
     override fun onResume() {

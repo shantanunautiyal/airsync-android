@@ -48,7 +48,6 @@ import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCa
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTilesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.SmartspacerCard
-import com.sameerasw.airsync.presentation.ui.components.cards.BluetoothCard
 import com.sameerasw.airsync.presentation.ui.components.sheets.AppSelectionSheet
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.HapticUtil
@@ -384,8 +383,6 @@ fun SettingsView(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingsCategoryTitle("Connection")
             RoundedCardContainer {
-                BluetoothCard()
-
                 DeviceInfoCard(
                     deviceName = uiState.deviceNameInput,
                     localIp = deviceInfo.localIp,

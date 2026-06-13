@@ -412,6 +412,10 @@ object WebSocketUtil {
                                         )
                                     } catch (_: Exception) {
                                     }
+                                    try {
+                                        MirrorRequestHelper.stopMirroring(context)
+                                    } catch (_: Exception) {
+                                    }
                                     onConnectionStatusChanged?.invoke(false)
                                     notifyConnectionStatusListeners(false)
 
@@ -432,6 +436,7 @@ object WebSocketUtil {
                                 t: Throwable,
                                 response: Response?
                             ) {
+                                Log.e(TAG, "WebSocket connection failed: url=$url, wasActive=${webSocket == WebSocketUtil.webSocket}", t)
                                 val totalToTry = ipList.size
                                 val failedCount = failedAttempts.incrementAndGet()
                                 val wasActive = webSocket == WebSocketUtil.webSocket
@@ -475,6 +480,10 @@ object WebSocketUtil {
                                         com.sameerasw.airsync.utils.MacDeviceStatusManager.cleanup(
                                             context
                                         )
+                                    } catch (_: Exception) {
+                                    }
+                                    try {
+                                        MirrorRequestHelper.stopMirroring(context)
                                     } catch (_: Exception) {
                                     }
                                     onConnectionStatusChanged?.invoke(false)
@@ -748,6 +757,10 @@ object WebSocketUtil {
         ctx?.let { c ->
             try {
                 com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(c)
+            } catch (_: Exception) {
+            }
+            try {
+                MirrorRequestHelper.stopMirroring(c)
             } catch (_: Exception) {
             }
         }

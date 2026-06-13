@@ -126,7 +126,7 @@ object MirrorRequestHelper {
         }
         
         val notification = builder
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_laptop_24)
             .setContentTitle("Screen Mirroring Request")
             .setContentText("Mac wants to mirror your screen")
             .setAutoCancel(true)

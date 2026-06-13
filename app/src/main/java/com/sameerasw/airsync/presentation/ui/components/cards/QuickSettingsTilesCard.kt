@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.utils.HapticUtil
@@ -80,7 +81,7 @@ private fun TileItem(
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
-    Row(
+    Column(
         modifier = modifier
             .alpha(if (isAdded) 0.5f else 1f)
             .clip(MaterialTheme.shapes.medium)
@@ -90,8 +91,8 @@ private fun TileItem(
                 onClick(context)
             }
             .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(
             painter = painterResource(id = iconRes),
@@ -104,6 +105,8 @@ private fun TileItem(
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 color = if (isAdded) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary
             )
             Text(

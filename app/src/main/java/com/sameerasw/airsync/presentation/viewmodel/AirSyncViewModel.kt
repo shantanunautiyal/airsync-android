@@ -544,6 +544,36 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isDialogVisible = visible)
     }
 
+    fun showConnectionRequest(
+        ip: String,
+        port: String,
+        pcName: String?,
+        isPlus: Boolean,
+        symmetricKey: String?
+    ) {
+        val currentlyConnected = WebSocketUtil.isConnected()
+        
+        _uiState.value = _uiState.value.copy(
+            ipAddress = ip,
+            port = port,
+            symmetricKey = symmetricKey ?: _uiState.value.lastConnectedDevice?.symmetricKey,
+            isDialogVisible = !currentlyConnected
+        )
+
+        if (pcName != null && !currentlyConnected) {
+            _uiState.value = _uiState.value.copy(
+                lastConnectedDevice = ConnectedDevice(
+                    name = pcName,
+                    ipAddress = ip,
+                    port = port,
+                    lastConnected = System.currentTimeMillis(),
+                    isPlus = isPlus,
+                    symmetricKey = symmetricKey
+                )
+            )
+        }
+    }
+
     fun setPermissionDialogVisible(visible: Boolean) {
         _uiState.value = _uiState.value.copy(showPermissionDialog = visible)
     }
@@ -574,6 +604,7 @@ class AirSyncViewModel(
         isPlus: Boolean = false,
         symmetricKey: String? = null
     ) {
+        val sanitizedKey = symmetricKey?.replace(" ", "+")
         viewModelScope.launch {
             val deviceName = pcName ?: "My Mac"
             val ourIp = _deviceInfo.value.localIp
@@ -587,7 +618,7 @@ class AirSyncViewModel(
                 clientIp,
                 port,
                 isPlus,
-                symmetricKey
+                sanitizedKey
             )
 
             // Also save to legacy storage for backwards compatibility
@@ -597,7 +628,7 @@ class AirSyncViewModel(
                 port = port,
                 lastConnected = System.currentTimeMillis(),
                 isPlus = isPlus,
-                symmetricKey = symmetricKey
+                symmetricKey = sanitizedKey
             )
             repository.saveLastConnectedDevice(connectedDevice)
             _uiState.value = _uiState.value.copy(lastConnectedDevice = connectedDevice)

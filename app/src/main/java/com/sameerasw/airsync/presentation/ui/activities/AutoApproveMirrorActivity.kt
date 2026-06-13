@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.sameerasw.airsync.domain.model.MirroringOptions
 import com.sameerasw.airsync.service.ScreenCaptureService
 import com.sameerasw.airsync.utils.MirrorRequestHelper
+import com.sameerasw.airsync.utils.WebSocketUtil
 import com.sameerasw.airsync.data.local.DataStoreManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,14 @@ class AutoApproveMirrorActivity : ComponentActivity() {
             }
         } else {
             Log.d(TAG, "Permission denied by user")
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    WebSocketUtil.sendMessage("""{"type":"mirrorStop","data":{}}""")
+                    WebSocketUtil.sendMessage("""{"type":"mirrorStatus","data":{"isActive":false,"message":"Permission denied by user"}}""")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error sending mirror stop/status on permission denial", e)
+                }
+            }
         }
         
         // Reset pending flag and finish

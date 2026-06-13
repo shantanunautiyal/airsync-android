@@ -52,6 +52,9 @@ class RawFrameEncoder(
     private var lastLogTime = System.currentTimeMillis()
     private var totalBytes = 0L
     
+    private var reusableBitmap: Bitmap? = null
+    private var cleanBuffer: ByteBuffer? = null
+    
     companion object {
         private const val TAG = "RawFrameEncoder"
         private const val MAX_IMAGES = 3 // Triple buffering for smoother capture
@@ -161,9 +164,6 @@ class RawFrameEncoder(
                     
                     val jpegData = bitmapToJpeg(bitmap, jpegQuality)
                     
-                    // Always recycle bitmap to prevent memory leaks
-                    bitmap.recycle()
-                    
                     if (jpegData != null) {
                         val metadata = FrameMetadata(
                             width = encoderWidth,
@@ -189,7 +189,6 @@ class RawFrameEncoder(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error processing bitmap", e)
-                    bitmap.recycle() // Ensure cleanup even on error
                 }
             }
             
@@ -206,27 +205,28 @@ class RawFrameEncoder(
             val buffer = planes[0].buffer
             val pixelStride = planes[0].pixelStride
             val rowStride = planes[0].rowStride
-            val rowPadding = rowStride - pixelStride * image.width
+            val width = image.width
+            val height = image.height
             
-            // Create bitmap with exact dimensions to avoid extra allocation
-            val bitmap = if (rowPadding == 0) {
-                // No padding - direct copy
-                Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888).apply {
-                    copyPixelsFromBuffer(buffer)
-                }
+            val destBuffer = cleanBuffer ?: ByteBuffer.allocateDirect(width * height * 4).also { cleanBuffer = it }
+            destBuffer.rewind()
+            
+            if (rowStride == width * pixelStride) {
+                destBuffer.put(buffer)
             } else {
-                // Has padding - need to crop
-                val tempBitmap = Bitmap.createBitmap(
-                    image.width + rowPadding / pixelStride,
-                    image.height,
-                    Bitmap.Config.ARGB_8888
-                )
-                tempBitmap.copyPixelsFromBuffer(buffer)
-                val croppedBitmap = Bitmap.createBitmap(tempBitmap, 0, 0, image.width, image.height)
-                tempBitmap.recycle() // Free temp bitmap immediately
-                croppedBitmap
+                val rowBytes = width * pixelStride
+                for (row in 0 until height) {
+                    buffer.position(row * rowStride)
+                    val oldLimit = buffer.limit()
+                    buffer.limit(row * rowStride + rowBytes)
+                    destBuffer.put(buffer)
+                    buffer.limit(oldLimit)
+                }
             }
+            destBuffer.rewind()
             
+            val bitmap = reusableBitmap ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { reusableBitmap = it }
+            bitmap.copyPixelsFromBuffer(destBuffer)
             bitmap
         } catch (e: Exception) {
             Log.e(TAG, "Failed to convert image to bitmap", e)
@@ -273,6 +273,15 @@ class RawFrameEncoder(
             imageReader = null
         } catch (e: Exception) {
             Log.e(TAG, "Error closing image reader", e)
+        }
+        
+        // Recycle reusable bitmap and buffers
+        try {
+            reusableBitmap?.recycle()
+            reusableBitmap = null
+            cleanBuffer = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing bitmap and buffer", e)
         }
         
         // Reset state
