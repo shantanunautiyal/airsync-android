@@ -143,6 +143,7 @@ object HealthConnectUtil {
                         )
                     )
                     activeCalories = responseActive[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+                    Log.d(TAG, "Active Calories aggregation result: $activeCalories")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error aggregating active calories", e)
                 }
@@ -158,6 +159,7 @@ object HealthConnectUtil {
                         )
                         if (responseActiveRaw.records.isNotEmpty()) {
                             activeCalories = responseActiveRaw.records.sumOf { it.energy.inKilocalories }
+                            Log.d(TAG, "Active Calories raw records sum: $activeCalories")
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error reading raw active calories", e)
@@ -165,7 +167,7 @@ object HealthConnectUtil {
                 }
                 
                 // If we found any active calories, return them as Int
-                if (activeCalories != null) {
+                if (activeCalories != null && activeCalories > 0) {
                     return@withContext activeCalories.toInt()
                 }
                 
@@ -180,6 +182,7 @@ object HealthConnectUtil {
                         )
                     )
                     totalCalories = responseTotal[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories
+                    Log.d(TAG, "Total Calories aggregation result: $totalCalories")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error aggregating total calories", e)
                 }
@@ -195,13 +198,14 @@ object HealthConnectUtil {
                         )
                         if (responseTotalRaw.records.isNotEmpty()) {
                             totalCalories = responseTotalRaw.records.sumOf { it.energy.inKilocalories }
+                            Log.d(TAG, "Total Calories raw records sum: $totalCalories")
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error reading raw total calories", e)
                     }
                 }
                 
-                if (totalCalories != null) {
+                if (totalCalories != null && totalCalories > 0) {
                     totalCalories.toInt()
                 } else {
                     null
@@ -280,17 +284,40 @@ object HealthConnectUtil {
         return withContext(Dispatchers.IO) {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
-                val response = healthConnectClient.readRecords(
-                    ReadRecordsRequest(
-                        ActiveCaloriesBurnedRecord::class,
+                
+                // Use ExerciseSessionRecord aggregation (aligned with SimpleHealthConnectManager)
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL),
                         timeRangeFilter = TimeRangeFilter.between(start, end)
                     )
                 )
-
-                // Estimate active minutes from active calories (rough approximation)
-                val activeCalories = response.records.sumOf { it.energy.inKilocalories }
-                val minutes = (activeCalories / 5).toInt() // Rough estimate: 5 cal/min
-                if (minutes > 0) minutes else null
+                val duration = response[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL]
+                val minutes = duration?.toMinutes()?.toInt()
+                
+                if (minutes != null && minutes > 0) {
+                    Log.d(TAG, "Active minutes from ExerciseSession: $minutes")
+                    minutes
+                } else {
+                    // Fallback: estimate from active calories
+                    try {
+                        val activeResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                ActiveCaloriesBurnedRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(start, end)
+                            )
+                        )
+                        val activeCalories = activeResponse.records.sumOf { it.energy.inKilocalories }
+                        val estimated = (activeCalories / 5).toInt() // ~5 cal/min
+                        if (estimated > 0) {
+                            Log.d(TAG, "Active minutes estimated from calories: $estimated")
+                            estimated
+                        } else null
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error estimating active minutes from calories", e)
+                        null
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error reading active minutes", e)
                 null
@@ -373,7 +400,7 @@ object HealthConnectUtil {
                 }
                 
                 HealthSummary(
-                    date = date, // Return the requested date, not current time
+                    date = startOfDay.toInstant().toEpochMilli(), // Normalized start-of-day for reliable date comparison on Mac
                     steps = steps,
                     distance = distance,
                     calories = calories,
