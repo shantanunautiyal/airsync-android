@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.ConnectedDevice
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -78,6 +79,9 @@ object WakeupHandler {
                 dataStoreManager.saveLastConnectedDevice(connectedDevice)
             }
 
+            // Escalate discovery from DORMANT to PASSIVE so we participate in handshake
+            DiscoveryOrchestrator.setDiscoveryMode(context, DiscoveryMode.PASSIVE)
+
             Log.d(TAG, "Attempting to connect to Mac at $macIp:$macPort")
             WebSocketUtil.connect(
                 context = context,
@@ -97,9 +101,15 @@ object WakeupHandler {
                             } catch (e: Exception) {
                             }
                         }
+                    } else {
+                        // Connection failed — schedule transition back to DORMANT
+                        DiscoveryOrchestrator.scheduleDormantTransition(context, 60_000)
                     }
                 }
             )
+
+            // Fallback: if nothing happens within 60s, go back to DORMANT
+            DiscoveryOrchestrator.scheduleDormantTransition(context, 60_000)
         } catch (e: Exception) {
             Log.e(TAG, "Error processing wake-up request", e)
         }

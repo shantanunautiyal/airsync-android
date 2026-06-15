@@ -66,6 +66,8 @@ object WebSocketUtil {
     private var autoReconnectActive = AtomicBoolean(false)
     private var autoReconnectStartTime: Long = 0L
     private var autoReconnectAttempts: Int = 0
+    private val passivelyWaiting = AtomicBoolean(false)
+    private const val MAX_PROACTIVE_RETRIES = 5
 
     // Callback for connection status changes
     private var onConnectionStatusChanged: ((Boolean) -> Unit)? = null
@@ -844,6 +846,7 @@ object WebSocketUtil {
     // Public API to cancel auto reconnect (from Stop action)
     fun cancelAutoReconnect() {
         autoReconnectActive.set(false)
+        passivelyWaiting.set(false)
         autoReconnectJob?.cancel()
         autoReconnectJob = null
         autoReconnectAttempts = 0
@@ -855,6 +858,8 @@ object WebSocketUtil {
     }
 
     fun isAutoReconnecting(): Boolean = autoReconnectActive.get()
+
+    fun isPassivelyWaiting(): Boolean = passivelyWaiting.get()
 
     fun stopAutoReconnect(context: Context) {
         cancelAutoReconnect()
@@ -899,6 +904,7 @@ object WebSocketUtil {
     private fun tryStartAutoReconnect(context: Context) {
         if (autoReconnectActive.get()) return // already running
         autoReconnectActive.set(true)
+        passivelyWaiting.set(false)
         autoReconnectStartTime = System.currentTimeMillis()
         notifyConnectionStatusListeners(false)
         Log.d(TAG, "Starting Smart Auto-Reconnect strategy")
@@ -909,10 +915,11 @@ object WebSocketUtil {
                 val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
                 acquireWifiLock(context)
 
-                // 1.  Retry Loop (Try last known IPs immediately and periodically)
+                // 1.  Retry Loop (Try last known IPs — capped at MAX_PROACTIVE_RETRIES)
                 launch {
                     var backoffMs = 2000L
-                    while (autoReconnectActive.get() && !isConnected.get()) {
+                    var retryCount = 0
+                    while (autoReconnectActive.get() && !isConnected.get() && retryCount < MAX_PROACTIVE_RETRIES) {
                         val manual = ds.getUserManuallyDisconnected().first()
                         val autoEnabled = ds.getAutoReconnectEnabled().first()
 
@@ -939,7 +946,7 @@ object WebSocketUtil {
 
                                     Log.d(
                                         TAG,
-                                        "Proactive retry to $ips:$port (backoff: ${backoffMs}ms)"
+                                        "Proactive retry $retryCount/$MAX_PROACTIVE_RETRIES to $ips:$port (backoff: ${backoffMs}ms)"
                                     )
                                     connect(
                                         context = context,
@@ -957,9 +964,18 @@ object WebSocketUtil {
                             }
                         }
 
+                        retryCount++
                         delay(backoffMs)
-                        // Exponential backoff capped at 10 seconds
-                        backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(10_000L)
+                        // Exponential backoff capped at 15 seconds
+                        backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(15_000L)
+                    }
+
+                    // Max retries exhausted — go passive
+                    if (!isConnected.get() && autoReconnectActive.get()) {
+                        Log.d(TAG, "Max proactive retries ($MAX_PROACTIVE_RETRIES) exhausted, switching to passive wait")
+                        passivelyWaiting.set(true)
+                        releaseWifiLock()
+                        notifyConnectionStatusListeners(false)
                     }
                 }
 
@@ -973,6 +989,9 @@ object WebSocketUtil {
                     val discoveryMatch = discoveredList.find { it.name == last.name }
                     if (discoveryMatch != null) {
                         Log.d(TAG, "Discovery-triggered reconnect for: ${discoveryMatch.name}")
+                        // Reset passive waiting since we have a real target now
+                        passivelyWaiting.set(false)
+                        acquireWifiLock(context)
 
                         val all = ds.getAllNetworkDeviceConnections().first()
                         val targetConnection = all.firstOrNull { it.deviceName == last.name }

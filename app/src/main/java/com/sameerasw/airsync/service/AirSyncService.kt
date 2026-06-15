@@ -121,11 +121,12 @@ class AirSyncService : Service() {
             dataStoreManager.getDeviceDiscoveryEnabled().first()
         }
 
-        // Default to PASSIVE mode to save battery
-        // But do a burst to check for devices immediately
+        // Default to PASSIVE mode, do a burst to check for devices immediately,
+        // then auto-transition to DORMANT to save battery
         DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
         DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
         DiscoveryOrchestrator.burstBroadcast(this)
+        DiscoveryOrchestrator.scheduleDormantTransition(this)
 
         // Start WakeupService for HTTP wakeups
         WakeupService.startService(this)
@@ -185,8 +186,8 @@ class AirSyncService : Service() {
 
     private fun handleAppBackground() {
         if (isScanning) {
-            Log.d(TAG, "App in background, switching to PASSIVE discovery")
-            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
+            Log.d(TAG, "App in background, switching to DORMANT discovery to save battery")
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.DORMANT)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
@@ -260,8 +261,10 @@ class AirSyncService : Service() {
                     // Refresh UDP socket to bind to new network interface
                     DiscoveryOrchestrator.refreshSocket()
                     // When network becomes available, do a burst to announce ourselves
+                    // then auto-transition to DORMANT to save battery
                     if (isScanning) {
                         DiscoveryOrchestrator.burstBroadcast(applicationContext)
+                        DiscoveryOrchestrator.scheduleDormantTransition(applicationContext)
                         WebSocketUtil.requestAutoReconnect(applicationContext)
                     }
                 }

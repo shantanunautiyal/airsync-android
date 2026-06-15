@@ -12,14 +12,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
-import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -63,15 +61,12 @@ class BackgroundSyncService : Service() {
     
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
-    private lateinit var dataStoreManager: DataStoreManager
     
     private var syncJob: Job? = null
-    private var reconnectJob: Job? = null
     
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Background sync service created")
-        dataStoreManager = DataStoreManager(this)
         isRunning = true
         
         createNotificationChannel()
@@ -96,7 +91,6 @@ class BackgroundSyncService : Service() {
         
         isRunning = false
         syncJob?.cancel()
-        reconnectJob?.cancel()
         serviceJob.cancel()
         
         // Stop periodic sync
@@ -107,6 +101,9 @@ class BackgroundSyncService : Service() {
         syncJob?.cancel()
         
         syncJob = serviceScope.launch {
+            // Simply monitor connection state and update notification accordingly.
+            // All reconnection logic is handled by WebSocketUtil.tryStartAutoReconnect().
+            // This eliminates redundant polling that was draining battery.
             while (isActive) {
                 try {
                     if (WebSocketUtil.isConnected()) {
@@ -114,45 +111,21 @@ class BackgroundSyncService : Service() {
                         
                         // Start periodic sync if not already running
                         SyncManager.startPeriodicSync(this@BackgroundSyncService)
-                        
-                        // Wait and check connection
-                        delay(30_000) // Check every 30 seconds
+                    } else if (WebSocketUtil.isPassivelyWaiting()) {
+                        updateNotification("Waiting for Mac...")
+                    } else if (WebSocketUtil.isAutoReconnecting()) {
+                        updateNotification("Reconnecting...")
                     } else {
-                        updateNotification("Disconnected - Attempting to reconnect")
-                        
-                        // Try to reconnect
-                        attemptReconnect()
-                        
-                        delay(10_000) // Wait 10 seconds before next attempt
+                        updateNotification("Disconnected")
                     }
+                    
+                    // Check every 60 seconds (just for notification freshness, NOT for reconnection)
+                    delay(60_000)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error in sync loop: ${e.message}", e)
-                    delay(10_000)
+                    Log.e(TAG, "Error in sync monitor: ${e.message}", e)
+                    delay(60_000)
                 }
             }
-        }
-    }
-    
-    private suspend fun attemptReconnect() {
-        try {
-            val ipAddress = dataStoreManager.getIpAddress().first()
-            val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
-            val symmetricKey = dataStoreManager.getLastConnectedDevice().first()?.symmetricKey
-            val autoReconnect = dataStoreManager.getAutoReconnectEnabled().first()
-            
-            if (ipAddress.isNotEmpty() && autoReconnect) {
-                Log.d(TAG, "Attempting to reconnect to $ipAddress:$port")
-                
-                WebSocketUtil.connect(
-                    context = this@BackgroundSyncService,
-                    ipAddress = ipAddress,
-                    port = port,
-                    symmetricKey = symmetricKey,
-                    manualAttempt = false
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error attempting reconnect: ${e.message}", e)
         }
     }
     

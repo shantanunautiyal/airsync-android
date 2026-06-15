@@ -136,12 +136,23 @@ class UdpDiscoveryBackend : DiscoveryBackend {
             return
         }
 
-        if (currentMode == DiscoveryMode.ACTIVE) {
-            acquireMulticastLock(context)
-            startBroadcasting(context)
-        } else {
-            Log.d(TAG, "Switched to PASSIVE discovery (listening only)")
-            acquireMulticastLock(context)
+        when (currentMode) {
+            DiscoveryMode.ACTIVE -> {
+                acquireMulticastLock(context)
+                startBroadcasting(context)
+                startPruning()
+            }
+            DiscoveryMode.PASSIVE -> {
+                Log.d(TAG, "Switched to PASSIVE discovery (listening only)")
+                acquireMulticastLock(context)
+                startPruning()
+            }
+            DiscoveryMode.DORMANT -> {
+                Log.d(TAG, "Switched to DORMANT discovery (listen-only, zero overhead)")
+                broadcastJob?.cancel()
+                pruningJob?.cancel()
+                releaseMulticastLock()
+            }
         }
     }
 
@@ -202,7 +213,16 @@ class UdpDiscoveryBackend : DiscoveryBackend {
                     if (deviceType == "mac") {
                         handlePresenceMessage(context, json, sourceIp)
 
-                        if (currentMode == DiscoveryMode.PASSIVE) {
+                        if (currentMode == DiscoveryMode.DORMANT) {
+                            // Mac appeared while we were dormant — escalate and trigger reconnect
+                            Log.d(TAG, "Mac presence received in DORMANT mode — escalating")
+                            val macIp = sourceIp ?: ""
+                            val macPort = json.optInt("port", 6996)
+                            val macName = json.optString("name", "Mac")
+                            CoroutineScope(Dispatchers.IO).launch {
+                                WakeupHandler.processWakeupRequest(context, macIp, macPort, macName)
+                            }
+                        } else if (currentMode == DiscoveryMode.PASSIVE) {
                             CoroutineScope(Dispatchers.IO).launch {
                                 broadcastPresence(context)
                             }

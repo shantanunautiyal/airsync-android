@@ -28,6 +28,7 @@ object DiscoveryOrchestrator {
 
     private var mergeJob: Job? = null
     private var burstJob: Job? = null
+    private var dormantTransitionJob: Job? = null
 
     @Volatile
     private var isRunning = false
@@ -59,6 +60,8 @@ object DiscoveryOrchestrator {
         mergeJob = null
         burstJob?.cancel()
         burstJob = null
+        dormantTransitionJob?.cancel()
+        dormantTransitionJob = null
 
         mdnsBackend.stop(context)
         udpBackend.stop(context)
@@ -69,6 +72,11 @@ object DiscoveryOrchestrator {
         if (currentMode == mode) return
         Log.d(TAG, "Orchestrator changing mode to: $mode")
         currentMode = mode
+        // Cancel any pending dormant transition when user explicitly changes mode
+        if (mode == DiscoveryMode.ACTIVE) {
+            dormantTransitionJob?.cancel()
+            dormantTransitionJob = null
+        }
         if (isRunning) {
             updateBackends(context)
         }
@@ -89,6 +97,23 @@ object DiscoveryOrchestrator {
                 delay(3000)
             }
             Log.d(TAG, "Orchestrator burst broadcast completed")
+        }
+    }
+
+    /**
+     * Schedules an automatic transition to DORMANT mode after [delayMs].
+     * Used after burst broadcasts to conserve battery.
+     * Cancelled if the mode is explicitly changed to ACTIVE before the delay.
+     */
+    fun scheduleDormantTransition(context: Context, delayMs: Long = 35000) {
+        dormantTransitionJob?.cancel()
+        dormantTransitionJob = CoroutineScope(Dispatchers.IO).launch {
+            delay(delayMs)
+            if (isRunning && currentMode != DiscoveryMode.ACTIVE) {
+                Log.d(TAG, "Auto-transitioning to DORMANT mode after burst")
+                currentMode = DiscoveryMode.DORMANT
+                updateBackends(context)
+            }
         }
     }
 

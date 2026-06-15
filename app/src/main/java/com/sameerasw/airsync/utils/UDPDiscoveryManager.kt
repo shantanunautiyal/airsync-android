@@ -39,8 +39,9 @@ data class DiscoveredDevice(
 }
 
 enum class DiscoveryMode {
-    ACTIVE,  // Continuous broadcasting (Foreground)
-    PASSIVE  // Listening only (Background)
+    ACTIVE,   // Continuous broadcasting (Foreground)
+    PASSIVE,  // Listening + responds to presence (Background)
+    DORMANT   // Listen-only, zero broadcasts, no mDNS browse, no locks (Deep Background — battery saver)
 }
 
 @Deprecated("Use DiscoveryOrchestrator instead", ReplaceWith("DiscoveryOrchestrator", "com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator"))

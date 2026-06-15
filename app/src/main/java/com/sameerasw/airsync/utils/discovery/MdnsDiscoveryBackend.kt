@@ -79,14 +79,33 @@ class MdnsDiscoveryBackend : DiscoveryBackend {
 
     fun setModeWithContext(context: Context, mode: DiscoveryMode) {
         if (currentMode == mode) return
+        val previousMode = currentMode
         currentMode = mode
         if (isRunning) {
-            if (android.os.Build.VERSION.SDK_INT >= 32) {
-                registerService(context)
-            } else {
-                if (mode == DiscoveryMode.PASSIVE) {
-                    unregisterService()
-                } else {
+            when (mode) {
+                DiscoveryMode.DORMANT -> {
+                    // Stop browsing to save battery, keep registration so Mac can find us
+                    Log.d(TAG, "Switching to DORMANT: stopping mDNS browsing")
+                    stopBrowsing()
+                }
+                DiscoveryMode.PASSIVE -> {
+                    // If coming from DORMANT, restart browsing
+                    if (previousMode == DiscoveryMode.DORMANT) {
+                        Log.d(TAG, "Switching from DORMANT to PASSIVE: restarting mDNS browsing")
+                        startBrowsing()
+                    }
+                    if (android.os.Build.VERSION.SDK_INT >= 32) {
+                        registerService(context)
+                    } else {
+                        unregisterService()
+                    }
+                }
+                DiscoveryMode.ACTIVE -> {
+                    // If coming from DORMANT, restart browsing
+                    if (previousMode == DiscoveryMode.DORMANT) {
+                        Log.d(TAG, "Switching from DORMANT to ACTIVE: restarting mDNS browsing")
+                        startBrowsing()
+                    }
                     registerService(context)
                 }
             }
