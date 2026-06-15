@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -903,6 +904,16 @@ object WebSocketUtil {
      */
     private fun tryStartAutoReconnect(context: Context) {
         if (autoReconnectActive.get()) return // already running
+
+        // Check manual disconnect flag early — avoid starting coroutine + WiFiLock unnecessarily
+        val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
+        val manual = runBlocking { ds.getUserManuallyDisconnected().first() }
+        val autoEnabled = runBlocking { ds.getAutoReconnectEnabled().first() }
+        if (manual || !autoEnabled) {
+            Log.d(TAG, "Auto-reconnect skipped: manual=$manual, enabled=$autoEnabled")
+            return
+        }
+
         autoReconnectActive.set(true)
         passivelyWaiting.set(false)
         autoReconnectStartTime = System.currentTimeMillis()
@@ -912,7 +923,6 @@ object WebSocketUtil {
         autoReconnectJob?.cancel()
         autoReconnectJob = CoroutineScope(Dispatchers.IO).launch {
             try {
-                val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
                 acquireWifiLock(context)
 
                 // 1.  Retry Loop (Try last known IPs — capped at MAX_PROACTIVE_RETRIES)
@@ -1015,6 +1025,9 @@ object WebSocketUtil {
                         }
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                Log.d(TAG, "Auto-reconnect coroutine cancelled")
+                releaseWifiLock()
             } catch (e: Exception) {
                 Log.e(TAG, "Error in smart auto-reconnect: ${e.message}")
                 releaseWifiLock()

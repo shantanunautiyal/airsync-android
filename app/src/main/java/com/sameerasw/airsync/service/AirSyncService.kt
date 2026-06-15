@@ -51,9 +51,16 @@ class AirSyncService : Service() {
     // Network state tracking
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
-    private val connectionStatusListener: (Boolean) -> Unit = { _ ->
-        scope.launch {
-            updateNotification()
+    // Track last known state to avoid redundant notification updates
+    private var lastKnownConnectionStatus: Boolean? = null
+
+    private val connectionStatusListener: (Boolean) -> Unit = { connected ->
+        // Only update notification when status actually transitions
+        if (lastKnownConnectionStatus != connected) {
+            lastKnownConnectionStatus = connected
+            scope.launch {
+                updateNotification()
+            }
         }
     }
 
@@ -291,7 +298,15 @@ class AirSyncService : Service() {
         }
     }
 
+    private var lastNotificationUpdateMs = 0L
+    private val NOTIFICATION_UPDATE_THROTTLE_MS = 5000L
+
     private fun updateNotification() {
+        val now = System.currentTimeMillis()
+        if (now - lastNotificationUpdateMs < NOTIFICATION_UPDATE_THROTTLE_MS) {
+            return // Throttle: skip rapid consecutive updates
+        }
+        lastNotificationUpdateMs = now
         try {
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.notify(NOTIFICATION_ID, buildNotification())

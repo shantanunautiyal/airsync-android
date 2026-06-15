@@ -461,8 +461,14 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onListenerDisconnected()
         Log.d(TAG, "Notification listener disconnected")
 
-        serviceJob.cancel()
-        WebSocketUtil.cleanup()
+        serviceInstance = null
+        // Don't cancel serviceJob or call WebSocketUtil.cleanup() here!
+        // The system often rebinds the listener after package updates or memory pressure.
+        // Tearing down WebSocket connections causes DeadObjectException cascades and
+        // kills the auto-reconnect logic.
+
+        // Request rebind so the system reconnects us promptly
+        requestRebind(ComponentName(this, MediaNotificationListener::class.java))
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
