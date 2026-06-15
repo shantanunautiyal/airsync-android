@@ -80,14 +80,17 @@ object HealthConnectUtil {
         return withContext(Dispatchers.IO) {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
-                val response = healthConnectClient.readRecords(
-                    ReadRecordsRequest(
-                        StepsRecord::class,
+                // Use aggregate API — it deduplicates overlapping records from
+                // multiple sources (Samsung Health, phone pedometer, watch, etc.)
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(StepsRecord.COUNT_TOTAL),
                         timeRangeFilter = TimeRangeFilter.between(start, end)
                     )
                 )
-                val total = response.records.sumOf { it.count.toInt() }
-                if (total > 0) total else null
+                val total = response[StepsRecord.COUNT_TOTAL]?.toInt()
+                Log.d(TAG, "Steps aggregate result: $total")
+                if (total != null && total > 0) total else null
             } catch (e: Exception) {
                 Log.e(TAG, "Error reading steps", e)
                 null
@@ -106,14 +109,17 @@ object HealthConnectUtil {
         return withContext(Dispatchers.IO) {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
-                val response = healthConnectClient.readRecords(
-                    ReadRecordsRequest(
-                        DistanceRecord::class,
+                // Use aggregate API for deduplication
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
                         timeRangeFilter = TimeRangeFilter.between(start, end)
                     )
                 )
-                val total = response.records.sumOf { it.distance.inMeters } / 1000.0
-                if (total > 0) total else null
+                val meters = response[DistanceRecord.DISTANCE_TOTAL]?.inMeters
+                val km = if (meters != null && meters > 0) meters / 1000.0 else null
+                Log.d(TAG, "Distance aggregate result: $km km")
+                km
             } catch (e: Exception) {
                 Log.e(TAG, "Error reading distance", e)
                 null
@@ -132,6 +138,10 @@ object HealthConnectUtil {
         return withContext(Dispatchers.IO) {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
+                
+                // Only use Active Calories — never fall back to TotalCaloriesBurnedRecord
+                // because Total includes BMR (basal metabolic rate), which creates misleading
+                // data like 1558 kcal at midnight with 0 steps.
                 
                 // 1. Try aggregating Active Calories
                 var activeCalories: Double? = null
@@ -166,48 +176,11 @@ object HealthConnectUtil {
                     }
                 }
                 
-                // If we found any active calories, return them as Int
+                // Return active calories only — no TotalCalories fallback
                 if (activeCalories != null && activeCalories > 0) {
-                    return@withContext activeCalories.toInt()
-                }
-                
-                // 3. Fallback to Total Calories
-                Log.d(TAG, "Active calories unavailable, falling back to Total Calories")
-                var totalCalories: Double? = null
-                try {
-                    val responseTotal = healthConnectClient.aggregate(
-                        AggregateRequest(
-                            metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
-                            timeRangeFilter = TimeRangeFilter.between(start, end)
-                        )
-                    )
-                    totalCalories = responseTotal[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories
-                    Log.d(TAG, "Total Calories aggregation result: $totalCalories")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error aggregating total calories", e)
-                }
-                
-                // 4. If aggregated total is null, try reading raw Total Calories records
-                if (totalCalories == null) {
-                    try {
-                        val responseTotalRaw = healthConnectClient.readRecords(
-                            ReadRecordsRequest(
-                                TotalCaloriesBurnedRecord::class,
-                                timeRangeFilter = TimeRangeFilter.between(start, end)
-                            )
-                        )
-                        if (responseTotalRaw.records.isNotEmpty()) {
-                            totalCalories = responseTotalRaw.records.sumOf { it.energy.inKilocalories }
-                            Log.d(TAG, "Total Calories raw records sum: $totalCalories")
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error reading raw total calories", e)
-                    }
-                }
-                
-                if (totalCalories != null && totalCalories > 0) {
-                    totalCalories.toInt()
+                    activeCalories.toInt()
                 } else {
+                    Log.d(TAG, "No active calorie data available for range")
                     null
                 }
             } catch (e: Exception) {
@@ -285,7 +258,7 @@ object HealthConnectUtil {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
                 
-                // Use ExerciseSessionRecord aggregation (aligned with SimpleHealthConnectManager)
+                // Use ExerciseSessionRecord aggregation only — no estimation fallbacks
                 val response = healthConnectClient.aggregate(
                     AggregateRequest(
                         metrics = setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL),
@@ -299,24 +272,7 @@ object HealthConnectUtil {
                     Log.d(TAG, "Active minutes from ExerciseSession: $minutes")
                     minutes
                 } else {
-                    // Fallback: estimate from active calories
-                    try {
-                        val activeResponse = healthConnectClient.readRecords(
-                            ReadRecordsRequest(
-                                ActiveCaloriesBurnedRecord::class,
-                                timeRangeFilter = TimeRangeFilter.between(start, end)
-                            )
-                        )
-                        val activeCalories = activeResponse.records.sumOf { it.energy.inKilocalories }
-                        val estimated = (activeCalories / 5).toInt() // ~5 cal/min
-                        if (estimated > 0) {
-                            Log.d(TAG, "Active minutes estimated from calories: $estimated")
-                            estimated
-                        } else null
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error estimating active minutes from calories", e)
-                        null
-                    }
+                    null
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error reading active minutes", e)
@@ -386,18 +342,9 @@ object HealthConnectUtil {
                 val steps = getStepsForRange(context, startInstant, endInstant)
                 val calories = getCaloriesForRange(context, startInstant, endInstant)
                 
-                var distance = getDistanceForRange(context, startInstant, endInstant)
-                if ((distance == null || distance == 0.0) && steps != null && steps > 0) {
-                    distance = steps * 0.00075
-                }
-                
-                var activeMinutes = getActiveMinutesForRange(context, startInstant, endInstant)
-                if ((activeMinutes == null || activeMinutes == 0) && steps != null && steps > 0) {
-                    activeMinutes = Math.round(steps / 100.0).toInt()
-                    if (activeMinutes == 0 && steps > 0) {
-                        activeMinutes = 1
-                    }
-                }
+                // Only use real data from Health Connect — no estimation fallbacks
+                val distance = getDistanceForRange(context, startInstant, endInstant)
+                val activeMinutes = getActiveMinutesForRange(context, startInstant, endInstant)
                 
                 HealthSummary(
                     date = startOfDay.toInstant().toEpochMilli(), // Normalized start-of-day for reliable date comparison on Mac
