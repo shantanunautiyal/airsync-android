@@ -41,7 +41,8 @@ enum class PermissionType {
     BLUETOOTH,
     LOCAL_NETWORK,
     ANSWER_CALLS,
-    CLIPBOARD_ACCESSIBILITY
+    CLIPBOARD_ACCESSIBILITY,
+    LOCATION
 }
 
 data class PermissionInfo(
@@ -250,6 +251,14 @@ private fun getPermissionInfo(context: Context, permissionType: PermissionType):
             description = context.getString(R.string.permission_clipboard_a11y_explain),
             whyNeeded = context.getString(R.string.permission_clipboard_a11y_why),
             buttonText = context.getString(R.string.permission_clipboard_a11y_button)
+        )
+
+        PermissionType.LOCATION -> PermissionInfo(
+            title = "Location (Cellular Telemetry)",
+            icon = R.drawable.rounded_network_node_24,
+            description = "Required to accurately detect 5G Standalone vs NSA network states.",
+            whyNeeded = "To accurately read advanced cellular network states, such as distinguishing between 5G Standalone and NSA networks via TelephonyManager, Android requires the fine location permission.",
+            buttonText = "Grant Location Access"
         )
     }
 }
