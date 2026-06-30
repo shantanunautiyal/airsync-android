@@ -111,6 +111,8 @@ class DataStoreManager(private val context: Context) {
 
         private const val NETWORK_DEVICES_PREFIX = "network_device_"
         private const val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
+        
+        private val IS_CELLULAR_SYNC_ENABLED = booleanPreferencesKey("is_cellular_sync_enabled")
 
         private var instance: DataStoreManager? = null
 
@@ -1110,4 +1112,14 @@ class DataStoreManager(private val context: Context) {
 
     fun getUseRippleEnabled(): Flow<Boolean> =
         context.dataStore.data.map { it[USE_RIPPLE] ?: true }
+
+    suspend fun setCellularSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_CELLULAR_SYNC_ENABLED] = enabled
+        }
+    }
+
+    val isCellularSyncEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[IS_CELLULAR_SYNC_ENABLED] ?: true // Default to true
+    }
 }

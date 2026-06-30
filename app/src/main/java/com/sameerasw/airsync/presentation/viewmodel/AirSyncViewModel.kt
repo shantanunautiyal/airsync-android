@@ -159,6 +159,12 @@ class AirSyncViewModel(
             null
         }
 
+        val storedDefaultTab = try {
+            kotlinx.coroutines.runBlocking { repository.getDefaultTab().first() }
+        } catch (_: Exception) {
+            "dynamic"
+        }
+
         val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
 
         val initialIp = if (isWsConnected && activeIp != null) {
@@ -181,7 +187,8 @@ class AirSyncViewModel(
             ipAddress = savedIp,
             activeIp = activeIp,
             macDeviceStatus = if (isGlobalConnected) MacDeviceStatusManager.macDeviceStatus.value else null,
-            lastConnectedDevice = storedDevice
+            lastConnectedDevice = storedDevice,
+            defaultTab = storedDefaultTab
         )
 
         // Register for WebSocket connection status updates
@@ -273,6 +280,13 @@ class AirSyncViewModel(
             repository.getExcludedMediaPackages().collect { packages ->
                 _uiState.value = _uiState.value.copy(excludedMediaPackages = packages)
                 com.sameerasw.airsync.service.MediaNotificationListener.setExcludedMediaPackages(packages)
+            }
+        }
+
+        // Observe Cellular Sync preference
+        viewModelScope.launch {
+            repository.isCellularSyncEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isCellularSyncEnabled = enabled)
             }
         }
 
@@ -400,7 +414,7 @@ class AirSyncViewModel(
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
             val isMacMediaControlsEnabled = repository.getMacMediaControlsEnabled().first()
             val isClipboardHistoryEnabled = repository.getClipboardHistoryEnabled().first()
-            repository.getDefaultTab().first()
+            val defaultTab = repository.getDefaultTab().first()
             val isEssentialsConnectionEnabled = repository.getEssentialsConnectionEnabled().first()
             val isDeviceDiscoveryEnabled = repository.getDeviceDiscoveryEnabled().first()
             val isBlurEnabledSetting = repository.getUseBlurEnabled().first()
@@ -410,6 +424,7 @@ class AirSyncViewModel(
             val isPowerSaveMode = DeviceInfoUtil.isPowerSaveMode(context)
             val isBlurProblematic = DeviceInfoUtil.isBlurProblematicDevice()
             val isQuickShareEnabled = repository.isQuickShareEnabled().first()
+            val isCellularSyncEnabled = repository.isCellularSyncEnabled().first()
             val isNotifyOnCrashEnabled = repository.getNotifyOnCrashEnabled().first()
 
             // Replicate Essentials logic for initial state
@@ -465,6 +480,7 @@ class AirSyncViewModel(
                 isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
                 isMacMediaControlsEnabled = isMacMediaControlsEnabled,
                 isClipboardHistoryEnabled = isClipboardHistoryEnabled,
+                defaultTab = defaultTab,
                 isEssentialsConnectionEnabled = isEssentialsConnectionEnabled,
                 isDeviceDiscoveryEnabled = isDeviceDiscoveryEnabled,
                 isBlurSettingEnabled = isBlurEnabledSetting,
@@ -474,6 +490,7 @@ class AirSyncViewModel(
                 isBlurEnabled = isBlurEnabled,
                 isOnboardingCompleted = !isFirstRun,
                 isQuickShareEnabled = isQuickShareEnabled,
+                isCellularSyncEnabled = isCellularSyncEnabled,
                 isNotifyOnCrashEnabled = isNotifyOnCrashEnabled
             )
 
@@ -828,6 +845,13 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.setFileAccessEnabled(enabled)
             ServiceManager.updateServiceState(context)
+        }
+    }
+
+    fun toggleCellularSync(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isCellularSyncEnabled = enabled)
+        viewModelScope.launch {
+            repository.setCellularSyncEnabled(enabled)
         }
     }
 

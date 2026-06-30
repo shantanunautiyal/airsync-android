@@ -623,6 +623,10 @@ fun SettingsView(
                                 isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
                                 onToggleKeepPreviousLink = { enabled: Boolean ->
                                     viewModel.setKeepPreviousLinkEnabled(enabled)
+                                },
+                                isCellularSyncEnabled = uiState.isCellularSyncEnabled,
+                                onToggleCellularSync = { enabled: Boolean ->
+                                    viewModel.toggleCellularSync(enabled)
                                 }
                             )
                         }
