@@ -16,7 +16,7 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         versionCode = 32
-        versionName = "4.0.1"
+        versionName = "4.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
