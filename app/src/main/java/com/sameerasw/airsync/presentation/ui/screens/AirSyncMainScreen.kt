@@ -1258,6 +1258,7 @@ fun AirSyncMainScreen(
                                     createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
                                 },
                                 onImport = { openDocLauncher.launch(arrayOf("application/json")) },
+                                onResetOnboarding = { viewModel.resetOnboarding() },
                                 onShowHelp = { showHelpSheet = true },
                                 onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
                                 onAvatarLongClickWithPosition = { pos ->
@@ -1544,8 +1545,12 @@ private fun SettingsNavHost(
     pendingExportJson: (String) -> Unit,
     onImport: () -> Unit,
     onShowHelp: () -> Unit,
+    onResetOnboarding: () -> Unit = { viewModel.resetOnboarding() },
+    onToggleDeveloperMode: () -> Unit = { viewModel.toggleDeveloperModeVisibility() },
     onAvatarLongClickWithPosition: ((Offset) -> Unit)? = null,
-    onRippleToggleEnabledWithPosition: ((Offset) -> Unit)? = null
+    onRippleToggleEnabledWithPosition: ((Offset) -> Unit)? = null,
+    onNavigateToHealth: () -> Unit = {},
+    onNavigateToFileTransfer: () -> Unit = {}
 ) {
     var predictiveBackScale by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
     var predictiveBackOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
@@ -1589,11 +1594,13 @@ private fun SettingsNavHost(
             onSendMessage = onSendMessage,
             onExport = pendingExportJson,
             onImport = onImport,
-            onResetOnboarding = { viewModel.resetOnboarding() },
+            onResetOnboarding = onResetOnboarding,
             onShowHelp = onShowHelp,
-            onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
+            onToggleDeveloperMode = onToggleDeveloperMode,
             onAvatarLongClickWithPosition = onAvatarLongClickWithPosition,
-            onRippleToggleEnabledWithPosition = onRippleToggleEnabledWithPosition
+            onRippleToggleEnabledWithPosition = onRippleToggleEnabledWithPosition,
+            onNavigateToHealth = onNavigateToHealth,
+            onNavigateToFileTransfer = onNavigateToFileTransfer
         )
 
         // Detail sub-page
@@ -1639,11 +1646,13 @@ private fun SettingsNavHost(
                         onSendMessage = onSendMessage,
                         onExport = pendingExportJson,
                         onImport = onImport,
-                        onResetOnboarding = { viewModel.resetOnboarding() },
+                        onResetOnboarding = onResetOnboarding,
                         onShowHelp = onShowHelp,
-                        onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
+                        onToggleDeveloperMode = onToggleDeveloperMode,
                         onAvatarLongClickWithPosition = onAvatarLongClickWithPosition,
-                        onRippleToggleEnabledWithPosition = onRippleToggleEnabledWithPosition
+                        onRippleToggleEnabledWithPosition = onRippleToggleEnabledWithPosition,
+                        onNavigateToHealth = onNavigateToHealth,
+                        onNavigateToFileTransfer = onNavigateToFileTransfer
                     )
                 }
             }

@@ -991,7 +991,7 @@ object WebSocketUtil {
                                     acquireWifiLock(context)
                                     Log.d(
                                         TAG,
-                                        "Proactive retry $retryCount/$MAX_PROACTIVE_RETRIES to $ips:$port (backoff: ${backoffMs}ms)"
+                                        "Proactive retry ${failedStreak + 1}/$MAX_PROACTIVE_RETRIES to $ips:$port (backoff: ${backoffMs}ms)"
                                     )
                                     connect(
                                         context = context,
