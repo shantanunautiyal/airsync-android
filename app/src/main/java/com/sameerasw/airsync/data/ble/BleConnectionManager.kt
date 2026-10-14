@@ -44,21 +44,30 @@ class BleConnectionManager(private val context: Context) {
         scope.launch {
             combine(
                 dataStoreManager.getBleSyncEnabled(),
-                dataStoreManager.getBleAutoConnectEnabled(),
+                dataStoreManager.getUserManuallyDisconnected(),
+                dataStoreManager.isAppPaused(),
                 WebSocketUtil.connectionState
-            ) { enabled, auto, wsConnected ->
-                Triple(enabled, auto, wsConnected)
-            }.collectLatest { (enabled, _, wsConnected) ->
-                isBleEnabled = enabled
-                updateBleState(regularConnectionActive = wsConnected)
+            ) { enabled, manuallyDisconnected, isPaused, wsConnected ->
+                data class BleInputs(val enabled: Boolean, val manuallyDisconnected: Boolean, val isPaused: Boolean, val wsConnected: Boolean)
+                BleInputs(enabled, manuallyDisconnected, isPaused, wsConnected)
+            }.collectLatest { inputs ->
+                isBleEnabled = inputs.enabled
+                updateBleState(
+                    regularConnectionActive = inputs.wsConnected,
+                    manuallyDisconnected = inputs.manuallyDisconnected,
+                    isPaused = inputs.isPaused
+                )
             }
         }
     }
 
-    private fun updateBleState(regularConnectionActive: Boolean) {
-        if (!isBleEnabled) {
-            Log.d(TAG, "BLE disabled, stopping server")
-            bleServer?.stop()
+    private fun updateBleState(regularConnectionActive: Boolean, manuallyDisconnected: Boolean, isPaused: Boolean = false) {
+        if (isPaused || !isBleEnabled) {
+            Log.d(TAG, "BLE paused or disabled in settings, stopping/pausing server")
+            bleServer?.pauseAdvertising()
+            if (isPaused) {
+                bleServer?.disconnectAllConnectedDevices()
+            }
             return
         }
 
@@ -67,7 +76,7 @@ class BleConnectionManager(private val context: Context) {
             Log.d(TAG, "Regular connection active — pausing BLE advertising")
             bleServer?.pauseAdvertising()
         } else {
-            // No regular connection — ensure server is started and advertising.
+            // No regular connection — ensure server is started and advertising so devices can discover and connect
             Log.d(TAG, "No regular connection — resuming BLE advertising")
             bleServer?.start()
             bleServer?.resumeAdvertising()
@@ -92,5 +101,16 @@ class BleConnectionManager(private val context: Context) {
 
     fun disconnectAllConnectedDevices() {
         bleServer?.disconnectAllConnectedDevices()
+    }
+
+    fun restartServer() {
+        Log.d(TAG, "Restarting BLE GATT server...")
+        bleServer?.stop()
+        bleServer = BleGattServer(context)
+        _serverFlow.value = bleServer
+        BleTransportBridge.initialize(bleServer!!)
+        if (isBleEnabled) {
+            bleServer?.start()
+        }
     }
 }

@@ -88,7 +88,7 @@ object WebSocketUtil {
             .connectTimeout(5, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // Keep connection alive
-            .pingInterval(20, TimeUnit.SECONDS)
+            .pingInterval(5, TimeUnit.SECONDS)
             .build()
     }
 
@@ -219,7 +219,22 @@ object WebSocketUtil {
 
                 // Try each IP in parallel
                 ipList.forEach { ip ->
-                    val url = "ws://$ip:$port/socket"
+                    // Handle IPv6 addresses, wrapping them in brackets for URI parsing.
+                    // Also handle link-local scope zones (e.g. fe80::18cd:e714:19a7:2c21%wlan0 -> [fe80::18cd:e714:19a7:2c21])
+                    val formattedIp = if (ip.contains(":")) {
+                        var cleanIp = ip
+                        if (cleanIp.contains("%")) {
+                            cleanIp = cleanIp.substringBefore("%")
+                        }
+                        if (!cleanIp.startsWith("[")) {
+                            "[$cleanIp]"
+                        } else {
+                            cleanIp
+                        }
+                    } else {
+                        ip
+                    }
+                    val url = "ws://$formattedIp:$port/socket"
                     Log.d(TAG, "Attempting connection to $url")
 
                     CoroutineScope(Dispatchers.IO).launch {
@@ -323,40 +338,28 @@ object WebSocketUtil {
                                         updateConnectedStatus(true)
                                         isConnecting.set(false)
                                         handshakeTimeoutJob?.cancel()
-                                        try {
-                                            val ds =
-                                                com.sameerasw.airsync.data.local.DataStoreManager(
-                                                    context
-                                                )
-                                            kotlinx.coroutines.runBlocking {
-                                                ds.setUserManuallyDisconnected(
-                                                    false
-                                                )
-                                            }
-                                        } catch (_: Exception) {
-                                        }
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                             try {
+                                                 val ds =
+                                                     com.sameerasw.airsync.data.local.DataStoreManager.getInstance(
+                                                         context
+                                                     )
+                                                 ds.setUserManuallyDisconnected(false)
+                                                 val lastDevice = ds.getLastConnectedDevice().first()
+                                                 com.sameerasw.airsync.service.AirSyncService.start(
+                                                     context,
+                                                     lastDevice?.name
+                                                 )
+                                             } catch (e: Exception) {
+                                                 Log.e(
+                                                     TAG,
+                                                     "Error starting AirSyncService: ${e.message}"
+                                                 )
+                                             }
+                                         }
                                         try {
                                             SyncManager.startPeriodicSync(context)
                                         } catch (_: Exception) {
-                                        }
-
-                                        try {
-                                            val ds =
-                                                com.sameerasw.airsync.data.local.DataStoreManager(
-                                                    context
-                                                )
-                                            val lastDevice = kotlinx.coroutines.runBlocking {
-                                                ds.getLastConnectedDevice().first()
-                                            }
-                                            com.sameerasw.airsync.service.AirSyncService.start(
-                                                context,
-                                                lastDevice?.name
-                                            )
-                                        } catch (e: Exception) {
-                                            Log.e(
-                                                TAG,
-                                                "Error starting AirSyncService: ${e.message}"
-                                            )
                                         }
 
                                         onConnectionStatusChanged?.invoke(true)
@@ -535,6 +538,20 @@ object WebSocketUtil {
             return true
         }
 
+        // Handle IPv6 address checks
+        if (ipAddress.contains(":")) {
+            // Check for IPv6 localhost (::1) or Link-local (fe80::)
+            val cleanIp = ipAddress.lowercase().trim().removeSurrounding("[", "]").substringBefore("%")
+            if (cleanIp == "::1" || cleanIp.startsWith("fe80:")) {
+                return true
+            }
+            // Other common local/unique-local IPv6 prefixes (fc00::/7)
+            if (cleanIp.startsWith("fc") || cleanIp.startsWith("fd")) {
+                return true
+            }
+            return false
+        }
+
         // Check standard private IP ranges (RFC 1918) and Carrier-Grade NAT (Tailscale/VPNs)
         if (ipAddress.startsWith("192.168.") || ipAddress.startsWith("10.") || ipAddress.startsWith(
                 "100."
@@ -688,9 +705,19 @@ object WebSocketUtil {
     /**
      * Disconnects the WebSocket and cleans up resources.
      * Stops related services (AirSyncService, periodic sync) and updates UI state.
+     *
+     * @param manual True only for a user-initiated disconnect. Persists the manual-disconnect
+     * flag and tells the Mac so neither side auto-reconnects. Internal/automatic disconnects
+     * (handshake timeout, network change, socket error) must pass false so auto-reconnect can
+     * still resume.
      */
-    fun disconnect(context: Context? = null) {
-        Log.d(TAG, "Disconnecting WebSocket")
+    fun disconnect(context: Context? = null, manual: Boolean = false) {
+        Log.d(TAG, "Disconnecting WebSocket (manual=$manual)")
+
+        if (manual) {
+            sendMessage("{\"type\":\"userDisconnected\",\"data\":{}}")
+        }
+
         updateConnectedStatus(false)
         isConnecting.set(false)
         isSocketOpen.set(false)
@@ -698,38 +725,21 @@ object WebSocketUtil {
         handshakeTimeoutJob?.cancel()
         currentIpAddress = null
 
-        // Set manual disconnect flag
         val ctx = context ?: appContext
-        ctx?.let { c ->
-            try {
-                val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
-                kotlinx.coroutines.runBlocking {
-                    ds.setUserManuallyDisconnected(true)
-                }
-            } catch (_: Exception) {
-            }
 
-            // Send manual disconnect signal over BLE before disconnecting BLE client
-            try {
-                val ble = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
-                if (ble != null && ble.isAuthenticated) {
-                    Log.d(TAG, "Sending manual disconnect signal over BLE before disconnecting")
-                    ble.sendChunkedNotification(
-                        BleConstants.CHAR_MAC_CONTROL,
-                        "remote|manual_disconnect"
-                    )
-
-                    CoroutineScope(Dispatchers.IO).launch {
-                        delay(300)
-                        ble.disconnectAllConnectedDevices()
+        if (manual) {
+            ctx?.let { c ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(c)
+                        ds.setUserManuallyDisconnected(true)
+                    } catch (_: Exception) {
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending manual disconnect signal over BLE: ${e.message}")
             }
         }
 
-        webSocket?.close(1000, "Manual disconnection")
+        webSocket?.close(1000, if (manual) "Manual disconnection" else "Disconnected")
         webSocket = null
 
         // Transition back to scanning on disconnect
@@ -766,6 +776,17 @@ object WebSocketUtil {
                 MirrorRequestHelper.stopMirroring(c)
             } catch (_: Exception) {
             }
+        }
+
+        // Disconnect any active BLE transport connections
+        try {
+            val bleManager = com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()
+            if (manual && bleManager != null && bleManager.isAuthenticated) {
+                BleTransportBridge.sendManualDisconnect()
+            }
+            bleManager?.disconnectAllConnectedDevices()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error disconnecting BLE devices: ${e.message}")
         }
 
         // Update widgets to reflect new state
@@ -917,19 +938,21 @@ object WebSocketUtil {
         autoReconnectActive.set(true)
         passivelyWaiting.set(false)
         autoReconnectStartTime = System.currentTimeMillis()
-        notifyConnectionStatusListeners(false)
+        if (!com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
+            notifyConnectionStatusListeners(false)
+        }
         Log.d(TAG, "Starting Smart Auto-Reconnect strategy")
 
         autoReconnectJob?.cancel()
         autoReconnectJob = CoroutineScope(Dispatchers.IO).launch {
             try {
-                acquireWifiLock(context)
+                val ds = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(context)
 
-                // 1.  Retry Loop (Try last known IPs — capped at MAX_PROACTIVE_RETRIES)
+                // 1. Retry Loop (Try last known IPs immediately and periodically)
                 launch {
                     var backoffMs = 2000L
-                    var retryCount = 0
-                    while (autoReconnectActive.get() && !isConnected.get() && retryCount < MAX_PROACTIVE_RETRIES) {
+                    var failedStreak = 0
+                    while (autoReconnectActive.get() && !isConnected() && failedStreak < MAX_PROACTIVE_RETRIES) {
                         val manual = ds.getUserManuallyDisconnected().first()
                         val autoEnabled = ds.getAutoReconnectEnabled().first()
 
@@ -942,7 +965,18 @@ object WebSocketUtil {
                             break
                         }
 
-                        if (!isConnecting.get()) {
+                        // Check network capabilities before attempting Wi-Fi socket reconnect
+                        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                        val activeNetwork = cm?.activeNetwork
+                        val caps = cm?.getNetworkCapabilities(activeNetwork)
+                        val hasWifiOrVpn = caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true ||
+                                caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true ||
+                                caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) == true
+
+                        val expandNetworking = ds.getExpandNetworkingEnabled().first()
+                        val canAttemptWifiSocket = hasWifiOrVpn || expandNetworking
+
+                        if (!isConnecting.get() && canAttemptWifiSocket) {
                             val last = ds.getLastConnectedDevice().first()
                             if (last != null) {
                                 val all = ds.getAllNetworkDeviceConnections().first()
@@ -954,6 +988,7 @@ object WebSocketUtil {
                                         targetConnection.networkConnections.values.joinToString(",")
                                     val port = targetConnection.port.toIntOrNull() ?: 6996
 
+                                    acquireWifiLock(context)
                                     Log.d(
                                         TAG,
                                         "Proactive retry $retryCount/$MAX_PROACTIVE_RETRIES to $ips:$port (backoff: ${backoffMs}ms)"
@@ -967,21 +1002,26 @@ object WebSocketUtil {
                                         onConnectionStatus = { connected ->
                                             if (connected) {
                                                 cancelAutoReconnect()
+                                            } else {
+                                                releaseWifiLock()
                                             }
                                         }
                                     )
                                 }
                             }
+                        } else {
+                            releaseWifiLock()
                         }
 
-                        retryCount++
                         delay(backoffMs)
-                        // Exponential backoff capped at 15 seconds
-                        backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(15_000L)
+                        failedStreak++
+                        // Exponential backoff capped at 30 seconds after extended failures
+                        val maxCap = if (failedStreak > 10) 30_000L else 10_000L
+                        backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(maxCap)
                     }
 
                     // Max retries exhausted — go passive
-                    if (!isConnected.get() && autoReconnectActive.get()) {
+                    if (!isConnected() && autoReconnectActive.get()) {
                         Log.d(TAG, "Max proactive retries ($MAX_PROACTIVE_RETRIES) exhausted, switching to passive wait")
                         passivelyWaiting.set(true)
                         releaseWifiLock()
@@ -991,7 +1031,7 @@ object WebSocketUtil {
 
                 // 2. Discovery Monitoring (Listen for presence packets in case IP changed)
                 DiscoveryOrchestrator.discoveredDevices.collect { discoveredList ->
-                    if (!autoReconnectActive.get() || isConnected.get() || isConnecting.get()) return@collect
+                    if (!autoReconnectActive.get() || isConnected() || isConnecting.get()) return@collect
 
                     val last = ds.getLastConnectedDevice().first() ?: return@collect
 
@@ -1038,7 +1078,7 @@ object WebSocketUtil {
     // Public wrapper to request auto-reconnect from app logic (e.g., network changes)
     fun requestAutoReconnect(context: Context) {
         // Only if not already connected or connecting
-        if (isConnected.get() || isConnecting.get()) return
+        if (isConnected() || isConnecting.get()) return
         tryStartAutoReconnect(context)
     }
 }

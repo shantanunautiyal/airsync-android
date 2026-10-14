@@ -73,9 +73,18 @@ object BleTransportBridge {
         gattServer?.sendChunkedNotification(BleConstants.CHAR_NOTIFICATION_DISMISS_NOTIFY, id)
     }
 
-    fun sendDeviceName() {
-        val name = android.os.Build.MODEL
-        gattServer?.sendChunkedNotification(BleConstants.CHAR_DEVICE_NAME, name)
+    fun sendManualDisconnect() {
+        gattServer?.sendChunkedNotification(BleConstants.CHAR_MAC_CONTROL, "remote|manual_disconnect")
+    }
+
+    fun sendDeviceName(context: android.content.Context? = null) {
+        val ctx = context ?: com.sameerasw.airsync.AirSyncApp.getContext() ?: return
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val dataStoreManager = com.sameerasw.airsync.data.local.DataStoreManager.getInstance(ctx)
+            val persistedName = dataStoreManager.getDeviceName().first().ifBlank { null }
+            val name = persistedName ?: com.sameerasw.airsync.utils.DeviceInfoUtil.getDeviceName(ctx)
+            gattServer?.sendChunkedNotification(BleConstants.CHAR_DEVICE_NAME, name)
+        }
     }
 
     // --- Inbound (Mac -> Android) ---
@@ -83,6 +92,12 @@ object BleTransportBridge {
     fun handleMediaControl(action: String, context: android.content.Context) {
         Log.d(TAG, "Media control from BLE: $action")
         when {
+            action == "manual_disconnect" -> {
+                Log.d(TAG, "Received manual disconnect from Mac via BLE")
+                com.sameerasw.airsync.utils.WebSocketUtil.disconnect(context, manual = true)
+                gattServer?.disconnectAllConnectedDevices()
+            }
+
             action == "playPause" -> com.sameerasw.airsync.utils.MediaControlUtil.playPause(context)
             action == "next" -> com.sameerasw.airsync.utils.MediaControlUtil.skipNext(context)
             action == "previous" -> com.sameerasw.airsync.utils.MediaControlUtil.skipPrevious(
@@ -182,9 +197,13 @@ object BleTransportBridge {
         if (parts.size >= 2) {
             val id = parts[0]
             val actionName = parts[1]
+            // Reply text is optional and was previously dropped, so inline replies
+            // never worked over BLE. Empty means "plain button", not an empty reply.
+            val replyText = parts.getOrNull(2)?.takeIf { it.isNotEmpty() }
             com.sameerasw.airsync.utils.NotificationDismissalUtil.performNotificationAction(
                 id,
-                actionName
+                actionName,
+                replyText
             )
         }
     }

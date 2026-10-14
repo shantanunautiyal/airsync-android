@@ -67,6 +67,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getDeveloperMode()
     }
 
+    override suspend fun setDeveloperModeVisible(visible: Boolean) {
+        dataStoreManager.setDeveloperModeVisible(visible)
+    }
+
+    override fun getDeveloperModeVisible(): Flow<Boolean> {
+        return dataStoreManager.getDeveloperModeVisible()
+    }
+
     override suspend fun saveLastConnectedDevice(device: ConnectedDevice) {
         dataStoreManager.saveLastConnectedDevice(device)
     }
@@ -167,6 +175,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getSendNowPlayingEnabled()
     }
 
+    override suspend fun setExcludedMediaPackages(packages: Set<String>) {
+        dataStoreManager.setExcludedMediaPackages(packages)
+    }
+
+    override fun getExcludedMediaPackages(): Flow<Set<String>> {
+        return dataStoreManager.getExcludedMediaPackages()
+    }
+
     // New: Keep previous link setting
     override suspend fun setKeepPreviousLinkEnabled(enabled: Boolean) {
         dataStoreManager.setKeepPreviousLinkEnabled(enabled)
@@ -190,6 +206,14 @@ class AirSyncRepositoryImpl(
 
     override fun getUserManuallyDisconnected(): Flow<Boolean> {
         return dataStoreManager.getUserManuallyDisconnected()
+    }
+
+    override suspend fun setAppPaused(paused: Boolean) {
+        dataStoreManager.setAppPaused(paused)
+    }
+
+    override fun isAppPaused(): Flow<Boolean> {
+        return dataStoreManager.isAppPaused()
     }
 
     override suspend fun setMacMediaControlsEnabled(enabled: Boolean) {
@@ -216,6 +240,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getPitchBlackThemeEnabled()
     }
 
+    override suspend fun setUseRippleEnabled(enabled: Boolean) {
+        dataStoreManager.setUseRippleEnabled(enabled)
+    }
+
+    override fun getUseRippleEnabled(): Flow<Boolean> {
+        return dataStoreManager.getUseRippleEnabled()
+    }
+
     override suspend fun setDefaultTab(tab: String) {
         dataStoreManager.setDefaultTab(tab)
     }
@@ -224,13 +256,7 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getDefaultTab()
     }
 
-    override suspend fun setSentryReportingEnabled(enabled: Boolean) {
-        dataStoreManager.setSentryReportingEnabled(enabled)
-    }
 
-    override fun getSentryReportingEnabled(): Flow<Boolean> {
-        return dataStoreManager.getSentryReportingEnabled()
-    }
 
     override suspend fun setWidgetTransparency(alpha: Float) {
         dataStoreManager.setWidgetTransparency(alpha)
@@ -302,5 +328,13 @@ class AirSyncRepositoryImpl(
 
     override fun isFileAccessEnabled(): Flow<Boolean> {
         return dataStoreManager.isFileAccessEnabled()
+    }
+
+    override suspend fun setNotifyOnCrashEnabled(enabled: Boolean) {
+        dataStoreManager.setNotifyOnCrashEnabled(enabled)
+    }
+
+    override fun getNotifyOnCrashEnabled(): Flow<Boolean> {
+        return dataStoreManager.getNotifyOnCrashEnabled()
     }
 }

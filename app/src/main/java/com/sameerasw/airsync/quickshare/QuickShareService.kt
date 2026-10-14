@@ -163,7 +163,12 @@ class QuickShareService : Service() {
                     val pairedDevice = dataStoreManager.getLastConnectedDevice().first()
                     val pairedName = pairedDevice?.name
 
-                    if (!pairedName.isNullOrBlank() && deviceName == pairedName) {
+                    val isMatched = !pairedName.isNullOrBlank() && (
+                        deviceName.equals(pairedName, ignoreCase = true) ||
+                        deviceName.replace("’", "'").equals(pairedName.replace("’", "'"), ignoreCase = true)
+                    )
+
+                    if (isMatched) {
                         Log.d(TAG, "Auto-accepting transfer from paired Mac: $deviceName")
                         connection.sendSharingResponse(ConnectionResponseFrame.Status.ACCEPT)
                     } else {
@@ -191,12 +196,16 @@ class QuickShareService : Service() {
         when (intent?.action) {
             ACTION_ACCEPT -> {
                 val id = intent.getStringExtra(EXTRA_CONNECTION_ID)
-                activeConnections[id]?.sendSharingResponse(ConnectionResponseFrame.Status.ACCEPT)
+                serviceScope.launch {
+                    activeConnections[id]?.sendSharingResponse(ConnectionResponseFrame.Status.ACCEPT)
+                }
             }
 
             ACTION_REJECT -> {
                 val id = intent.getStringExtra(EXTRA_CONNECTION_ID)
-                activeConnections[id]?.sendSharingResponse(ConnectionResponseFrame.Status.REJECT)
+                serviceScope.launch {
+                    activeConnections[id]?.sendSharingResponse(ConnectionResponseFrame.Status.REJECT)
+                }
                 activeConnections.remove(id)
             }
 
@@ -228,8 +237,15 @@ class QuickShareService : Service() {
             }
 
             else -> {
-                // Remove the startForeground/createNotification call from here
-                server.start()
+                serviceScope.launch {
+                    val enabled = dataStoreManager.isQuickShareEnabled().first()
+                    if (enabled) {
+                        server.start()
+                    } else {
+                        Log.d(TAG, "Service restarted by system but Quick Share is disabled, stopping")
+                        stopDiscovery()
+                    }
+                }
             }
         }
         return START_STICKY

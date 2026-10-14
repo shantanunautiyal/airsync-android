@@ -38,12 +38,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class BleGattServer(private val context: Context) {
     companion object {
         private const val TAG = "BleGattServer"
-        private var instance: BleGattServer? = null
-        fun isAnyAuthenticated(): Boolean = instance?.isAuthenticated ?: false
-    }
-
-    init {
-        instance = this
+        private val authenticatedFlag = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun isAnyAuthenticated(): Boolean = authenticatedFlag.get()
     }
 
     private val bluetoothManager =
@@ -52,6 +48,16 @@ class BleGattServer(private val context: Context) {
     private var gattServer: BluetoothGattServer? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val dataStoreManager = DataStoreManager(context)
+
+    private var isBleSyncEnabled = true
+
+    init {
+        scope.launch {
+            dataStoreManager.getBleSyncEnabled().collect { enabled ->
+                isBleSyncEnabled = enabled
+            }
+        }
+    }
 
     private val _connectionState = MutableStateFlow(BleConnectionState.DISCONNECTED)
     val connectionState = _connectionState.asStateFlow()
@@ -91,42 +97,12 @@ class BleGattServer(private val context: Context) {
             return
         }
 
-        val isEnabled = try {
-            runBlocking { dataStoreManager.getBleSyncEnabled().first() }
-        } catch (e: Exception) {
-            false
-        }
-        if (!isEnabled) {
+        if (!isBleSyncEnabled) {
             Log.d(TAG, "BLE Sync is disabled in settings, skipping start")
             return
         }
 
-        // Set Bluetooth adapter name dynamically based on configured device name to keep BLE matching precise
-        val customName = try {
-            runBlocking { dataStoreManager.getDeviceName().first() }
-        } catch (e: Exception) {
-            ""
-        }
-        val rawName =
-            if (customName.isNotBlank()) customName else com.sameerasw.airsync.utils.DeviceInfoUtil.getDeviceName(
-                context
-            )
-        val baseName = rawName
-            .replace("AirSync-AirSync-", "")
-            .replace("AirSync-", "")
-            .replace("airsync-", "")
-            .replace("airsync", "")
-            .trim()
 
-        val bleName = "AirSync-$baseName"
-        try {
-            if (adapter.name != bleName) {
-                adapter.name = bleName
-                Log.d(TAG, "Updated Bluetooth adapter name to: $bleName")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to set Bluetooth adapter name: ${e.message}")
-        }
 
         setupGattServer()
     }
@@ -144,6 +120,7 @@ class BleGattServer(private val context: Context) {
         pendingServices.clear()
         _connectionState.value = BleConnectionState.DISCONNECTED
         isAuthenticated = false
+        authenticatedFlag.set(false)
         isAdvertisingPaused = false
     }
 
@@ -316,13 +293,9 @@ class BleGattServer(private val context: Context) {
                     _connectionState.value =
                         if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
                     isAuthenticated = false
+                    authenticatedFlag.set(false)
                     if (gattServer != null) {
-                        val isEnabled = try {
-                            runBlocking { dataStoreManager.getBleSyncEnabled().first() }
-                        } catch (e: Exception) {
-                            false
-                        }
-                        if (isEnabled) {
+                        if (isBleSyncEnabled) {
                             if (!isAdvertisingPaused) {
                                 startAdvertising()
                             }
@@ -525,12 +498,14 @@ class BleGattServer(private val context: Context) {
                 if (token.contentEquals(expectedToken.toByteArray(Charsets.UTF_8))) {
                     Log.i(TAG, "BLE Auth Success!")
                     isAuthenticated = true
+                    authenticatedFlag.set(true)
                     _connectionState.value = BleConnectionState.AUTHENTICATED
                     sendNotification(
                         BleConstants.CHAR_AUTH_RESULT,
                         byteArrayOf(BleConstants.AUTH_SUCCESS)
                     )
                     BleTransportBridge.sendDeviceName()
+                    dataStoreManager.setUserManuallyDisconnected(false)
                     startHeartbeat()
                 } else {
                     Log.w(TAG, "BLE Auth Failed! Token mismatch.")
@@ -670,10 +645,17 @@ class BleGattServer(private val context: Context) {
         isSending[uuid] = true
 
         val characteristic = findCharacteristic(uuid) ?: return
-        characteristic.value = data
-
-        connectedDevices.forEach { device ->
-            gattServer?.notifyCharacteristicChanged(device, characteristic, false)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            connectedDevices.forEach { device ->
+                gattServer?.notifyCharacteristicChanged(device, characteristic, false, data)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            characteristic.value = data
+            connectedDevices.forEach { device ->
+                @Suppress("DEPRECATION")
+                gattServer?.notifyCharacteristicChanged(device, characteristic, false)
+            }
         }
     }
 
@@ -726,6 +708,12 @@ class BleGattServer(private val context: Context) {
             }
         }
         isAuthenticated = false
-        _connectionState.value = BleConnectionState.DISCONNECTED
+        authenticatedFlag.set(false)
+        stopHeartbeat()
+        _connectionState.value = if (gattServer != null) BleConnectionState.ADVERTISING else BleConnectionState.DISCONNECTED
+        isAdvertisingPaused = false
+        if (gattServer != null && isBleSyncEnabled) {
+            startAdvertising()
+        }
     }
 }

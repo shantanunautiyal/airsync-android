@@ -138,7 +138,7 @@ class AirSyncDeviceTarget : SmartspacerTargetProvider() {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
-        }
+
     }
 
     override fun getConfig(smartspacerId: String?): Config {

@@ -11,6 +11,7 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -39,8 +40,11 @@ import com.sameerasw.airsync.utils.KeyguardHelper
 import com.sameerasw.airsync.utils.NotesRoleManager
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.ShortcutUtil
-import com.sameerasw.airsync.utils.UDPDiscoveryManager
+import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.canerture.exceptionreport.handler.ExceptionReport
+import com.sameerasw.airsync.crash.CrashHandler
+import com.sameerasw.airsync.crash.CrashReportActivity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.net.URLDecoder
@@ -177,10 +181,14 @@ class MainActivity : ComponentActivity() {
         // Install and configure the splash screen before any UI rendering
         val splashScreen = installSplashScreen()
 
-        // Make activity draw behind system bars - let the theme handle the colors
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Enable edge-to-edge for Android 15+ and backward compatibility
+        enableEdgeToEdge()
 
         super.onCreate(savedInstanceState)
+
+        ExceptionReport(this) { deviceInfo, stackTrace ->
+            CrashHandler.onCrash(applicationContext, deviceInfo, stackTrace)
+        }.setCustomActivity(CrashReportActivity::class.java)
 
         // Dynamically set the splash screen icon based on last connected device
         splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
@@ -337,11 +345,18 @@ class MainActivity : ComponentActivity() {
 
         // Check if this is a QS tile long-press intent and device is not connected
         if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
-            if (!WebSocketUtil.isConnected()) {
-                // Not connected, open QR scanner instead
-                val qrScannerIntent = Intent(this, QRScannerActivity::class.java)
-                qrScannerLauncher.launch(qrScannerIntent)
-                return
+            val ds = DataStoreManager.getInstance(applicationContext)
+            val isPaused = runBlocking { ds.isAppPaused().first() }
+            if (!isPaused && !WebSocketUtil.isConnected()) {
+                // Not connected and not paused: pause the app on QS tile long-press
+                runBlocking {
+                    ds.setAppPaused(true)
+                }
+                WebSocketUtil.stopAutoReconnect(this)
+                WebSocketUtil.disconnect(this, manual = true)
+                com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.stop(this)
+                com.sameerasw.airsync.service.AirSyncService.stop(this)
+                ShortcutUtil.refreshShortcuts(this, false)
             }
         }
 
@@ -600,15 +615,19 @@ class MainActivity : ComponentActivity() {
         }
 
         // Check if this is a QS tile long-press intent
-        if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
-            // Check if device is connected
-            if (!WebSocketUtil.isConnected()) {
-                // Not connected, open QR scanner
-                val qrScannerIntent = Intent(this, QRScannerActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
+            val ds = DataStoreManager.getInstance(applicationContext)
+            val isPaused = runBlocking { ds.isAppPaused().first() }
+            // Check if device is disconnected and not paused
+            if (!isPaused && !WebSocketUtil.isConnected()) {
+                runBlocking {
+                    ds.setAppPaused(true)
                 }
-                startActivity(qrScannerIntent)
-                finish()
+                WebSocketUtil.stopAutoReconnect(this)
+                WebSocketUtil.disconnect(this, manual = true)
+                com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.stop(this)
+                com.sameerasw.airsync.service.AirSyncService.stop(this)
+                ShortcutUtil.refreshShortcuts(this, false)
             }
         }
     }
@@ -651,13 +670,16 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
-            AdbDiscoveryHolder.initialize(this)
             val ds = DataStoreManager.getInstance(applicationContext)
+            val isPaused = runBlocking { ds.isAppPaused().first() }
+            if (isPaused) return
+
+            AdbDiscoveryHolder.initialize(this)
             val isDiscoveryEnabled = runBlocking {
                 ds.getDeviceDiscoveryEnabled().first()
             }
-            UDPDiscoveryManager.start(this, isDiscoveryEnabled)
-            UDPDiscoveryManager.burstBroadcast(this)
+            DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
+            DiscoveryOrchestrator.burstBroadcast(this)
         }
     }
 

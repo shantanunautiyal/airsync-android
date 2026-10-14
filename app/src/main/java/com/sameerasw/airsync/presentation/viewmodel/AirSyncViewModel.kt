@@ -211,12 +211,27 @@ class AirSyncViewModel(
             }
         }
 
-        // Observe sentry reporting preference
+        // Observe ripple preference
         viewModelScope.launch {
-            repository.getSentryReportingEnabled().collect { enabled ->
-                _uiState.value = _uiState.value.copy(isSentryReportingEnabled = enabled)
+            repository.getUseRippleEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isRippleSettingEnabled = enabled)
             }
         }
+
+        
+        viewModelScope.launch {
+            repository.getDeveloperModeVisible().collect { visible ->
+                _uiState.value = _uiState.value.copy(isDeveloperModeVisible = visible)
+            }
+        }
+
+        viewModelScope.launch {
+            repository.isAppPaused().collect { paused ->
+                _uiState.value = _uiState.value.copy(isAppPaused = paused)
+            }
+        }
+
+
 
         // Observe widget transparency preference
         viewModelScope.launch {
@@ -243,6 +258,28 @@ class AirSyncViewModel(
         viewModelScope.launch {
             repository.isFileAccessEnabled().collect { enabled ->
                 _uiState.value = _uiState.value.copy(isFileAccessEnabled = enabled)
+            }
+        }
+
+        // Observe Send now playing preference
+        viewModelScope.launch {
+            repository.getSendNowPlayingEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isSendNowPlayingEnabled = enabled)
+            }
+        }
+
+        // Observe Excluded media packages preference
+        viewModelScope.launch {
+            repository.getExcludedMediaPackages().collect { packages ->
+                _uiState.value = _uiState.value.copy(excludedMediaPackages = packages)
+                com.sameerasw.airsync.service.MediaNotificationListener.setExcludedMediaPackages(packages)
+            }
+        }
+
+        // Observe Notify on Crash preference
+        viewModelScope.launch {
+            repository.getNotifyOnCrashEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isNotifyOnCrashEnabled = enabled)
             }
         }
 
@@ -367,12 +404,13 @@ class AirSyncViewModel(
             val isEssentialsConnectionEnabled = repository.getEssentialsConnectionEnabled().first()
             val isDeviceDiscoveryEnabled = repository.getDeviceDiscoveryEnabled().first()
             val isBlurEnabledSetting = repository.getUseBlurEnabled().first()
+            val isRippleEnabledSetting = repository.getUseRippleEnabled().first()
             val isPitchBlackThemeEnabled = repository.getPitchBlackThemeEnabled().first()
-            val isSentryReportingEnabled = repository.getSentryReportingEnabled().first()
             val isFirstRun = repository.getFirstRun().first()
             val isPowerSaveMode = DeviceInfoUtil.isPowerSaveMode(context)
             val isBlurProblematic = DeviceInfoUtil.isBlurProblematicDevice()
             val isQuickShareEnabled = repository.isQuickShareEnabled().first()
+            val isNotifyOnCrashEnabled = repository.getNotifyOnCrashEnabled().first()
 
             // Replicate Essentials logic for initial state
             val isBlurEnabled = isBlurEnabledSetting && !isPowerSaveMode && !isBlurProblematic
@@ -430,12 +468,13 @@ class AirSyncViewModel(
                 isEssentialsConnectionEnabled = isEssentialsConnectionEnabled,
                 isDeviceDiscoveryEnabled = isDeviceDiscoveryEnabled,
                 isBlurSettingEnabled = isBlurEnabledSetting,
+                isRippleSettingEnabled = isRippleEnabledSetting,
                 isPowerSaveMode = isPowerSaveMode,
                 isPitchBlackThemeEnabled = isPitchBlackThemeEnabled,
                 isBlurEnabled = isBlurEnabled,
-                isSentryReportingEnabled = isSentryReportingEnabled,
                 isOnboardingCompleted = !isFirstRun,
-                isQuickShareEnabled = isQuickShareEnabled
+                isQuickShareEnabled = isQuickShareEnabled,
+                isNotifyOnCrashEnabled = isNotifyOnCrashEnabled
             )
 
             updateRatingPromptDisplay()
@@ -680,9 +719,13 @@ class AirSyncViewModel(
     }
 
     fun toggleDeveloperModeVisibility() {
+        val newVisibility = !_uiState.value.isDeveloperModeVisible
         _uiState.value = _uiState.value.copy(
-            isDeveloperModeVisible = !_uiState.value.isDeveloperModeVisible
+            isDeveloperModeVisible = newVisibility
         )
+        viewModelScope.launch {
+            repository.setDeveloperModeVisible(newVisibility)
+        }
     }
 
     fun setClipboardSyncEnabled(enabled: Boolean) {
@@ -734,13 +777,7 @@ class AirSyncViewModel(
         }
     }
 
-    fun setSentryReportingEnabled(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(isSentryReportingEnabled = enabled)
-        viewModelScope.launch {
-            repository.setSentryReportingEnabled(enabled)
-            // Note: Changes typically take effect on next launch as Sentry is initialized in Application.onCreate
-        }
-    }
+
 
     fun setPitchBlackThemeEnabled(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isPitchBlackThemeEnabled = enabled)
@@ -794,6 +831,13 @@ class AirSyncViewModel(
         }
     }
 
+    fun setNotifyOnCrashEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isNotifyOnCrashEnabled = enabled)
+        viewModelScope.launch {
+            repository.setNotifyOnCrashEnabled(enabled)
+        }
+    }
+
     fun manualSyncAppIcons(context: Context) {
         _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
 
@@ -827,9 +871,29 @@ class AirSyncViewModel(
         }
     }
 
-    // Awaitable variant used when ordering matters (e.g., ensure flag is persisted before disconnect)
-    suspend fun setUserManuallyDisconnectedAwait(disconnected: Boolean) {
-        repository.setUserManuallyDisconnected(disconnected)
+    fun setAppPaused(context: Context, paused: Boolean) {
+        viewModelScope.launch {
+            repository.setAppPaused(paused)
+            if (paused) {
+                WebSocketUtil.stopAutoReconnect(context)
+                WebSocketUtil.disconnect(context, manual = true)
+                com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.stop(context)
+                com.sameerasw.airsync.service.AirSyncService.stop(context)
+                _uiState.value = _uiState.value.copy(
+                    isConnected = false,
+                    isConnecting = false,
+                    response = "Paused"
+                )
+                ShortcutUtil.refreshShortcuts(context, false)
+            } else {
+                repository.setUserManuallyDisconnected(false)
+                val isDiscovery = repository.getDeviceDiscoveryEnabled().first()
+                com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.start(context, isDiscovery)
+                com.sameerasw.airsync.service.AirSyncService.startScanning(context)
+                WebSocketUtil.requestAutoReconnect(context)
+                ShortcutUtil.refreshShortcuts(context, false)
+            }
+        }
     }
 
     private fun hasNetworkAwareMappingForLastDevice(): ConnectedDevice? {
@@ -881,9 +945,11 @@ class AirSyncViewModel(
                         val target = hasNetworkAwareMappingForLastDevice()
 
                         if (currentIp == "No Wi-Fi" || currentIp == "Unknown") {
-                            // No usable Wi‑Fi: ensure we stop any active connection and do not attempt reconnect
+                            // No usable Wi‑Fi: ensure we stop any active Wi-Fi WebSocket connection without affecting BLE
                             try {
-                                WebSocketUtil.disconnect(context)
+                                if (WebSocketUtil.isWifiConnected()) {
+                                    WebSocketUtil.disconnect(context)
+                                }
                             } catch (_: Exception) {
                             }
                             // Stop service if needed
@@ -903,8 +969,8 @@ class AirSyncViewModel(
                             updatePort(target.port)
                             updateSymmetricKey(target.symmetricKey)
 
-                            // If connected/connecting to old network, disconnect first to force a clean switch
-                            if (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting()) {
+                            // If Wi-Fi WebSocket is connected to old network, disconnect it first
+                            if (WebSocketUtil.isWifiConnected()) {
                                 try {
                                     WebSocketUtil.disconnect(context)
                                 } catch (_: Exception) {
@@ -1207,6 +1273,13 @@ class AirSyncViewModel(
         }
     }
 
+    fun setUseRippleEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isRippleSettingEnabled = enabled)
+        viewModelScope.launch {
+            repository.setUseRippleEnabled(enabled)
+        }
+    }
+
     fun resetOnboarding() {
         viewModelScope.launch {
             repository.setFirstRun(true)
@@ -1221,6 +1294,57 @@ class AirSyncViewModel(
         _uiState.value = _uiState.value.copy(isOnboardingCompleted = completed)
         viewModelScope.launch {
             repository.setFirstRun(!completed)
+        }
+    }
+
+    private val _mediaApps =
+        MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())
+    val mediaApps: StateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>> =
+        _mediaApps.asStateFlow()
+
+    fun loadMediaApps(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val installed = com.sameerasw.airsync.utils.AppUtil.getInstalledApps(context)
+                val excluded = _uiState.value.excludedMediaPackages
+                val mapped = installed.map { app ->
+                    app.copy(isEnabled = excluded.contains(app.packageName))
+                }
+                _mediaApps.value = mapped
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to load media apps: ${e.message}")
+            }
+        }
+    }
+
+    fun toggleExcludedMediaPackage(packageName: String, isExcluded: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val currentExcluded = _uiState.value.excludedMediaPackages.toMutableSet()
+                if (isExcluded) {
+                    currentExcluded.add(packageName)
+                } else {
+                    currentExcluded.remove(packageName)
+                }
+                repository.setExcludedMediaPackages(currentExcluded)
+                _mediaApps.value = _mediaApps.value.map { app ->
+                    if (app.packageName == packageName) app.copy(isEnabled = isExcluded) else app
+                }
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to toggle excluded media package: ${e.message}")
+            }
+        }
+    }
+
+    fun saveAllMediaApps(apps: List<com.sameerasw.airsync.domain.model.NotificationApp>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val excluded = apps.filter { it.isEnabled }.map { it.packageName }.toSet()
+                repository.setExcludedMediaPackages(excluded)
+                _mediaApps.value = apps
+            } catch (e: Exception) {
+                Log.e("AirSyncViewModel", "Failed to save all media apps: ${e.message}")
+            }
         }
     }
 

@@ -63,31 +63,24 @@ class ContactLookupHelper(private val context: Context) {
     }
 
     /**
-     * Get device's country code from SIM card or locale
+     * Get device's country code from SIM, cellular network ISO, or locale.
      */
     private fun getDeviceCountryCode(): String {
         return try {
-            // First try to get country from SIM card (most accurate for phone numbers)
-            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-            val simCountry = telephonyManager?.simCountryIso?.uppercase()
-            if (!simCountry.isNullOrEmpty()) {
-                return simCountry
-            }
-            
-            // Fallback to network country
-            val networkCountry = telephonyManager?.networkCountryIso?.uppercase()
-            if (!networkCountry.isNullOrEmpty()) {
-                return networkCountry
-            }
-            
-            // Fallback to device locale
+            val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+            val simCountry = tm?.simCountryIso?.uppercase()?.takeIf { it.isNotEmpty() }
+            if (simCountry != null) return simCountry
+
+            val networkCountry = tm?.networkCountryIso?.uppercase()?.takeIf { it.isNotEmpty() }
+            if (networkCountry != null) return networkCountry
+
             val locale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 context.resources.configuration.locales.get(0)
             } else {
                 @Suppress("DEPRECATION")
                 context.resources.configuration.locale
             }
-            locale?.country?.takeIf { it.isNotEmpty() } ?: "US"
+            locale?.country?.uppercase()?.takeIf { it.isNotEmpty() } ?: "US"
         } catch (e: Exception) {
             // Final fallback - try deprecated locale method
             try {

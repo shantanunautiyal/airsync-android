@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -11,6 +12,9 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -37,6 +41,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.rounded.ContentPaste
@@ -79,10 +84,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
@@ -90,15 +99,20 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sameerasw.airsync.presentation.ui.components.cards.IncomingFileTransferCard
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.sameerasw.airsync.R
+import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import com.sameerasw.airsync.presentation.ui.components.AirSyncFloatingToolbar
 import com.sameerasw.airsync.presentation.ui.components.FloatingMediaPlayer
 import com.sameerasw.airsync.presentation.ui.components.RoundedCardContainer
 import com.sameerasw.airsync.presentation.ui.components.SettingsView
+import com.sameerasw.airsync.presentation.ui.components.buttons.ListExpandToggleButton
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
+import com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.RateAppCard
 import com.sameerasw.airsync.presentation.ui.components.cards.RemoteFunctionsCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
@@ -106,6 +120,7 @@ import com.sameerasw.airsync.presentation.ui.components.sheets.HelpSupportBottom
 import com.sameerasw.airsync.presentation.ui.composables.WelcomeScreen
 import com.sameerasw.airsync.presentation.ui.models.AirSyncTab
 import com.sameerasw.airsync.presentation.ui.modifiers.BlurDirection
+import com.sameerasw.airsync.presentation.ui.modifiers.liquidRipple
 import com.sameerasw.airsync.presentation.ui.modifiers.progressiveBlur
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
@@ -145,6 +160,9 @@ fun AirSyncMainScreen(
     onTitleChange: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val dataStoreManager = remember { DataStoreManager.getInstance(context) }
+    val bleSyncEnabled by dataStoreManager.getBleSyncEnabled().collectAsState(initial = false)
+    var showConfigureLastDevice by rememberSaveable { mutableStateOf(false) }
     val viewModel: AirSyncViewModel = androidx.lifecycle.viewmodel.compose.viewModel {
         AirSyncViewModel.create(context)
     }
@@ -170,6 +188,8 @@ fun AirSyncMainScreen(
     if (!uiState.isOnboardingCompleted) {
         hasSeenWelcomeThisSession = true
     }
+
+    var activeSettingsCategory by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Volume & Media state
     var volume by remember { mutableFloatStateOf(50f) }
@@ -219,6 +239,11 @@ fun AirSyncMainScreen(
         rememberPagerState(
             initialPage = initialPage,
             pageCount = { if (uiState.isConnected) 4 else 2 })
+
+    LaunchedEffect(pagerState.currentPage) {
+        activeSettingsCategory = null
+    }
+
     val navCallbackState = rememberUpdatedState(onNavigateToApps)
     LaunchedEffect(navCallbackState.value) {
     }
@@ -228,6 +253,21 @@ fun AirSyncMainScreen(
     var showHelpSheet by remember { mutableStateOf(false) }
     val onDismissHelp = { showHelpSheet = false }
     var loadingHapticsJob by remember { mutableStateOf<Job?>(null) }
+
+    var rippleTrigger by remember { mutableStateOf(0) }
+    var rippleOrigin by remember { mutableStateOf(Offset.Zero) }
+    var rootSize by remember { mutableStateOf(IntSize.Zero) }
+
+    var wasConnected by remember { mutableStateOf(uiState.isConnected) }
+    LaunchedEffect(uiState.isConnected) {
+        if (uiState.isConnected && !wasConnected) {
+            val originX = if (rootSize.width > 0) rootSize.width / 2f else 500f
+            val originY = if (rootSize.height > 0) rootSize.height * 0.25f else 400f
+            rippleOrigin = Offset(originX, originY)
+            rippleTrigger++
+        }
+        wasConnected = uiState.isConnected
+    }
 
     // Initial tab navigation logic
     LaunchedEffect(Unit) {
@@ -506,8 +546,7 @@ fun AirSyncMainScreen(
 
     fun disconnect() {
         scope.launch {
-            viewModel.setUserManuallyDisconnectedAwait(true)
-            WebSocketUtil.disconnect(context)
+            WebSocketUtil.disconnect(context, manual = true)
             viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
             viewModel.clearClipboardHistory()
             viewModel.setResponse("Disconnected")
@@ -728,10 +767,16 @@ fun AirSyncMainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onSizeChanged { rootSize = it }
             ) {
                 HorizontalPager(
                     modifier = modifier
                         .fillMaxSize()
+                        .liquidRipple(
+                            trigger = rippleTrigger,
+                            origin = rippleOrigin,
+                            enabled = uiState.isRippleSettingEnabled
+                        )
                         .progressiveBlur(
                             blurRadius = if (uiState.isBlurEnabled) 40f else 0f,
                             height = statusBarHeightPx * 1.15f,
@@ -786,6 +831,10 @@ fun AirSyncMainScreen(
                                         connectedDevice = uiState.lastConnectedDevice,
                                         lastConnected = uiState.lastConnectedDevice != null,
                                         uiState = uiState,
+                                        isPaused = uiState.isAppPaused,
+                                        onTogglePause = {
+                                            viewModel.setAppPaused(context, !uiState.isAppPaused)
+                                        }
                                     )
 
                                     // Remote Functions Card (Lock Screen, etc.)
@@ -800,7 +849,12 @@ fun AirSyncMainScreen(
                                     }
                                 }
 
-                                RoundedCardContainer {
+                                AnimatedVisibility(
+                                    visible = !uiState.isConnected && !uiState.isAppPaused,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    RoundedCardContainer {
                                     // Nearby Devices (UDP Discovery)
                                     val discoveredDevices by viewModel.discoveredDevices.collectAsState()
 
@@ -813,12 +867,6 @@ fun AirSyncMainScreen(
                                         uiState.lastConnectedDevice?.let { device ->
                                             LastConnectedDeviceCard(
                                                 device = device,
-                                                isAutoReconnectEnabled = uiState.isAutoReconnectEnabled,
-                                                onToggleAutoReconnect = { enabled ->
-                                                    viewModel.setAutoReconnectEnabled(
-                                                        enabled
-                                                    )
-                                                },
                                                 onQuickConnect = {
                                                     // Check if we can use network-aware connection first
                                                     val networkAwareDevice =
@@ -873,7 +921,7 @@ fun AirSyncMainScreen(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = "Available Devices",
+                                                        text = stringResource(R.string.label_device_discovery),
                                                         style = MaterialTheme.typography.titleMedium,
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
@@ -1065,34 +1113,56 @@ fun AirSyncMainScreen(
                                             }
                                         }
                                     }
+                                }
+                            }
 
-                                    AnimatedVisibility(
-                                        visible = !uiState.isConnected,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        Column {
-                                            ManualConnectionCard(
-                                                isConnected = uiState.isConnected,
-                                                lastConnected = uiState.lastConnectedDevice != null,
-                                                uiState = uiState,
-                                                onIpChange = { viewModel.updateIpAddress(it) },
-                                                onPortChange = { viewModel.updatePort(it) },
-                                                onPcNameChange = { viewModel.updateManualPcName(it) },
-                                                onIsPlusChange = { viewModel.updateManualIsPlus(it) },
-                                                onSymmetricKeyChange = {
-                                                    viewModel.updateSymmetricKey(
-                                                        it
-                                                    )
-                                                },
-                                                onConnect = { viewModel.prepareForManualConnection() },
-                                                onQrScanClick = { launchScanner(context) }
-                                            )
+                                AnimatedVisibility(
+                                    visible = !uiState.isAppPaused,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        ListExpandToggleButton(
+                                            isExpanded = showConfigureLastDevice,
+                                            onToggle = { showConfigureLastDevice = !showConfigureLastDevice },
+                                            title = R.string.action_configure,
+                                            iconRes = R.drawable.rounded_settings_24
+                                        )
+
+                                        AnimatedVisibility(
+                                            visible = showConfigureLastDevice,
+                                            enter = expandVertically() + fadeIn(),
+                                            exit = shrinkVertically() + fadeOut()
+                                        ) {
+                                            RoundedCardContainer {
+                                                IconToggleItem(
+                                                    iconRes = R.drawable.rounded_sync_desktop_24,
+                                                    title = stringResource(R.string.setting_auto_reconnect_title),
+                                                    description = stringResource(R.string.setting_auto_reconnect_desc),
+                                                    isChecked = uiState.isAutoReconnectEnabled,
+                                                    onCheckedChange = { enabled ->
+                                                        viewModel.setAutoReconnectEnabled(enabled)
+                                                    }
+                                                )
+
+                                                IconToggleItem(
+                                                    iconRes = R.drawable.rounded_bluetooth_24,
+                                                    title = stringResource(R.string.setting_nearby_connection_title),
+                                                    description = stringResource(R.string.setting_nearby_connection_desc),
+                                                    isChecked = bleSyncEnabled,
+                                                    onCheckedChange = { enabled ->
+                                                        scope.launch {
+                                                            dataStoreManager.setBleSyncEnabled(enabled)
+                                                            dataStoreManager.setBleAutoConnectEnabled(enabled)
+                                                        }
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(100.dp))
+                                Spacer(modifier = Modifier.height(200.dp))
                             }
                         }
 
@@ -1111,27 +1181,35 @@ fun AirSyncMainScreen(
                                 )
                             } else {
                                 // When disconnected: page 1 = Settings
-                                SettingsView(
-                                    modifier = Modifier.fillMaxSize(),
+                                SettingsNavHost(
                                     context = context,
-                                    innerPaddingBottom = 0.dp,
                                     uiState = uiState,
                                     deviceInfo = deviceInfo,
                                     versionName = versionName,
                                     viewModel = viewModel,
-                                    scrollState = settingsScrollState,
                                     scope = scope,
+                                    activeCategory = activeSettingsCategory,
+                                    onCategoryChange = { activeSettingsCategory = it },
+                                    settingsScrollState = settingsScrollState,
                                     onSendMessage = { message -> sendMessage(message) },
-                                    onExport = { json ->
+                                    pendingExportJson = { json ->
                                         pendingExportJson = json
                                         createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
                                     },
-                                onImport = { openDocLauncher.launch(arrayOf("application/json")) },
-                                onResetOnboarding = { viewModel.resetOnboarding() },
-                                onShowHelp = { showHelpSheet = true },
-                                onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
-                                onNavigateToHealth = onNavigateToHealth,
-                                onNavigateToFileTransfer = onNavigateToFileTransfer
+                                    onImport = { openDocLauncher.launch(arrayOf("application/json")) },
+                                    onResetOnboarding = { viewModel.resetOnboarding() },
+                                    onShowHelp = { showHelpSheet = true },
+                                    onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
+                                    onAvatarLongClickWithPosition = { pos ->
+                                        rippleOrigin = pos
+                                        rippleTrigger++
+                                    },
+                                    onRippleToggleEnabledWithPosition = { pos ->
+                                        rippleOrigin = pos
+                                        rippleTrigger++
+                                    },
+                                    onNavigateToHealth = onNavigateToHealth,
+                                    onNavigateToFileTransfer = onNavigateToFileTransfer
                                 )
                             }
                         }
@@ -1164,25 +1242,32 @@ fun AirSyncMainScreen(
 
                         3 -> {
                             // Page 3 only exists when connected = Settings tab
-                            SettingsView(
-                                modifier = Modifier.fillMaxSize(),
+                            SettingsNavHost(
                                 context = context,
-                                innerPaddingBottom = 0.dp,
                                 uiState = uiState,
                                 deviceInfo = deviceInfo,
                                 versionName = versionName,
                                 viewModel = viewModel,
-                                scrollState = settingsScrollState,
                                 scope = scope,
+                                activeCategory = activeSettingsCategory,
+                                onCategoryChange = { activeSettingsCategory = it },
+                                settingsScrollState = settingsScrollState,
                                 onSendMessage = { message -> sendMessage(message) },
-                                onExport = { json ->
+                                pendingExportJson = { json ->
                                     pendingExportJson = json
                                     createDocLauncher.launch("airsync_settings_${System.currentTimeMillis()}.json")
                                 },
                                 onImport = { openDocLauncher.launch(arrayOf("application/json")) },
-                                onResetOnboarding = { viewModel.resetOnboarding() },
                                 onShowHelp = { showHelpSheet = true },
                                 onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
+                                onAvatarLongClickWithPosition = { pos ->
+                                    rippleOrigin = pos
+                                    rippleTrigger++
+                                },
+                                onRippleToggleEnabledWithPosition = { pos ->
+                                    rippleOrigin = pos
+                                    rippleTrigger++
+                                },
                                 onNavigateToHealth = onNavigateToHealth,
                                 onNavigateToFileTransfer = onNavigateToFileTransfer
                             )
@@ -1232,7 +1317,8 @@ fun AirSyncMainScreen(
                                         sendRemoteAction("vol_mute")
                                         isMuted = !isMuted
                                     },
-                                    onMediaAction = { sendRemoteAction(it) }
+                                    onMediaAction = { sendRemoteAction(it) },
+                                    isRippleEnabled = uiState.isRippleSettingEnabled
                                 )
                             }
 
@@ -1255,12 +1341,16 @@ fun AirSyncMainScreen(
                                     MainFAB(
                                         currentTab = tabs.getOrNull(pagerState.currentPage),
                                         isConnected = uiState.isConnected,
+                                        isAppPaused = uiState.isAppPaused,
+                                        activeSettingsCategory = activeSettingsCategory,
                                         onAction = { action ->
                                             when (action) {
                                                 "keyboard" -> showKeyboard = !showKeyboard
                                                 "clear_history" -> viewModel.clearClipboardHistory()
                                                 "disconnect" -> disconnect()
                                                 "scan" -> launchScanner(context)
+                                                "back" -> activeSettingsCategory = null
+                                                "resume" -> viewModel.setAppPaused(context, false)
                                             }
                                         }
                                     )
@@ -1292,7 +1382,8 @@ fun AirSyncMainScreen(
                                         sendRemoteAction("vol_mute")
                                         isMuted = !isMuted
                                     },
-                                    onMediaAction = { sendRemoteAction(it) }
+                                    onMediaAction = { sendRemoteAction(it) },
+                                    isRippleEnabled = uiState.isRippleSettingEnabled
                                 )
                             }
 
@@ -1315,12 +1406,16 @@ fun AirSyncMainScreen(
                                     MainFAB(
                                         currentTab = tabs.getOrNull(pagerState.currentPage),
                                         isConnected = uiState.isConnected,
+                                        isAppPaused = uiState.isAppPaused,
+                                        activeSettingsCategory = activeSettingsCategory,
                                         onAction = { action ->
                                             when (action) {
                                                 "keyboard" -> showKeyboard = !showKeyboard
                                                 "clear_history" -> viewModel.clearClipboardHistory()
                                                 "disconnect" -> disconnect()
                                                 "scan" -> launchScanner(context)
+                                                "back" -> activeSettingsCategory = null
+                                                "resume" -> viewModel.setAppPaused(context, false)
                                             }
                                         }
                                     )
@@ -1380,6 +1475,8 @@ fun AirSyncMainScreen(
 private fun MainFAB(
     currentTab: AirSyncTab?,
     isConnected: Boolean,
+    isAppPaused: Boolean,
+    activeSettingsCategory: String?,
     onAction: (String) -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
@@ -1387,29 +1484,167 @@ private fun MainFAB(
     FloatingToolbarDefaults.StandardFloatingActionButton(
         onClick = {
             HapticUtil.performClick(haptics)
-            when (currentTab?.title) {
-                R.string.tab_remote -> onAction("keyboard")
-                R.string.tab_clipboard -> onAction("clear_history")
-                else -> {
-                    if (isConnected) onAction("disconnect") else onAction("scan")
+            if (currentTab?.title == R.string.tab_settings && activeSettingsCategory != null) {
+                onAction("back")
+            } else {
+                when (currentTab?.title) {
+                    R.string.tab_remote -> onAction("keyboard")
+                    R.string.tab_clipboard -> onAction("clear_history")
+                    else -> {
+                        if (isConnected) {
+                            onAction("disconnect")
+                        } else if (isAppPaused) {
+                            onAction("resume")
+                        } else {
+                            onAction("scan")
+                        }
+                    }
                 }
             }
         }
     ) {
-        when (currentTab?.title) {
-            R.string.tab_remote -> {
-                Icon(Icons.Rounded.Keyboard, contentDescription = "Keyboard")
-            }
+        if (currentTab?.title == R.string.tab_settings && activeSettingsCategory != null) {
+            Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+        } else {
+            when (currentTab?.title) {
+                R.string.tab_remote -> {
+                    Icon(Icons.Rounded.Keyboard, contentDescription = "Keyboard")
+                }
 
-            R.string.tab_clipboard -> {
-                Icon(Icons.Rounded.Delete, contentDescription = "Clear History")
-            }
+                R.string.tab_clipboard -> {
+                    Icon(Icons.Rounded.Delete, contentDescription = "Clear History")
+                }
 
-            else -> {
-                if (isConnected) {
-                    Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
-                } else {
-                    Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
+                else -> {
+                    if (isConnected) {
+                        Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
+                    } else if (isAppPaused) {
+                        Icon(painter = painterResource(R.drawable.rounded_play_arrow_24), contentDescription = stringResource(R.string.resume))
+                    } else {
+                        Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsNavHost(
+    context: Context,
+    uiState: com.sameerasw.airsync.domain.model.UiState,
+    deviceInfo: com.sameerasw.airsync.domain.model.DeviceInfo,
+    versionName: String?,
+    viewModel: AirSyncViewModel,
+    scope: kotlinx.coroutines.CoroutineScope,
+    activeCategory: String?,
+    onCategoryChange: (String?) -> Unit,
+    settingsScrollState: androidx.compose.foundation.ScrollState,
+    onSendMessage: (String) -> Unit,
+    pendingExportJson: (String) -> Unit,
+    onImport: () -> Unit,
+    onShowHelp: () -> Unit,
+    onAvatarLongClickWithPosition: ((Offset) -> Unit)? = null,
+    onRippleToggleEnabledWithPosition: ((Offset) -> Unit)? = null
+) {
+    var predictiveBackScale by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    var predictiveBackOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+
+    LaunchedEffect(activeCategory) {
+        if (activeCategory != null) {
+            predictiveBackScale = 1f
+            predictiveBackOffset = 0f
+        }
+    }
+
+    val canGoBack = activeCategory != null
+
+    androidx.activity.compose.PredictiveBackHandler(enabled = canGoBack) { progressFlow ->
+        try {
+            progressFlow.collect { backEvent ->
+                predictiveBackScale = 1f - (backEvent.progress * 0.08f)
+                predictiveBackOffset = backEvent.progress * 120f
+            }
+            onCategoryChange(null)
+        } catch (e: java.util.concurrent.CancellationException) {
+            predictiveBackScale = 1f
+            predictiveBackOffset = 0f
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Main settings list
+        SettingsView(
+            modifier = Modifier.fillMaxSize(),
+            context = context,
+            innerPaddingBottom = 0.dp,
+            uiState = uiState,
+            deviceInfo = deviceInfo,
+            versionName = versionName,
+            viewModel = viewModel,
+            activeCategory = null,
+            onCategoryChange = onCategoryChange,
+            scrollState = settingsScrollState,
+            scope = scope,
+            onSendMessage = onSendMessage,
+            onExport = pendingExportJson,
+            onImport = onImport,
+            onResetOnboarding = { viewModel.resetOnboarding() },
+            onShowHelp = onShowHelp,
+            onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
+            onAvatarLongClickWithPosition = onAvatarLongClickWithPosition,
+            onRippleToggleEnabledWithPosition = onRippleToggleEnabledWithPosition
+        )
+
+        // Detail sub-page
+        var lastNonNullCategory by remember { mutableStateOf("") }
+        if (activeCategory != null) {
+            lastNonNullCategory = activeCategory
+        }
+        val displayedCategory = activeCategory ?: lastNonNullCategory
+
+        AnimatedVisibility(
+            visible = activeCategory != null,
+            enter = androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { it },
+                animationSpec = tween(220)
+            ) + fadeIn(animationSpec = tween(220)),
+            exit = androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = tween(220)
+            ) + fadeOut(animationSpec = tween(220))
+        ) {
+            if (displayedCategory.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .graphicsLayer {
+                            scaleX = predictiveBackScale
+                            scaleY = predictiveBackScale
+                            translationX = predictiveBackOffset
+                        }
+                ) {
+                    SettingsView(
+                        modifier = Modifier.fillMaxSize(),
+                        context = context,
+                        innerPaddingBottom = 0.dp,
+                        uiState = uiState,
+                        deviceInfo = deviceInfo,
+                        versionName = versionName,
+                        viewModel = viewModel,
+                        activeCategory = displayedCategory,
+                        scrollState = rememberScrollState(),
+                        scope = scope,
+                        onSendMessage = onSendMessage,
+                        onExport = pendingExportJson,
+                        onImport = onImport,
+                        onResetOnboarding = { viewModel.resetOnboarding() },
+                        onShowHelp = onShowHelp,
+                        onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
+                        onAvatarLongClickWithPosition = onAvatarLongClickWithPosition,
+                        onRippleToggleEnabledWithPosition = onRippleToggleEnabledWithPosition
+                    )
                 }
             }
         }

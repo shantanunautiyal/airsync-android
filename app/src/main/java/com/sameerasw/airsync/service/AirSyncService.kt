@@ -64,6 +64,8 @@ class AirSyncService : Service() {
         }
     }
 
+    private var cachedLastDevice: com.sameerasw.airsync.domain.model.ConnectedDevice? = null
+
     override fun onCreate() {
         super.onCreate()
         serviceInstance = this
@@ -73,12 +75,22 @@ class AirSyncService : Service() {
         registerNetworkCallback()
         WebSocketUtil.registerConnectionStatusListener(connectionStatusListener)
 
+        val dataStoreManager = DataStoreManager.getInstance(applicationContext)
+        scope.launch {
+            dataStoreManager.getLastConnectedDevice().collect { device ->
+                cachedLastDevice = device
+                updateNotification()
+            }
+        }
+
         // Monitor connection status, auto-reconnect, and battery status to update notification live
         scope.launch {
             MacDeviceStatusManager.macDeviceStatus.collect {
                 updateNotification()
             }
         }
+
+        promoteToForeground()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -122,24 +134,24 @@ class AirSyncService : Service() {
             startForeground(NOTIFICATION_ID, buildNotification())
         }
 
-        val dataStoreManager =
-            DataStoreManager.getInstance(applicationContext)
-        val isDiscoveryEnabled = runBlocking {
-            dataStoreManager.getDeviceDiscoveryEnabled().first()
+        scope.launch {
+            val dataStoreManager = DataStoreManager.getInstance(applicationContext)
+            val isDiscoveryEnabled = dataStoreManager.getDeviceDiscoveryEnabled().first()
+
+            // Default to PASSIVE mode to save battery
+            // But do a burst to check for devices immediately
+            DiscoveryOrchestrator.start(this@AirSyncService, isDiscoveryEnabled)
+            DiscoveryOrchestrator.setDiscoveryMode(this@AirSyncService, DiscoveryMode.PASSIVE)
+            DiscoveryOrchestrator.burstBroadcast(this@AirSyncService)
+
+            DiscoveryOrchestrator.scheduleDormantTransition(this@AirSyncService)
+
+            // Start WakeupService for HTTP wakeups
+            WakeupService.startService(this@AirSyncService)
+
+            // Also trigger auto-reconnect logic to check if we already have a candidate
+            WebSocketUtil.requestAutoReconnect(this@AirSyncService)
         }
-
-        // Default to PASSIVE mode, do a burst to check for devices immediately,
-        // then auto-transition to DORMANT to save battery
-        DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
-        DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
-        DiscoveryOrchestrator.burstBroadcast(this)
-        DiscoveryOrchestrator.scheduleDormantTransition(this)
-
-        // Start WakeupService for HTTP wakeups
-        WakeupService.startService(this)
-
-        // Also trigger auto-reconnect logic to check if we already have a candidate
-        WebSocketUtil.requestAutoReconnect(this)
     }
 
     private fun startWebDavServer() {
@@ -175,35 +187,36 @@ class AirSyncService : Service() {
         }
     }
 
-    private fun handleAppForeground() {
-        if (isScanning) {
-            Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
-            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
+    private fun promoteToForeground() {
+        try {
+            val notification = buildNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
-                    buildNotification(),
+                    notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 )
             } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
+                startForeground(NOTIFICATION_ID, notification)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error promoting to foreground", e)
+        }
+    }
+
+    private fun handleAppForeground() {
+        promoteToForeground()
+        if (isScanning) {
+            Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
         }
     }
 
     private fun handleAppBackground() {
+        promoteToForeground()
         if (isScanning) {
-            Log.d(TAG, "App in background, switching to DORMANT discovery to save battery")
-            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.DORMANT)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    buildNotification(),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
-            }
+            Log.d(TAG, "App in background, switching to PASSIVE discovery")
+            DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
         }
     }
 
@@ -224,19 +237,18 @@ class AirSyncService : Service() {
             startForeground(NOTIFICATION_ID, buildNotification())
         }
 
-        val dataStoreManager =
-            DataStoreManager.getInstance(applicationContext)
-        val isDiscoveryEnabled = runBlocking {
-            dataStoreManager.getDeviceDiscoveryEnabled().first()
+        scope.launch {
+            val dataStoreManager = DataStoreManager.getInstance(applicationContext)
+            val isDiscoveryEnabled = dataStoreManager.getDeviceDiscoveryEnabled().first()
+
+            // Keep discovery manager running for wake-ups even when connected
+            // But stay in Passive mode mostly
+            DiscoveryOrchestrator.start(this@AirSyncService, isDiscoveryEnabled)
+            DiscoveryOrchestrator.setDiscoveryMode(this@AirSyncService, DiscoveryMode.PASSIVE)
+
+            WakeupService.startService(this@AirSyncService)
+            monitorWebDavRequirements()
         }
-
-        // Keep discovery manager running for wake-ups even when connected
-        // But stay in Passive mode mostly
-        DiscoveryOrchestrator.start(this, isDiscoveryEnabled)
-        DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
-
-        WakeupService.startService(this)
-        monitorWebDavRequirements()
     }
 
     private fun stopSync() {
@@ -267,12 +279,13 @@ class AirSyncService : Service() {
                     )
                     // Refresh UDP socket to bind to new network interface
                     DiscoveryOrchestrator.refreshSocket()
-                    // When network becomes available, do a burst to announce ourselves
                     // then auto-transition to DORMANT to save battery
-                    if (isScanning) {
+                    if (isScanning && !com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
                         DiscoveryOrchestrator.burstBroadcast(applicationContext)
                         DiscoveryOrchestrator.scheduleDormantTransition(applicationContext)
                         WebSocketUtil.requestAutoReconnect(applicationContext)
+                    } else if (isScanning) {
+                        DiscoveryOrchestrator.burstBroadcast(applicationContext)
                     }
                 }
             }
@@ -337,8 +350,7 @@ class AirSyncService : Service() {
         val isAuto = WebSocketUtil.isAutoReconnecting()
         val isConnecting = WebSocketUtil.isConnecting()
 
-        val dataStoreManager = DataStoreManager.getInstance(applicationContext)
-        val lastDevice = runBlocking { dataStoreManager.getLastConnectedDevice().first() }
+        val lastDevice = cachedLastDevice
         val macStatus = MacDeviceStatusManager.macDeviceStatus.value
 
         if (isConnected && lastDevice != null) {
@@ -423,21 +435,36 @@ class AirSyncService : Service() {
         fun isRunning(): Boolean = serviceInstance != null
 
         fun startScanning(context: Context) {
-            val intent = Intent(context, AirSyncService::class.java).apply {
-                action = ACTION_START_SCANNING
+            runBlocking {
+                val dataStoreManager = DataStoreManager.getInstance(context)
+                if (dataStoreManager.isAppPaused().first()) {
+                    Log.d(TAG, "App is paused, ignoring startScanning")
+                    return@runBlocking
+                }
+                val intent = Intent(context, AirSyncService::class.java).apply {
+                    action = ACTION_START_SCANNING
+                }
+                startAction(context, intent)
             }
-            startAction(context, intent)
         }
 
         fun start(context: Context, deviceName: String?) {
-            val intent = Intent(context, AirSyncService::class.java).apply {
-                action = ACTION_START_SYNC
-                putExtra(EXTRA_DEVICE_NAME, deviceName)
+            runBlocking {
+                val dataStoreManager = DataStoreManager.getInstance(context)
+                if (dataStoreManager.isAppPaused().first()) {
+                    Log.d(TAG, "App is paused, ignoring start")
+                    return@runBlocking
+                }
+                val intent = Intent(context, AirSyncService::class.java).apply {
+                    action = ACTION_START_SYNC
+                    putExtra(EXTRA_DEVICE_NAME, deviceName)
+                }
+                startAction(context, intent)
             }
-            startAction(context, intent)
         }
 
         fun notifyAppForeground(context: Context) {
+            if (!isRunning()) return
             val intent = Intent(context, AirSyncService::class.java).apply {
                 action = ACTION_APP_FOREGROUND
             }
@@ -445,6 +472,7 @@ class AirSyncService : Service() {
         }
 
         fun notifyAppBackground(context: Context) {
+            if (!isRunning()) return
             val intent = Intent(context, AirSyncService::class.java).apply {
                 action = ACTION_APP_BACKGROUND
             }

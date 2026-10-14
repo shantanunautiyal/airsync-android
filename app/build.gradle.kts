@@ -15,25 +15,24 @@ android {
     defaultConfig {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
-        versionCode = 29
-        versionName = "4.0.0"
+        versionCode = 32
+        versionName = "4.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
 //        optimized dev build
-//          debug {
-//             isMinifyEnabled = true
-//             isShrinkResources = true
-//             isDebuggable = false
-//
-//             proguardFiles(
-//                 getDefaultProguardFile("proguard-android-optimize.txt"),
-//                 "proguard-rules.pro"
-//             )
-//          }
-// end
+//           debug {
+//              isMinifyEnabled = true
+//              isShrinkResources = true
+//              isDebuggable = false
+//              proguardFiles(
+//                  getDefaultProguardFile("proguard-android-optimize.txt"),
+//                  "proguard-rules.pro"
+//              )
+//           }
+//        end
 
         release {
             isMinifyEnabled = true
@@ -68,6 +67,7 @@ android {
 
 
 dependencies {
+    implementation(libs.exceptionreport)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -90,6 +90,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha10")
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
 
     // DataStore for state persistence
     implementation(libs.androidx.datastore.preferences)
@@ -148,7 +149,6 @@ dependencies {
     // Google Play Review
     implementation(libs.play.review)
     implementation(libs.play.review.ktx)
-    implementation(libs.sentry.android)
 
     // Coil for image and GIF loading
     implementation("io.coil-kt:coil-compose:2.6.0")

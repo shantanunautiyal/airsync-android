@@ -27,6 +27,9 @@ interface AirSyncRepository {
     suspend fun setDeveloperMode(enabled: Boolean)
     fun getDeveloperMode(): Flow<Boolean>
 
+    suspend fun setDeveloperModeVisible(visible: Boolean)
+    fun getDeveloperModeVisible(): Flow<Boolean>
+
     suspend fun saveLastConnectedDevice(device: ConnectedDevice)
     fun getLastConnectedDevice(): Flow<ConnectedDevice?>
 
@@ -73,6 +76,9 @@ interface AirSyncRepository {
     suspend fun setSendNowPlayingEnabled(enabled: Boolean)
     fun getSendNowPlayingEnabled(): Flow<Boolean>
 
+    suspend fun setExcludedMediaPackages(packages: Set<String>)
+    fun getExcludedMediaPackages(): Flow<Set<String>>
+
     // Keep previous link settings
     suspend fun setKeepPreviousLinkEnabled(enabled: Boolean)
     fun getKeepPreviousLinkEnabled(): Flow<Boolean>
@@ -84,6 +90,10 @@ interface AirSyncRepository {
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
     fun getUserManuallyDisconnected(): Flow<Boolean>
+
+    // App paused mode
+    suspend fun setAppPaused(paused: Boolean)
+    fun isAppPaused(): Flow<Boolean>
 
     // Mac Media controls
     suspend fun setMacMediaControlsEnabled(enabled: Boolean)
@@ -97,13 +107,15 @@ interface AirSyncRepository {
     suspend fun setPitchBlackThemeEnabled(enabled: Boolean)
     fun getPitchBlackThemeEnabled(): Flow<Boolean>
 
+    // Ripple animation settings
+    suspend fun setUseRippleEnabled(enabled: Boolean)
+    fun getUseRippleEnabled(): Flow<Boolean>
+
     // Default tab settings
     suspend fun setDefaultTab(tab: String)
     fun getDefaultTab(): Flow<String>
 
-    // Sentry reporting settings
-    suspend fun setSentryReportingEnabled(enabled: Boolean)
-    fun getSentryReportingEnabled(): Flow<Boolean>
+
 
     // Widget specific settings
     suspend fun setWidgetTransparency(alpha: Float)
@@ -136,4 +148,7 @@ interface AirSyncRepository {
     // File Access (WebDAV Server)
     suspend fun setFileAccessEnabled(enabled: Boolean)
     fun isFileAccessEnabled(): Flow<Boolean>
+
+    suspend fun setNotifyOnCrashEnabled(enabled: Boolean)
+    fun getNotifyOnCrashEnabled(): Flow<Boolean>
 }
