@@ -41,12 +41,6 @@ object PermissionUtil {
         }
     }
 
-    fun openAccessibilitySettings(context: Context) {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        context.startActivity(intent)
-    }
 
     /**
      * Check if the app is whitelisted from battery optimization
