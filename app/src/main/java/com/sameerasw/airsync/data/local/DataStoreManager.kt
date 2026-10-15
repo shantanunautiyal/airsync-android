@@ -59,6 +59,7 @@ class DataStoreManager(private val context: Context) {
 
         // Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
+        private val CONTINUE_BROWSING_DOMAIN_FILTER = stringPreferencesKey("continue_browsing_domain_filter")
 
         // Send now playing toggle
         private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
@@ -242,6 +243,18 @@ class DataStoreManager(private val context: Context) {
     fun getContinueBrowsingEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { preferences ->
             preferences[CONTINUE_BROWSING_ENABLED] != false // Default to enabled
+        }
+    }
+
+    suspend fun setContinueBrowsingDomainFilter(filter: String) {
+        context.dataStore.edit { preferences ->
+            preferences[CONTINUE_BROWSING_DOMAIN_FILTER] = filter
+        }
+    }
+
+    fun getContinueBrowsingDomainFilter(): Flow<String> {
+        return context.dataStore.data.map { preferences ->
+            preferences[CONTINUE_BROWSING_DOMAIN_FILTER] ?: ""
         }
     }
 

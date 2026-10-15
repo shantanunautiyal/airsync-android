@@ -110,6 +110,9 @@ object WebSocketMessageHandler {
                 // Call Audio
                 "callAudioControl" -> handleCallAudioControl(context, data)
                 "callMicAudio" -> handleCallMicAudio(context, data)
+                // Asset cache: Mac requests specific icons after receiving manifest
+                "requestIcons" -> handleRequestIcons(context, data)
+
                 "mirrorRequest" -> {
                     // Extract mirror mode and package name
                     val mode = data?.optString("mode", "device") ?: "device"
@@ -155,9 +158,18 @@ object WebSocketMessageHandler {
                         "app" -> {
                             if (packageName.isNotEmpty()) {
                                 Log.d(TAG, "📱 App-specific mirror request: package=$packageName, autoApprove=$autoApprove")
-                                Log.d(TAG, "ℹ️ Note: Mirroring current screen (not launching app)")
-                                // Just start mirroring - don't launch the app
-                                // User should already have the app open or will open it manually
+                                try {
+                                    val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+                                    if (launchIntent != null) {
+                                        launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        context.startActivity(launchIntent)
+                                        Log.d(TAG, "🚀 Successfully launched $packageName for mirror session")
+                                    } else {
+                                        Log.w(TAG, "No launch intent found for $packageName")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed to launch $packageName", e)
+                                }
                                 MirrorRequestHelper.handleMirrorRequest(context, mirroringOptions, autoApprove)
                             } else {
                                 Log.w(TAG, "⚠️ App mirror requested but no package name provided")
@@ -441,6 +453,34 @@ object WebSocketMessageHandler {
             Log.d(TAG, "Nav action '$action': ${if (success) "success" else "failed"}")
         } catch (e: Exception) {
             Log.e(TAG, "Error handling nav action: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Handle "requestIcons" from Mac.
+     * Mac sends a list of package names for which it needs icon data
+     * (after comparing hashes from our appIconManifest).
+     *
+     * Expected data format: { "packages": ["com.example.app1", "com.example.app2", ...] }
+     */
+    private fun handleRequestIcons(context: Context, data: JSONObject?) {
+        try {
+            if (data == null) return
+            val packagesArray = data.optJSONArray("packages")
+            if (packagesArray == null) {
+                Log.w(TAG, "requestIcons: missing 'packages' array")
+                return
+            }
+
+            val packages = mutableListOf<String>()
+            for (i in 0 until packagesArray.length()) {
+                packages.add(packagesArray.getString(i))
+            }
+
+            Log.d(TAG, "📦 Mac requested ${packages.size} icons via asset cache protocol")
+            SyncManager.handleRequestedIcons(context, packages)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling requestIcons: ${e.message}", e)
         }
     }
 
@@ -2025,24 +2065,28 @@ object WebSocketMessageHandler {
                     return@launch
                 }
 
-                // Get requested date from Mac, default to today
+                // Get requested date and optional dateString from Mac
                 val requestedDate = data?.optLong("date", System.currentTimeMillis()) 
                     ?: System.currentTimeMillis()
+                val dateString = data?.optString("dateString")?.takeIf { it.isNotBlank() }
+                val forceRefresh = data?.optBoolean("forceRefresh", false) ?: false
                 
-                Log.d(TAG, "Requesting health summary for date: $requestedDate")
+                Log.d(TAG, "Requesting health summary for date: $requestedDate (dateString=$dateString, forceRefresh=$forceRefresh)")
 
-                // Use cache to reduce Health Connect queries
+                // Use local cache with dateString to avoid querying Health Connect repeatedly
                 val summary = com.sameerasw.airsync.health.HealthDataCache.getSummaryWithCache(
                     context,
-                    requestedDate
-                ) { date ->
-                    HealthConnectUtil.getSummaryForDate(context, date)
+                    requestedDate,
+                    dateString,
+                    forceRefresh
+                ) { date, dStr ->
+                    HealthConnectUtil.getSummaryForDate(context, date, dStr)
                 }
                 
                 if (summary != null) {
                     val json = JsonUtil.createHealthSummaryJson(summary)
                     WebSocketUtil.sendMessage(json)
-                    Log.d(TAG, "Sent health summary for date: $requestedDate")
+                    Log.d(TAG, "Sent health summary for date: $requestedDate (${summary.dateString})")
                 } else {
                     Log.w(TAG, "Failed to get health summary for date: $requestedDate")
                 }
@@ -2069,9 +2113,20 @@ object WebSocketMessageHandler {
                 val healthData = HealthConnectUtil.getRecentHealthData(context, hours)
                 
                 if (healthData.isNotEmpty()) {
-                    val json = JsonUtil.createHealthDataJson(healthData)
-                    WebSocketUtil.sendMessage(json)
-                    Log.d(TAG, "Sent ${healthData.size} health data records")
+                    // Batch health data to prevent websocket frame overflow and disconnection
+                    // Send in chunks of 100 with small delay between batches
+                    val chunkSize = 100
+                    val chunks = healthData.chunked(chunkSize)
+                    Log.d(TAG, "Streaming ${healthData.size} health data records in ${chunks.size} chunks")
+                    
+                    for ((index, chunk) in chunks.withIndex()) {
+                        val json = JsonUtil.createHealthDataJson(chunk)
+                        WebSocketUtil.sendMessage(json)
+                        if (index < chunks.size - 1) {
+                            delay(50) // Throttle to prevent saturating websocket
+                        }
+                    }
+                    Log.d(TAG, "Finished sending all health data chunks")
                 } else {
                     Log.w(TAG, "No health data available")
                 }

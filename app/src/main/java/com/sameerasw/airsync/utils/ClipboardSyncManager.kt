@@ -167,13 +167,26 @@ object ClipboardSyncManager {
                 } catch (_: Exception) {
                     true
                 }
-                val keepPrevious = try {
-                    dataStoreManager.getKeepPreviousLinkEnabled().first()
+                val domainFilter = try {
+                    dataStoreManager.getContinueBrowsingDomainFilter().first()
                 } catch (_: Exception) {
-                    true
+                    ""
                 }
-                if (continueEnabled && WebSocketUtil.isConnected() && isLinkOnly(text)) {
-                    NotificationUtil.showContinueBrowsingLink(context, text.trim(), keepPrevious)
+                val trimmedText = text.trim()
+                val isAllowedDomain = if (domainFilter.isBlank()) {
+                    true
+                } else {
+                    val host = try {
+                        android.net.Uri.parse(trimmedText).host?.lowercase() ?: ""
+                    } catch (_: Exception) {
+                        ""
+                    }
+                    val allowed = domainFilter.split(",", "\n", ";").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+                    allowed.isEmpty() || allowed.any { domain -> host == domain || host.endsWith(".$domain") }
+                }
+
+                if (continueEnabled && WebSocketUtil.isConnected() && isLinkOnly(text) && isAllowedDomain) {
+                    NotificationUtil.showContinueBrowsingLink(context, trimmedText)
                 }
             }
         } catch (e: Exception) {

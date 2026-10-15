@@ -97,8 +97,6 @@ object ShortcutUtil {
                     .build()
             )
         } else {
-            buildShareMacShortcut(context)?.let { shortcuts.add(it) }
-
             // 1. Remote (Direct to Remote tab)
             // Use MainActivity with a specific action
             shortcuts.add(
@@ -162,6 +160,11 @@ object ShortcutUtil {
                     })
                     .build()
             )
+        }
+
+        // Include Direct Share target shortcut if a paired device exists
+        buildShareMacShortcut(context)?.let {
+            shortcuts.add(it)
         }
 
         // Set dynamic shortcuts (replaces existing ones)

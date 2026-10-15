@@ -250,18 +250,7 @@ object PermissionUtil {
      * Get permissions that are critical for app functionality
      */
     fun getCriticalMissingPermissions(context: Context): List<String> {
-        val critical = mutableListOf<String>()
-
-        // Notification listener is critical for the app's main functionality
-        if (!isNotificationListenerEnabled(context)) {
-            critical.add("Notification Access")
-        }
-
-        if (!isLocationPermissionGranted(context)) {
-            critical.add("Location Access")
-        }
-
-        return critical
+        return emptyList()
     }
 
     /**
@@ -269,6 +258,15 @@ object PermissionUtil {
      */
     fun getOptionalMissingPermissions(context: Context): List<String> {
         val optional = mutableListOf<String>()
+
+        // Notification listener is recommended for notification sync
+        if (!isNotificationListenerEnabled(context)) {
+            optional.add("Notification Access")
+        }
+
+        if (!isLocationPermissionGranted(context)) {
+            optional.add("Location Access")
+        }
 
         // POST_NOTIFICATIONS is recommended but not critical
         if (isNotificationPermissionRequired() && !isPostNotificationPermissionGranted(context)) {

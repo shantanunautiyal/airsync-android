@@ -18,7 +18,7 @@ import java.time.ZoneId
 object HealthDataCache {
     private const val TAG = "HealthDataCache"
     private const val CACHE_DIR = "health_cache"
-    private const val CACHE_EXPIRY_DAYS = 30 // Keep data for 30 days
+    private const val CACHE_EXPIRY_DAYS = 730 // Keep historical health data for 2 years
     
     private fun getCacheDir(context: Context): File {
         val dir = File(context.filesDir, CACHE_DIR)
@@ -28,11 +28,16 @@ object HealthDataCache {
         return dir
     }
     
-    private fun getCacheFile(context: Context, date: Long): File {
-        val localDate = Instant.ofEpochMilli(date)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-        return File(getCacheDir(context), "health_${localDate}.json")
+    private fun getCacheFile(context: Context, date: Long, dateString: String? = null): File {
+        val fileName = if (!dateString.isNullOrBlank()) {
+            "health_${dateString}.json"
+        } else {
+            val localDate = Instant.ofEpochMilli(date)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+            "health_${localDate}.json"
+        }
+        return File(getCacheDir(context), fileName)
     }
     
     /**
@@ -40,9 +45,10 @@ object HealthDataCache {
      */
     suspend fun saveSummary(context: Context, summary: HealthSummary) = withContext(Dispatchers.IO) {
         try {
-            val file = getCacheFile(context, summary.date)
+            val file = getCacheFile(context, summary.date, summary.dateString)
             val json = JSONObject().apply {
                 put("date", summary.date)
+                put("dateString", summary.dateString ?: "")
                 put("steps", summary.steps)
                 put("distance", summary.distance)
                 put("calories", summary.calories)
@@ -64,7 +70,7 @@ object HealthDataCache {
                 put("cachedAt", System.currentTimeMillis())
             }
             file.writeText(json.toString())
-            Log.d(TAG, "Cached health data for date: ${summary.date}")
+            Log.d(TAG, "Cached health data for date: ${summary.date} (${summary.dateString})")
         } catch (e: Exception) {
             Log.e(TAG, "Error saving health cache", e)
         }
@@ -74,9 +80,9 @@ object HealthDataCache {
      * Load health summary from cache
      * Returns null if not cached, cache is stale, or data is corrupted
      */
-    suspend fun loadSummary(context: Context, date: Long): HealthSummary? = withContext(Dispatchers.IO) {
+    suspend fun loadSummary(context: Context, date: Long, dateString: String? = null): HealthSummary? = withContext(Dispatchers.IO) {
         try {
-            val file = getCacheFile(context, date)
+            val file = getCacheFile(context, date, dateString)
             if (!file.exists()) {
                 return@withContext null
             }
@@ -98,10 +104,17 @@ object HealthDataCache {
             
             val cachedAt = json.optLong("cachedAt", 0)
             
-            // Check if cache is stale (older than 1 hour for today, otherwise keep indefinitely)
-            val isToday = isToday(date)
-            if (isToday && System.currentTimeMillis() - cachedAt > 3600_000) {
-                Log.d(TAG, "Cache stale for today's date")
+            // Check if cache is stale:
+            // Past dates are immutable and NEVER expire from cache!
+            // Today's date expires after 5 minutes so fresh steps/vitals can load.
+            val todayString = LocalDate.now().toString()
+            val isToday = if (!dateString.isNullOrBlank()) {
+                dateString == todayString
+            } else {
+                isToday(date)
+            }
+            if (isToday && System.currentTimeMillis() - cachedAt > 300_000) {
+                Log.d(TAG, "Cache expired for today's health data")
                 return@withContext null
             }
             
@@ -125,6 +138,8 @@ object HealthDataCache {
             fun getOptionalDouble(key: String): Double? = 
                 if (json.isNull(key) || !json.has(key)) null else json.optDouble(key)
             
+            val cachedDateString = json.optString("dateString").ifEmpty { dateString }
+
             HealthSummary(
                 date = cachedDate,
                 steps = getOptionalInt("steps"),
@@ -144,7 +159,8 @@ object HealthDataCache {
                 vo2Max = getOptionalDouble("vo2Max"),
                 bodyTemperature = getOptionalDouble("bodyTemperature"),
                 bloodGlucose = getOptionalDouble("bloodGlucose"),
-                hydration = getOptionalDouble("hydration")
+                hydration = getOptionalDouble("hydration"),
+                dateString = cachedDateString
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error loading health cache", e)
@@ -158,25 +174,25 @@ object HealthDataCache {
     suspend fun getSummaryWithCache(
         context: Context,
         date: Long,
-        fetchFromHealthConnect: suspend (Long) -> HealthSummary?
+        dateString: String? = null,
+        forceRefresh: Boolean = false,
+        fetchFromHealthConnect: suspend (Long, String?) -> HealthSummary?
     ): HealthSummary? {
-        // Try cache first
-        val cached = loadSummary(context, date)
-        if (cached != null) {
-            Log.d(TAG, "Using cached health data for date: $date")
-            return cached
+        // Try cache first if not force refreshed
+        if (!forceRefresh) {
+            val cached = loadSummary(context, date, dateString)
+            if (cached != null) {
+                Log.d(TAG, "Using cached health data for date: $date (${dateString})")
+                return cached
+            }
         }
         
         // Fetch from Health Connect
-        Log.d(TAG, "Fetching fresh health data for date: $date")
-        val fresh = fetchFromHealthConnect(date)
-        
-        // Cache the result
-        if (fresh != null) {
-            saveSummary(context, fresh)
+        val summary = fetchFromHealthConnect(date, dateString)
+        if (summary != null) {
+            saveSummary(context, summary)
         }
-        
-        return fresh
+        return summary
     }
     
     /**

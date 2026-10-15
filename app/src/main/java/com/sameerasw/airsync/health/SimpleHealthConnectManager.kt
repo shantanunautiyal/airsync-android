@@ -57,7 +57,9 @@ class SimpleHealthConnectManager(private val context: Context) {
             HealthPermission.getReadPermission(Vo2MaxRecord::class),
             HealthPermission.getReadPermission(BodyTemperatureRecord::class),
             HealthPermission.getReadPermission(BloodGlucoseRecord::class),
-            HealthPermission.getReadPermission(HydrationRecord::class)
+            HealthPermission.getReadPermission(HydrationRecord::class),
+            "android.permission.health.READ_HEALTH_DATA_HISTORY",
+            "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
         )
     }
     
@@ -293,13 +295,37 @@ class SimpleHealthConnectManager(private val context: Context) {
     private suspend fun getSteps(start: Instant, end: Instant): Long {
         return try {
             Log.d(TAG, "Querying steps from $start to $end")
-            val response = healthConnectClient.aggregate(
-                AggregateRequest(
-                    metrics = setOf(StepsRecord.COUNT_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
+            var steps = 0L
+            try {
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(StepsRecord.COUNT_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                    )
                 )
-            )
-            val steps = response[StepsRecord.COUNT_TOTAL] ?: 0L
+                steps = response[StepsRecord.COUNT_TOTAL] ?: 0L
+            } catch (e: Exception) {
+                Log.w(TAG, "Steps aggregate failed, falling back to raw records: ${e.message}")
+            }
+
+            // Fallback to raw records if aggregate is 0 (common for historical or third-party synced data)
+            if (steps == 0L) {
+                try {
+                    val rawResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            StepsRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(start, end)
+                        )
+                    )
+                    if (rawResponse.records.isNotEmpty()) {
+                        steps = rawResponse.records.sumOf { it.count }
+                        Log.d(TAG, "Raw steps fallback result: $steps")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading raw steps: ${e.message}", e)
+                }
+            }
+
             Log.d(TAG, "Steps result: $steps")
             steps
         } catch (e: Exception) {
@@ -393,13 +419,36 @@ class SimpleHealthConnectManager(private val context: Context) {
     
     private suspend fun getDistance(start: Instant, end: Instant): Double {
         return try {
-            val response = healthConnectClient.aggregate(
-                AggregateRequest(
-                    metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
+            var km = 0.0
+            try {
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                    )
                 )
-            )
-            response[DistanceRecord.DISTANCE_TOTAL]?.inKilometers ?: 0.0
+                km = response[DistanceRecord.DISTANCE_TOTAL]?.inKilometers ?: 0.0
+            } catch (e: Exception) {
+                Log.w(TAG, "Distance aggregate failed: ${e.message}")
+            }
+
+            if (km == 0.0) {
+                try {
+                    val rawResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            DistanceRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(start, end)
+                        )
+                    )
+                    if (rawResponse.records.isNotEmpty()) {
+                        val totalMeters = rawResponse.records.sumOf { it.distance.inMeters }
+                        km = totalMeters / 1000.0
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading raw distance", e)
+                }
+            }
+            km
         } catch (e: Exception) {
             Log.e(TAG, "Error getting distance", e)
             0.0
@@ -423,14 +472,39 @@ class SimpleHealthConnectManager(private val context: Context) {
     
     private suspend fun getSleep(start: Instant, end: Instant): Double {
         return try {
-            val response = healthConnectClient.aggregate(
-                AggregateRequest(
-                    metrics = setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
+            var hours = 0.0
+            try {
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                    )
                 )
-            )
-            val duration = response[SleepSessionRecord.SLEEP_DURATION_TOTAL]
-            duration?.toHours()?.toDouble() ?: 0.0
+                val duration = response[SleepSessionRecord.SLEEP_DURATION_TOTAL]
+                hours = duration?.toMinutes()?.toDouble()?.div(60.0) ?: 0.0
+            } catch (e: Exception) {
+                Log.w(TAG, "Sleep aggregate failed: ${e.message}")
+            }
+
+            if (hours == 0.0) {
+                try {
+                    val rawResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            SleepSessionRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(start, end)
+                        )
+                    )
+                    if (rawResponse.records.isNotEmpty()) {
+                        val totalMinutes = rawResponse.records.sumOf { session ->
+                            java.time.Duration.between(session.startTime, session.endTime).toMinutes()
+                        }
+                        hours = totalMinutes / 60.0
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading raw sleep records", e)
+                }
+            }
+            hours
         } catch (e: Exception) {
             Log.e(TAG, "Error getting sleep", e)
             0.0
@@ -439,14 +513,38 @@ class SimpleHealthConnectManager(private val context: Context) {
     
     private suspend fun getActiveMinutes(start: Instant, end: Instant): Long {
         return try {
-            val response = healthConnectClient.aggregate(
-                AggregateRequest(
-                    metrics = setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
+            var minutes = 0L
+            try {
+                val response = healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                    )
                 )
-            )
-            val duration = response[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL]
-            duration?.toMinutes() ?: 0L
+                val duration = response[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL]
+                minutes = duration?.toMinutes() ?: 0L
+            } catch (e: Exception) {
+                Log.w(TAG, "Exercise duration aggregate failed: ${e.message}")
+            }
+
+            if (minutes == 0L) {
+                try {
+                    val rawResponse = healthConnectClient.readRecords(
+                        ReadRecordsRequest(
+                            ExerciseSessionRecord::class,
+                            timeRangeFilter = TimeRangeFilter.between(start, end)
+                        )
+                    )
+                    if (rawResponse.records.isNotEmpty()) {
+                        minutes = rawResponse.records.sumOf { session ->
+                            java.time.Duration.between(session.startTime, session.endTime).toMinutes()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reading raw exercise records", e)
+                }
+            }
+            minutes
         } catch (e: Exception) {
             Log.e(TAG, "Error getting active minutes", e)
             0L

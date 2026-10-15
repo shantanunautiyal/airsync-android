@@ -104,6 +104,10 @@ class MacMediaPlayerService : Service() {
 
     private var mediaSession: MediaSessionCompat? = null
     private var currentAlbumArt: Bitmap? = null
+    private var lastNotifiedTitle: String? = null
+    private var lastNotifiedArtist: String? = null
+    private var lastNotifiedIsPlaying: Boolean? = null
+    private var lastNotifiedAlbumArt: Bitmap? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -268,6 +272,11 @@ class MacMediaPlayerService : Service() {
             updatePlaybackState(isPlaying, elapsedTime, timestamp, playbackRate)
             mediaSession?.isActive = true
 
+            lastNotifiedTitle = title
+            lastNotifiedArtist = artist
+            lastNotifiedIsPlaying = isPlaying
+            lastNotifiedAlbumArt = currentAlbumArt
+
             val notification = createMediaNotification(title, artist, isPlaying)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
@@ -298,11 +307,25 @@ class MacMediaPlayerService : Service() {
             updateMediaMetadata(title, artist, duration)
             updatePlaybackState(isPlaying, elapsedTime, timestamp, playbackRate)
 
-            val notification = createMediaNotification(title, artist, isPlaying)
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.notify(NOTIFICATION_ID, notification)
+            // Issue #156 fix: Only update system notification when visible UI attributes change!
+            // Extrapolating playback position does NOT require posting a new system notification,
+            // which was triggering 2,000+ wakeups and preventing deep sleep.
+            val notificationNeedsUpdate = title != lastNotifiedTitle ||
+                    artist != lastNotifiedArtist ||
+                    isPlaying != lastNotifiedIsPlaying ||
+                    currentAlbumArt != lastNotifiedAlbumArt
 
-            Log.d(TAG, "Mac media session updated")
+            if (notificationNeedsUpdate) {
+                lastNotifiedTitle = title
+                lastNotifiedArtist = artist
+                lastNotifiedIsPlaying = isPlaying
+                lastNotifiedAlbumArt = currentAlbumArt
+
+                val notification = createMediaNotification(title, artist, isPlaying)
+                val notificationManager = getSystemService(NotificationManager::class.java)
+                notificationManager.notify(NOTIFICATION_ID, notification)
+                Log.d(TAG, "Mac media session notification updated")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error updating Mac media session: ${e.message}")
         }
@@ -430,6 +453,10 @@ class MacMediaPlayerService : Service() {
         try {
             mediaSession?.release()
             mediaSession = null
+            lastNotifiedTitle = null
+            lastNotifiedArtist = null
+            lastNotifiedIsPlaying = null
+            lastNotifiedAlbumArt = null
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             Log.d(TAG, "Mac media session stopped")

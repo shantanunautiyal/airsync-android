@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -195,9 +197,10 @@ fun KeyboardInputSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp)
                 .navigationBarsPadding()
                 .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 12.dp)
         ) {
             // Shared rows visible in both modes
             NavigationRow(
@@ -339,7 +342,7 @@ private fun CustomKeyboard(
         ButtonGroup(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .height(46.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             content = {
@@ -380,7 +383,7 @@ private fun CustomKeyboard(
         ButtonGroup(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .height(48.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             content = {
@@ -427,7 +430,7 @@ private fun CustomKeyboard(
         ButtonGroup(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .height(48.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             content = {
@@ -476,7 +479,7 @@ private fun CustomKeyboard(
         ButtonGroup(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .height(48.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             content = {
@@ -502,7 +505,7 @@ private fun CustomKeyboard(
                                 interactionSource = shiftInteraction,
                                 indication = null
                             )
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(
                                 if (shiftState != ShiftState.OFF) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.surfaceTint
@@ -598,7 +601,7 @@ private fun CustomKeyboard(
                                 }
                             )
                         }
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceTint),
                     contentAlignment = Alignment.Center
                 ) {
@@ -616,7 +619,7 @@ private fun CustomKeyboard(
         ButtonGroup(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
+                .height(48.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             content = {
@@ -703,7 +706,7 @@ private fun CustomKeyboard(
                                 }
                             )
                         }
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
@@ -780,7 +783,7 @@ private fun NavigationRow(
     ButtonGroup(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(44.dp)
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         content = {
@@ -874,7 +877,7 @@ private fun ModifierRow(
     ButtonGroup(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(44.dp)
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         content = {
@@ -917,7 +920,7 @@ private fun ModifierRow(
                         .weight(1f)
                         .fillMaxHeight()
                         .animateWidth(interaction)
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(
                             if (status.active) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.surfaceContainerLow

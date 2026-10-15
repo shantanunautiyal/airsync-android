@@ -537,9 +537,10 @@ private fun DateChipRow(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = when (selectedDate) {
-                    LocalDate.now() -> "Today"
-                    LocalDate.now().minusDays(1) -> "Yesterday"
+                text = when {
+                    selectedDate == LocalDate.now() -> "Today"
+                    selectedDate == LocalDate.now().minusDays(1) -> "Yesterday"
+                    selectedDate.year != LocalDate.now().year -> selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM dd, yyyy"))
                     else -> selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM dd"))
                 },
                 style = MaterialTheme.typography.titleMedium,
@@ -649,7 +650,7 @@ private fun DatePickerDialog(
     onDismiss: () -> Unit
 ) {
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = selectedDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        initialSelectedDateMillis = selectedDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
     )
 
     androidx.compose.material3.DatePickerDialog(
@@ -657,9 +658,10 @@ private fun DatePickerDialog(
         confirmButton = {
             TextButton(onClick = {
                 datePickerState.selectedDateMillis?.let { millis ->
-                    val date = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                    val date = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneOffset.UTC).toLocalDate()
                     onDateSelected(date)
                 }
+                onDismiss()
             }) { Text("OK") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }

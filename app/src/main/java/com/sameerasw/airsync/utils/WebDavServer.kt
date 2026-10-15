@@ -16,6 +16,7 @@ import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.path
+import io.ktor.server.request.receiveStream
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
@@ -27,6 +28,7 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import java.io.File
 import java.net.ServerSocket
+import java.net.URI
 import java.net.URLDecoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -66,12 +68,37 @@ class WebDavServer(private val context: Context) {
                         method(HttpMethod.parse("PROPFIND")) {
                             handle { handlePropfind(call) }
                         }
+                        method(HttpMethod.parse("PROPPATCH")) {
+                            handle { handleProppatch(call) }
+                        }
+                        method(HttpMethod.parse("MKCOL")) {
+                            handle { handleMkcol(call) }
+                        }
+                        method(HttpMethod.parse("LOCK")) {
+                            handle { handleLock(call) }
+                        }
+                        method(HttpMethod.parse("UNLOCK")) {
+                            handle { handleUnlock(call) }
+                        }
+                        method(HttpMethod.parse("MOVE")) {
+                            handle { handleMove(call) }
+                        }
+                        method(HttpMethod.parse("COPY")) {
+                            handle { handleCopy(call) }
+                        }
+                        method(HttpMethod.Put) {
+                            handle { handlePut(call) }
+                        }
+                        method(HttpMethod.Delete) {
+                            handle { handleDelete(call) }
+                        }
                         get { handleGet(call) }
                         head { handleHead(call) }
                         method(HttpMethod.Options) {
                             handle {
-                                call.response.header("Allow", "GET, HEAD, OPTIONS, PROPFIND")
+                                call.response.header("Allow", "GET, HEAD, OPTIONS, PROPFIND, PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH, LOCK, UNLOCK")
                                 call.response.header("DAV", "1, 2")
+                                call.response.header("MS-Author-Via", "DAV")
                                 call.respond(HttpStatusCode.OK)
                             }
                         }
@@ -244,5 +271,173 @@ class WebDavServer(private val context: Context) {
             rfc1123Format.format(Date(file.lastModified()))
         )
         call.respond(HttpStatusCode.OK)
+    }
+
+    private suspend fun handlePut(call: ApplicationCall) {
+        val relativePath = resolveRequestPath(call)
+        val file = File(storageRoot, relativePath)
+
+        Log.d(TAG, "PUT: raw=${call.request.path()} -> resolved=${file.absolutePath}")
+        try {
+            file.parentFile?.mkdirs()
+            val existed = file.exists()
+            call.receiveStream().use { input ->
+                file.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            if (existed) {
+                call.respond(HttpStatusCode.NoContent)
+            } else {
+                call.respond(HttpStatusCode.Created)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling PUT for ${file.absolutePath}", e)
+            call.respond(HttpStatusCode.InternalServerError, "Error saving file: ${e.message}")
+        }
+    }
+
+    private suspend fun handleMkcol(call: ApplicationCall) {
+        val relativePath = resolveRequestPath(call)
+        val file = File(storageRoot, relativePath)
+
+        Log.d(TAG, "MKCOL: raw=${call.request.path()} -> resolved=${file.absolutePath}")
+        if (file.exists()) {
+            call.respond(HttpStatusCode.MethodNotAllowed, "Resource already exists")
+            return
+        }
+
+        val parent = file.parentFile
+        if (parent != null && !parent.exists()) {
+            call.respond(HttpStatusCode.Conflict, "Parent collection does not exist")
+            return
+        }
+
+        if (file.mkdir()) {
+            call.respond(HttpStatusCode.Created)
+        } else {
+            call.respond(HttpStatusCode.InternalServerError, "Failed to create collection")
+        }
+    }
+
+    private suspend fun handleDelete(call: ApplicationCall) {
+        val relativePath = resolveRequestPath(call)
+        val file = File(storageRoot, relativePath)
+
+        Log.d(TAG, "DELETE: raw=${call.request.path()} -> resolved=${file.absolutePath}")
+        if (!file.exists()) {
+            call.respond(HttpStatusCode.NotFound)
+            return
+        }
+
+        val deleted = if (file.isDirectory) file.deleteRecursively() else file.delete()
+        if (deleted) {
+            call.respond(HttpStatusCode.NoContent)
+        } else {
+            call.respond(HttpStatusCode.InternalServerError, "Failed to delete resource")
+        }
+    }
+
+    private suspend fun handleMove(call: ApplicationCall) {
+        val relativePath = resolveRequestPath(call)
+        val source = File(storageRoot, relativePath)
+        val destHeader = call.request.headers["Destination"]
+
+        if (destHeader == null) {
+            call.respond(HttpStatusCode.BadRequest, "Missing Destination header")
+            return
+        }
+
+        try {
+            val destUri = URI(destHeader)
+            val destPath = URLDecoder.decode(destUri.path, "UTF-8").trimStart('/').trimEnd('/')
+            val target = File(storageRoot, destPath)
+            target.parentFile?.mkdirs()
+
+            Log.d(TAG, "MOVE: ${source.absolutePath} -> ${target.absolutePath}")
+            val success = source.renameTo(target) || (source.copyRecursively(target, overwrite = true) && source.deleteRecursively())
+            if (success) {
+                call.respond(HttpStatusCode.Created)
+            } else {
+                call.respond(HttpStatusCode.InternalServerError, "Failed to move resource")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in MOVE", e)
+            call.respond(HttpStatusCode.InternalServerError, e.message ?: "Move error")
+        }
+    }
+
+    private suspend fun handleCopy(call: ApplicationCall) {
+        val relativePath = resolveRequestPath(call)
+        val source = File(storageRoot, relativePath)
+        val destHeader = call.request.headers["Destination"]
+
+        if (destHeader == null) {
+            call.respond(HttpStatusCode.BadRequest, "Missing Destination header")
+            return
+        }
+
+        try {
+            val destUri = URI(destHeader)
+            val destPath = URLDecoder.decode(destUri.path, "UTF-8").trimStart('/').trimEnd('/')
+            val target = File(storageRoot, destPath)
+            target.parentFile?.mkdirs()
+
+            Log.d(TAG, "COPY: ${source.absolutePath} -> ${target.absolutePath}")
+            val success = source.copyRecursively(target, overwrite = true)
+            if (success) {
+                call.respond(HttpStatusCode.Created)
+            } else {
+                call.respond(HttpStatusCode.InternalServerError, "Failed to copy resource")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in COPY", e)
+            call.respond(HttpStatusCode.InternalServerError, e.message ?: "Copy error")
+        }
+    }
+
+    private suspend fun handleProppatch(call: ApplicationCall) {
+        val rawPath = call.request.path()
+        Log.d(TAG, "PROPPATCH: raw=$rawPath")
+        val xml = """
+            <?xml version="1.0" encoding="utf-8" ?>
+            <d:multistatus xmlns:d="DAV:">
+              <d:response>
+                <d:href>$rawPath</d:href>
+                <d:propstat>
+                  <d:status>HTTP/1.1 200 OK</d:status>
+                </d:propstat>
+              </d:response>
+            </d:multistatus>
+        """.trimIndent()
+        call.respondText(xml, ContentType.Text.Xml.withParameter("charset", "utf-8"), HttpStatusCode.MultiStatus)
+    }
+
+    private suspend fun handleLock(call: ApplicationCall) {
+        val rawPath = call.request.path()
+        Log.d(TAG, "LOCK: raw=$rawPath")
+        val lockToken = "urn:uuid:airsync-${System.currentTimeMillis()}"
+        call.response.header("Lock-Token", "<$lockToken>")
+        val xml = """
+            <?xml version="1.0" encoding="utf-8" ?>
+            <d:prop xmlns:d="DAV:">
+              <d:lockdiscovery>
+                <d:activelock>
+                  <d:locktype><d:write/></d:locktype>
+                  <d:lockscope><d:exclusive/></d:lockscope>
+                  <d:depth>Infinity</d:depth>
+                  <d:timeout>Second-3600</d:timeout>
+                  <d:locktoken><d:href>$lockToken</d:href></d:locktoken>
+                  <d:lockroot><d:href>$rawPath</d:href></d:lockroot>
+                </d:activelock>
+              </d:lockdiscovery>
+            </d:prop>
+        """.trimIndent()
+        call.respondText(xml, ContentType.Text.Xml.withParameter("charset", "utf-8"), HttpStatusCode.OK)
+    }
+
+    private suspend fun handleUnlock(call: ApplicationCall) {
+        Log.d(TAG, "UNLOCK: raw=${call.request.path()}")
+        call.respond(HttpStatusCode.NoContent)
     }
 }

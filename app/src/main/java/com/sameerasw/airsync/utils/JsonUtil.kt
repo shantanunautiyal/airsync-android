@@ -250,6 +250,54 @@ object JsonUtil {
     }
 
     /**
+     * Creates a JSON manifest of app icon hashes for incremental sync.
+     * Sends only package names, metadata, and hashes — no actual icon data.
+     * The Mac compares hashes and requests only changed/missing icons via "requestIcons".
+     */
+    fun createAppIconManifestJson(
+        apps: List<com.sameerasw.airsync.domain.model.NotificationApp>,
+        hashMap: Map<String, String>
+    ): String {
+        val appEntries = apps.joinToString(",") { app ->
+            val hash = hashMap[app.packageName] ?: ""
+            """
+            "${app.packageName}": {
+                "name": "${escape(app.appName)}",
+                "hash": "$hash",
+                "listening": ${app.isEnabled},
+                "systemApp": ${app.isSystemApp}
+            }
+            """.trimIndent()
+        }
+        return """{"type":"appIconManifest","data":{ $appEntries }}"""
+    }
+
+    /**
+     * Creates a JSON string containing only the requested app icons (delta sync).
+     * Used in response to a "requestIcons" message from Mac.
+     */
+    fun createAppIconsDeltaJson(
+        apps: List<com.sameerasw.airsync.domain.model.NotificationApp>,
+        iconMap: Map<String, String>
+    ): String {
+        // Only include apps that have icon data to send
+        val filteredApps = apps.filter { iconMap.containsKey(it.packageName) }
+        val appEntries = filteredApps.joinToString(",") { app ->
+            val iconData = iconMap[app.packageName] ?: ""
+            """
+            "${app.packageName}": {
+                "name": "${escape(app.appName)}",
+                "icon": "$iconData",
+                "listening": ${app.isEnabled},
+                "systemApp": ${app.isSystemApp}
+            }
+            """.trimIndent()
+        }
+        return """{"type":"appIconsDelta","data":{ $appEntries }}"""
+    }
+
+
+    /**
      * Creates a JSON string for clipboard updates
      */
     fun createClipboardUpdateJson(text: String): String {
@@ -408,8 +456,9 @@ object JsonUtil {
         val bodyTemperatureJson = summary.bodyTemperature?.let { "$it" } ?: "null"
         val bloodGlucoseJson = summary.bloodGlucose?.let { "$it" } ?: "null"
         val hydrationJson = summary.hydration?.let { "$it" } ?: "null"
+        val dateStringJson = summary.dateString?.let { "\"$it\"" } ?: "null"
         
-        return """{"type":"healthSummary","data":{"date":${summary.date},"steps":$stepsJson,"distance":$distanceJson,"calories":$caloriesJson,"activeMinutes":$activeMinutesJson,"heartRateAvg":$heartRateAvgJson,"heartRateMin":$heartRateMinJson,"heartRateMax":$heartRateMaxJson,"sleepDuration":$sleepDurationJson,"floorsClimbed":$floorsClimbedJson,"weight":$weightJson,"bloodPressureSystolic":$bloodPressureSystolicJson,"bloodPressureDiastolic":$bloodPressureDiastolicJson,"oxygenSaturation":$oxygenSaturationJson,"restingHeartRate":$restingHeartRateJson,"vo2Max":$vo2MaxJson,"bodyTemperature":$bodyTemperatureJson,"bloodGlucose":$bloodGlucoseJson,"hydration":$hydrationJson}}"""
+        return """{"type":"healthSummary","data":{"date":${summary.date},"dateString":$dateStringJson,"steps":$stepsJson,"distance":$distanceJson,"calories":$caloriesJson,"activeMinutes":$activeMinutesJson,"heartRateAvg":$heartRateAvgJson,"heartRateMin":$heartRateMinJson,"heartRateMax":$heartRateMaxJson,"sleepDuration":$sleepDurationJson,"floorsClimbed":$floorsClimbedJson,"weight":$weightJson,"bloodPressureSystolic":$bloodPressureSystolicJson,"bloodPressureDiastolic":$bloodPressureDiastolicJson,"oxygenSaturation":$oxygenSaturationJson,"restingHeartRate":$restingHeartRateJson,"vo2Max":$vo2MaxJson,"bodyTemperature":$bodyTemperatureJson,"bloodGlucose":$bloodGlucoseJson,"hydration":$hydrationJson}}"""
     }
 
     /**

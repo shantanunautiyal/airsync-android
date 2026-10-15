@@ -208,6 +208,7 @@
 
         <activity
             android:name=".presentation.ui.activities.QuickShareSendActivity"
+            android:icon="@mipmap/ic_launcher"
             android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/quick_share_send_label"

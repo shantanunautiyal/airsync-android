@@ -14,6 +14,7 @@ import com.sameerasw.airsync.models.HealthSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -37,7 +38,9 @@ object HealthConnectUtil {
         HealthPermission.getReadPermission(Vo2MaxRecord::class),
         HealthPermission.getReadPermission(BodyTemperatureRecord::class),
         HealthPermission.getReadPermission(BloodGlucoseRecord::class),
-        HealthPermission.getReadPermission(HydrationRecord::class)
+        HealthPermission.getReadPermission(HydrationRecord::class),
+        "android.permission.health.READ_HEALTH_DATA_HISTORY",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     )
 
     fun isAvailable(context: Context): Boolean {
@@ -80,16 +83,38 @@ object HealthConnectUtil {
         return withContext(Dispatchers.IO) {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
-                // Use aggregate API — it deduplicates overlapping records from
-                // multiple sources (Samsung Health, phone pedometer, watch, etc.)
-                val response = healthConnectClient.aggregate(
-                    AggregateRequest(
-                        metrics = setOf(StepsRecord.COUNT_TOTAL),
-                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                var total: Int? = null
+                try {
+                    val response = healthConnectClient.aggregate(
+                        AggregateRequest(
+                            metrics = setOf(StepsRecord.COUNT_TOTAL),
+                            timeRangeFilter = TimeRangeFilter.between(start, end)
+                        )
                     )
-                )
-                val total = response[StepsRecord.COUNT_TOTAL]?.toInt()
-                Log.d(TAG, "Steps aggregate result: $total")
+                    total = response[StepsRecord.COUNT_TOTAL]?.toInt()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Steps aggregation failed, falling back to raw records: ${e.message}")
+                }
+                
+                // Fallback to raw records if aggregate returned null or 0 (common for historical data)
+                if (total == null || total == 0) {
+                    try {
+                        val rawResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                StepsRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(start, end)
+                            )
+                        )
+                        if (rawResponse.records.isNotEmpty()) {
+                            total = rawResponse.records.sumOf { it.count.toInt() }
+                            Log.d(TAG, "Raw steps fallback result: $total")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error reading raw steps", e)
+                    }
+                }
+                
+                Log.d(TAG, "Steps final result: $total")
                 if (total != null && total > 0) total else null
             } catch (e: Exception) {
                 Log.e(TAG, "Error reading steps", e)
@@ -109,16 +134,42 @@ object HealthConnectUtil {
         return withContext(Dispatchers.IO) {
             try {
                 val healthConnectClient = HealthConnectClient.getOrCreate(context)
-                // Use aggregate API for deduplication
-                val response = healthConnectClient.aggregate(
-                    AggregateRequest(
-                        metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
-                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                var km: Double? = null
+                try {
+                    val response = healthConnectClient.aggregate(
+                        AggregateRequest(
+                            metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
+                            timeRangeFilter = TimeRangeFilter.between(start, end)
+                        )
                     )
-                )
-                val meters = response[DistanceRecord.DISTANCE_TOTAL]?.inMeters
-                val km = if (meters != null && meters > 0) meters / 1000.0 else null
-                Log.d(TAG, "Distance aggregate result: $km km")
+                    val meters = response[DistanceRecord.DISTANCE_TOTAL]?.inMeters
+                    km = if (meters != null && meters > 0) meters / 1000.0 else null
+                } catch (e: Exception) {
+                    Log.w(TAG, "Distance aggregation failed, falling back to raw records: ${e.message}")
+                }
+                
+                // Fallback to raw records if aggregate returned null
+                if (km == null || km == 0.0) {
+                    try {
+                        val rawResponse = healthConnectClient.readRecords(
+                            ReadRecordsRequest(
+                                DistanceRecord::class,
+                                timeRangeFilter = TimeRangeFilter.between(start, end)
+                            )
+                        )
+                        if (rawResponse.records.isNotEmpty()) {
+                            val totalMeters = rawResponse.records.sumOf { it.distance.inMeters }
+                            if (totalMeters > 0) {
+                                km = totalMeters / 1000.0
+                                Log.d(TAG, "Raw distance fallback result: $km km")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error reading raw distance", e)
+                    }
+                }
+                
+                Log.d(TAG, "Distance final result: $km km")
                 km
             } catch (e: Exception) {
                 Log.e(TAG, "Error reading distance", e)
@@ -322,19 +373,26 @@ object HealthConnectUtil {
      * @param date Timestamp in milliseconds for the requested date
      * @return HealthSummary with date matching the request, or null on error
      */
-    suspend fun getSummaryForDate(context: Context, date: Long): HealthSummary? {
+    suspend fun getSummaryForDate(context: Context, date: Long, dateString: String? = null): HealthSummary? {
         return withContext(Dispatchers.IO) {
             try {
-                // Convert timestamp to start/end of day
-                val localDate = Instant.ofEpochMilli(date)
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDate()
+                // If dateString is passed, parse it directly to avoid any timezone day shift
+                val localDate = if (!dateString.isNullOrBlank()) {
+                    try {
+                        LocalDate.parse(dateString)
+                    } catch (_: Exception) {
+                        Instant.ofEpochMilli(date).atZone(ZoneId.systemDefault()).toLocalDate()
+                    }
+                } else {
+                    Instant.ofEpochMilli(date).atZone(ZoneId.systemDefault()).toLocalDate()
+                }
                 
                 val startOfDay = localDate.atStartOfDay(ZoneId.systemDefault())
                 val startInstant = startOfDay.toInstant()
                 val endInstant = startOfDay.plusDays(1).toInstant()
+                val resolvedDateString = if (!dateString.isNullOrBlank()) dateString else localDate.toString()
                 
-                Log.d(TAG, "Fetching health data for date: $date (${localDate})")
+                Log.d(TAG, "Fetching health data for date: $date (${localDate}, dateString: $resolvedDateString)")
                 
                 // Get heart rate stats (min, max, avg)
                 val heartRateStats = getHeartRateStats(context, startInstant, endInstant)
@@ -366,10 +424,11 @@ object HealthConnectUtil {
                     vo2Max = getLatestVo2MaxForRange(context, startInstant, endInstant),
                     bodyTemperature = getLatestBodyTemperatureForRange(context, startInstant, endInstant),
                     bloodGlucose = getLatestBloodGlucoseForRange(context, startInstant, endInstant),
-                    hydration = getHydrationForRange(context, startInstant, endInstant)
+                    hydration = getHydrationForRange(context, startInstant, endInstant),
+                    dateString = resolvedDateString
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Error getting health summary for date $date", e)
+                Log.e(TAG, "Error getting health summary for date $date (dateString=$dateString)", e)
                 null
             }
         }

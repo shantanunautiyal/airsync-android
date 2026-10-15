@@ -1,0 +1,82 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Package Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Prepare Artifacts
+        id: prepare_artifacts
+        run: |
+          mkdir -p release-artifacts
+          APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -f "$APK_PATH" ]; then
+            VERSION_NAME=$(grep "versionName" app/build.gradle.kts | head -n 1 | awk -F'"' '{print $2}')
+            if [ -z "$VERSION_NAME" ]; then
+              VERSION_NAME="latest"
+            fi
+            RELEASE_NAME="AirSync-Android-${VERSION_NAME}-debug.apk"
+            cp "$APK_PATH" "release-artifacts/${RELEASE_NAME}"
+            echo "apk_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+            echo "apk_path=release-artifacts/${RELEASE_NAME}" >> $GITHUB_OUTPUT
+            echo "version_name=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "ERROR: APK not found"
+            exit 1
+          fi
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirSync-Android-Debug
+          path: release-artifacts/
+
+      - name: Create or Update GitHub Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}-{1}', steps.prepare_artifacts.outputs.version_name, github.run_number) }}
+          name: ${{ format('AirSync Android v{0} (Build {1})', steps.prepare_artifacts.outputs.version_name, github.run_number) }}
+          body: |
+            ## Automated AirSync Android Release
+            
+            - **Commit**: `${{ github.sha }}`
+            - **Branch**: `${{ github.ref_name }}`
+            - **Build**: `${{ github.run_number }}`
+            
+            ### Included Artifacts
+            - `${{ steps.prepare_artifacts.outputs.apk_name }}`
+          draft: false
+          prerelease: false
+          files: release-artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

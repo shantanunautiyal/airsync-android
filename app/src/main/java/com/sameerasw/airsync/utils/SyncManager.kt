@@ -335,7 +335,14 @@ object SyncManager {
 
                 // Sync health data
                 if (HealthConnectUtil.isAvailable(context) && HealthConnectUtil.hasPermissions(context)) {
-                    val summary = HealthConnectUtil.getSummaryForDate(context, System.currentTimeMillis())
+                    val summary = com.sameerasw.airsync.health.HealthDataCache.getSummaryWithCache(
+                        context,
+                        System.currentTimeMillis(),
+                        null,
+                        false
+                    ) { date, dStr ->
+                        HealthConnectUtil.getSummaryForDate(context, date, dStr)
+                    }
                     if (summary != null) {
                         val json = JsonUtil.createHealthSummaryJson(summary)
                         if (WebSocketUtil.sendMessage(json)) {
@@ -531,25 +538,51 @@ object SyncManager {
             val iconMap = AppIconUtil.getAppIconsAsBase64(context, allPackages)
 
             if (iconMap.isNotEmpty()) {
-                // Create and send app icons JSON
-                val appIconsJson = JsonUtil.createAppIconsJson(allApps, iconMap)
+                // Compute hashes and cache icon data for future delta syncs
+                val hashMap = mutableMapOf<String, String>()
+                for ((pkg, iconData) in iconMap) {
+                    val hash = AssetCacheManager.computeAndCache("icon:$pkg", iconData)
+                    hashMap[pkg] = hash
+                }
 
-                if (WebSocketUtil.sendMessage(appIconsJson)) {
-                    Log.d(
-                        TAG,
-                        "✅ App icons sent successfully (${iconMap.size} icons with full app details)"
-                    )
+                Log.d(TAG, "Computed ${hashMap.size} icon hashes. ${AssetCacheManager.getStats()}")
 
-                    // Update counter only for automatic syncs
-                    if (!isManualSync) {
-                        updateIconSyncCounter(context)
+                // Check if we have prior cached hashes (i.e., this isn't the first sync)
+                val existingManifest = AssetCacheManager.buildManifest("icon")
+                val isFirstSync = existingManifest.isEmpty() || isManualSync
+
+                if (isFirstSync) {
+                    // First sync or manual: send full icons the traditional way
+                    val appIconsJson = JsonUtil.createAppIconsJson(allApps, iconMap)
+                    if (WebSocketUtil.sendMessage(appIconsJson)) {
+                        Log.d(
+                            TAG,
+                            "✅ Full app icons sent (${iconMap.size} icons, first sync / manual)"
+                        )
+                        if (!isManualSync) {
+                            updateIconSyncCounter(context)
+                        }
+                        onResult?.invoke(true, "Successfully synced ${iconMap.size} app icons")
+                    } else {
+                        Log.e(TAG, "Failed to send app icons")
+                        onResult?.invoke(false, "Failed to send app icons")
                     }
-
-                    val message = "Successfully synced ${iconMap.size} app icons with details"
-                    onResult?.invoke(true, message)
                 } else {
-                    Log.e(TAG, "Failed to send app icons")
-                    onResult?.invoke(false, "Failed to send app icons")
+                    // Subsequent sync: send manifest (hashes only) — ~100x smaller
+                    val manifestJson = JsonUtil.createAppIconManifestJson(allApps, hashMap)
+                    if (WebSocketUtil.sendMessage(manifestJson)) {
+                        Log.d(
+                            TAG,
+                            "✅ App icon manifest sent (${hashMap.size} hashes, waiting for requestIcons)"
+                        )
+                        if (!isManualSync) {
+                            updateIconSyncCounter(context)
+                        }
+                        onResult?.invoke(true, "Sent icon manifest for ${hashMap.size} apps")
+                    } else {
+                        Log.e(TAG, "Failed to send app icon manifest")
+                        onResult?.invoke(false, "Failed to send icon manifest")
+                    }
                 }
             } else {
                 val message = "No app icons could be collected"
@@ -562,6 +595,7 @@ object SyncManager {
             onResult?.invoke(false, "Error: ${e.message}")
         }
     }
+
 
     /**
      * Send optimized app icons for a subset of packages (triggered by macInfo)
@@ -688,5 +722,93 @@ object SyncManager {
         lastAudioInfo = null
         lastBatteryInfo = null
         lastVolume = -1
+        AssetCacheManager.clearAll()
+    }
+
+    /**
+     * Handle "requestIcons" from Mac — sends only the icons for requested packages.
+     * Called when Mac has compared its local icon cache with the manifest we sent
+     * and determined which icons it's missing or have changed.
+     */
+    fun handleRequestedIcons(context: Context, requestedPackages: List<String>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!WebSocketUtil.isConnected()) {
+                    Log.w(TAG, "Not connected; cannot send requested icons")
+                    return@launch
+                }
+
+                if (requestedPackages.isEmpty()) {
+                    Log.d(TAG, "Mac has all icons cached, no delta needed 🎉")
+                    return@launch
+                }
+
+                Log.d(TAG, "📦 Mac requested ${requestedPackages.size} icons: ${requestedPackages.take(5)}...")
+
+                // First, try to serve from our local AssetCacheManager
+                val cachedIcons = AssetCacheManager.getDataForKeys("icon", requestedPackages.toSet())
+                val missingPackages = requestedPackages.filter { !cachedIcons.containsKey(it) }
+
+                // For any icons not in our cache, re-extract them
+                val freshIcons = if (missingPackages.isNotEmpty()) {
+                    Log.d(TAG, "Re-extracting ${missingPackages.size} icons not in local cache")
+                    AppIconUtil.getAppIconsAsBase64(context, missingPackages)
+                } else {
+                    emptyMap()
+                }
+
+                // Merge cached + fresh
+                val allIcons = cachedIcons.toMutableMap()
+                allIcons.putAll(freshIcons)
+
+                // Cache any freshly extracted icons
+                for ((pkg, iconData) in freshIcons) {
+                    AssetCacheManager.computeAndCache("icon:$pkg", iconData)
+                }
+
+                if (allIcons.isEmpty()) {
+                    Log.w(TAG, "No icons resolved for requested packages")
+                    return@launch
+                }
+
+                // Build app metadata for the delta response
+                val pm = context.packageManager
+                val ds = DataStoreManager(context)
+                val savedApps = ds.getNotificationApps().first()
+                val savedAppsMap = savedApps.associateBy { it.packageName }
+
+                val apps = allIcons.keys.mapNotNull { pkg ->
+                    try {
+                        val ai = pm.getApplicationInfo(pkg, 0)
+                        val appName = pm.getApplicationLabel(ai).toString()
+                        val isSystem =
+                            (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                                    (ai.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                        val isEnabled = savedAppsMap[pkg]?.isEnabled ?: true
+
+                        com.sameerasw.airsync.domain.model.NotificationApp(
+                            packageName = pkg,
+                            appName = appName,
+                            isEnabled = isEnabled,
+                            isSystemApp = isSystem,
+                            lastUpdated = System.currentTimeMillis()
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Skipping package $pkg in delta: ${e.message}")
+                        null
+                    }
+                }
+
+                // Send delta (only the requested icons)
+                val deltaJson = JsonUtil.createAppIconsDeltaJson(apps, allIcons)
+                if (WebSocketUtil.sendMessage(deltaJson)) {
+                    Log.d(TAG, "✅ Delta icons sent: ${allIcons.size} icons (${cachedIcons.size} from cache, ${freshIcons.size} freshly extracted)")
+                } else {
+                    Log.e(TAG, "Failed to send delta icons")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling requestedIcons: ${e.message}")
+            }
+        }
     }
 }

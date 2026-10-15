@@ -41,5 +41,6 @@ data class HealthSummary(
     val vo2Max: Double?,
     val bodyTemperature: Double?, // celsius
     val bloodGlucose: Double?, // mmol/L
-    val hydration: Double? // liters
+    val hydration: Double?, // liters
+    val dateString: String? = null
 )

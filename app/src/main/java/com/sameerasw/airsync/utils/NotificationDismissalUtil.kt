@@ -69,22 +69,75 @@ object NotificationDismissalUtil {
     }
 
     /**
+     * Find a notification by ID with multiple fallbacks: direct ID, system key, package/title prefix, or live system query.
+     */
+    fun findNotification(notificationId: String): StatusBarNotification? {
+        // 1. Direct hit in memory map
+        activeNotifications[notificationId]?.let { return it }
+
+        // 2. Direct hit by system key in activeNotifications
+        activeNotifications.values.firstOrNull { it.key == notificationId }?.let { return it }
+
+        // 3. Fallback: match by prefix (packageName + titleHash)
+        // Format is "${packageName}_${title.hashCode()}_$timestamp"
+        val prefix = if (notificationId.contains("_")) {
+            val lastUnderscore = notificationId.lastIndexOf('_')
+            notificationId.substring(0, lastUnderscore)
+        } else null
+
+        if (prefix != null) {
+            val match = activeNotifications.entries.firstOrNull { it.key.startsWith(prefix) }?.value
+            if (match != null) return match
+        }
+
+        // 4. Fallback: query active notifications directly from system listener
+        try {
+            val service = getNotificationListenerService() ?: return null
+            val systemNotifications = service.activeNotifications ?: return null
+            for (sbn in systemNotifications) {
+                if (sbn.key == notificationId) {
+                    storeNotification(notificationId, sbn)
+                    return sbn
+                }
+                val cachedId = keyToId[sbn.key] ?: idMapPrefs()?.getString(sbn.key, null)
+                if (cachedId == notificationId) {
+                    activeNotifications[notificationId] = sbn
+                    return sbn
+                }
+                if (prefix != null) {
+                    val sbnTitle = sbn.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString() ?: ""
+                    val sbnPrefix = "${sbn.packageName}_${sbnTitle.hashCode()}"
+                    if (sbnPrefix == prefix) {
+                        activeNotifications[notificationId] = sbn
+                        return sbn
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error finding system notification: ${e.message}")
+        }
+
+        return null
+    }
+
+    /**
      * Dismiss a notification by its ID
      */
     fun dismissNotification(notificationId: String): Boolean {
         return try {
-            val notification = activeNotifications[notificationId]
+            val notification = findNotification(notificationId)
             if (notification != null) {
                 val service = getNotificationListenerService()
                 if (service != null) {
                     // Mark suppressed to avoid echo back to Mac when onNotificationRemoved triggers
                     markSuppressed(notificationId)
+                    markSuppressed(notification.key)
                     service.cancelNotification(notification.key)
                     // Cleanup maps after cancel is requested (onNotificationRemoved may also do this)
                     activeNotifications.remove(notificationId)
                     keyToId.remove(notification.key)
                     idMapPrefs()?.edit()?.remove(notification.key)?.apply()
-                    Log.d(TAG, "Successfully dismissed notification: $notificationId")
+                    Log.d(TAG, "Successfully dismissed notification: $notificationId (key: ${notification.key})")
                     true
                 } else {
                     Log.w(TAG, "Notification listener service not available")
@@ -119,7 +172,7 @@ object NotificationDismissalUtil {
                 Log.w(TAG, "Notification listener service not available")
                 return false
             }
-            val sbn = activeNotifications[notificationId]
+            val sbn = findNotification(notificationId)
             if (sbn == null) {
                 Log.w(TAG, "Notification with ID $notificationId not found for action $actionName")
                 return false

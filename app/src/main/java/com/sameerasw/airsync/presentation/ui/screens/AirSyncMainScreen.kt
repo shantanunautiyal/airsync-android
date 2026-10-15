@@ -317,8 +317,7 @@ fun AirSyncMainScreen(
         val criticalPermissions =
             com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
         if (criticalPermissions.isNotEmpty()) {
-            Toast.makeText(context, "Missing permissions", Toast.LENGTH_SHORT).show()
-            return
+            android.util.Log.w("AirSyncMainScreen", "Connecting with ungranted permissions: $criticalPermissions")
         }
 
         viewModel.setConnectingDeviceId(deviceId)
