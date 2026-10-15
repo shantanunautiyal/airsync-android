@@ -98,6 +98,8 @@ interface AirSyncRepository {
     // Mac Media controls
     suspend fun setMacMediaControlsEnabled(enabled: Boolean)
     fun getMacMediaControlsEnabled(): Flow<Boolean>
+    suspend fun setHideEmptyMediaBarEnabled(enabled: Boolean)
+    fun isHideEmptyMediaBarEnabled(): Flow<Boolean>
 
     // Blur settings
     suspend fun setUseBlurEnabled(enabled: Boolean)
@@ -154,4 +156,15 @@ interface AirSyncRepository {
 
     suspend fun setNotifyOnCrashEnabled(enabled: Boolean)
     fun getNotifyOnCrashEnabled(): Flow<Boolean>
+
+    // OpenRouter AI
+    suspend fun setOpenRouterEnabled(enabled: Boolean)
+    fun isOpenRouterEnabled(): Flow<Boolean>
+    suspend fun setOpenRouterApiKey(apiKey: String)
+    fun getOpenRouterApiKey(): Flow<String>
+    suspend fun setOpenRouterModel(model: String)
+    fun getOpenRouterModel(): Flow<String>
+    suspend fun saveLastAiHealthSuggestion(suggestion: String, date: String)
+    fun getLastAiHealthSuggestion(): Flow<String>
+    fun getLastAiHealthSuggestionDate(): Flow<String>
 }

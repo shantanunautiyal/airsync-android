@@ -13,6 +13,8 @@ fun MediaSyncCard(
     onToggleSendNowPlaying: (Boolean) -> Unit,
     isMacMediaControlsEnabled: Boolean,
     onToggleMacMediaControls: (Boolean) -> Unit,
+    isHideEmptyMediaBarEnabled: Boolean = false,
+    onToggleHideEmptyMediaBar: (Boolean) -> Unit = {},
     onOpenExcludedApps: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -44,6 +46,15 @@ fun MediaSyncCard(
             isChecked = isMacMediaControlsEnabled,
             onCheckedChange = onToggleMacMediaControls
         )
+        if (isMacMediaControlsEnabled) {
+            IconToggleItem(
+                iconRes = R.drawable.rounded_music_cast_24,
+                title = "Hide when nothing is playing",
+                description = "Automatically hide the media bar if no music is active on Mac",
+                isChecked = isHideEmptyMediaBarEnabled,
+                onCheckedChange = onToggleHideEmptyMediaBar
+            )
+        }
     }
 }
 

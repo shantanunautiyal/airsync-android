@@ -77,6 +77,7 @@ class DataStoreManager(private val context: Context) {
 
         // Mac Media controls toggle (for user-initiated proof for Play Store)
         private val MAC_MEDIA_CONTROLS_ENABLED = booleanPreferencesKey("mac_media_controls_enabled")
+        private val HIDE_EMPTY_MEDIA_BAR_ENABLED = booleanPreferencesKey("hide_empty_media_bar_enabled")
 
         // Essentials Bridge
         private val ESSENTIALS_CONNECTION_ENABLED =
@@ -114,6 +115,13 @@ class DataStoreManager(private val context: Context) {
         private const val NETWORK_CONNECTIONS_PREFIX = "network_connections_"
         
         private val IS_CELLULAR_SYNC_ENABLED = booleanPreferencesKey("is_cellular_sync_enabled")
+
+        // OpenRouter AI Health Coach
+        private val OPENROUTER_ENABLED = booleanPreferencesKey("openrouter_enabled")
+        private val OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
+        private val OPENROUTER_MODEL = stringPreferencesKey("openrouter_model")
+        private val LAST_AI_HEALTH_SUGGESTION = stringPreferencesKey("last_ai_health_suggestion")
+        private val LAST_AI_HEALTH_SUGGESTION_DATE = stringPreferencesKey("last_ai_health_suggestion_date")
 
         private var instance: DataStoreManager? = null
 
@@ -332,6 +340,18 @@ class DataStoreManager(private val context: Context) {
     fun getMacMediaControlsEnabled(): Flow<Boolean> {
         return context.dataStore.data.map { prefs ->
             prefs[MAC_MEDIA_CONTROLS_ENABLED] ?: true // Default to true
+        }
+    }
+
+    suspend fun setHideEmptyMediaBarEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[HIDE_EMPTY_MEDIA_BAR_ENABLED] = enabled
+        }
+    }
+
+    fun isHideEmptyMediaBarEnabled(): Flow<Boolean> {
+        return context.dataStore.data.map { prefs ->
+            prefs[HIDE_EMPTY_MEDIA_BAR_ENABLED] ?: false
         }
     }
 
@@ -1135,4 +1155,38 @@ class DataStoreManager(private val context: Context) {
     val isCellularSyncEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[IS_CELLULAR_SYNC_ENABLED] ?: true // Default to true
     }
+
+    suspend fun setOpenRouterEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[OPENROUTER_ENABLED] = enabled }
+    }
+
+    fun isOpenRouterEnabled(): Flow<Boolean> =
+        context.dataStore.data.map { it[OPENROUTER_ENABLED] ?: false }
+
+    suspend fun setOpenRouterApiKey(apiKey: String) {
+        context.dataStore.edit { it[OPENROUTER_API_KEY] = apiKey.trim() }
+    }
+
+    fun getOpenRouterApiKey(): Flow<String> =
+        context.dataStore.data.map { it[OPENROUTER_API_KEY] ?: "" }
+
+    suspend fun setOpenRouterModel(model: String) {
+        context.dataStore.edit { it[OPENROUTER_MODEL] = model.trim() }
+    }
+
+    fun getOpenRouterModel(): Flow<String> =
+        context.dataStore.data.map { it[OPENROUTER_MODEL] ?: com.sameerasw.airsync.ai.OpenRouterHealthCoach.DEFAULT_FREE_MODEL }
+
+    suspend fun saveLastAiHealthSuggestion(suggestion: String, date: String) {
+        context.dataStore.edit {
+            it[LAST_AI_HEALTH_SUGGESTION] = suggestion
+            it[LAST_AI_HEALTH_SUGGESTION_DATE] = date
+        }
+    }
+
+    fun getLastAiHealthSuggestion(): Flow<String> =
+        context.dataStore.data.map { it[LAST_AI_HEALTH_SUGGESTION] ?: "" }
+
+    fun getLastAiHealthSuggestionDate(): Flow<String> =
+        context.dataStore.data.map { it[LAST_AI_HEALTH_SUGGESTION_DATE] ?: "" }
 }

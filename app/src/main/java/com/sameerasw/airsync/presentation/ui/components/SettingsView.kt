@@ -61,6 +61,7 @@ import com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.MediaSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
+import com.sameerasw.airsync.presentation.ui.components.cards.OpenRouterSettingsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTilesCard
 import com.sameerasw.airsync.presentation.ui.components.cards.SmartspacerCard
@@ -186,7 +187,7 @@ fun SettingsView(
     ) {
 
         val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val topSpacing = (statusBarHeight - 24.dp).coerceAtLeast(0.dp)
+        val topSpacing = statusBarHeight + 12.dp
 
         Spacer(
             modifier = Modifier
@@ -640,6 +641,10 @@ fun SettingsView(
                                 onToggleMacMediaControls = { enabled ->
                                     viewModel.setMacMediaControlsEnabled(enabled)
                                 },
+                                isHideEmptyMediaBarEnabled = uiState.isHideEmptyMediaBarEnabled,
+                                onToggleHideEmptyMediaBar = { enabled ->
+                                    viewModel.setHideEmptyMediaBarEnabled(enabled)
+                                },
                                 onOpenExcludedApps = {
                                     HapticUtil.performClick(haptics)
                                     viewModel.loadMediaApps(context)
@@ -668,6 +673,15 @@ fun SettingsView(
                             )
                         }
                         "Integrations" -> {
+                            OpenRouterSettingsCard(
+                                isEnabled = uiState.isOpenRouterEnabled,
+                                apiKey = uiState.openRouterApiKey,
+                                selectedModel = uiState.openRouterModel,
+                                onToggleEnabled = { viewModel.setOpenRouterEnabled(it) },
+                                onApiKeyChange = { viewModel.setOpenRouterApiKey(it) },
+                                onModelChange = { viewModel.setOpenRouterModel(it) }
+                            )
+
                             SmartspacerCard(
                                 isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
                                 onToggleSmartspacerShowWhenDisconnected = { enabled: Boolean ->

@@ -32,6 +32,7 @@ data class UiState(
     val mirroringOptions: MirroringOptions? = null,
     val isSmartspacerShowWhenDisconnected: Boolean = false,
     val isMacMediaControlsEnabled: Boolean = true,
+    val isHideEmptyMediaBarEnabled: Boolean = false,
     // Mac device status
     val macDeviceStatus: MacDeviceStatus? = null,
     // Auth failure dialog
@@ -58,5 +59,8 @@ data class UiState(
     val isCellularSyncEnabled: Boolean = true,
     val isNotifyOnCrashEnabled: Boolean = true,
     val isAppPaused: Boolean = false,
-    val bleConnectionState: com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState = com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.DISCONNECTED
+    val bleConnectionState: com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState = com.sameerasw.airsync.data.ble.BleGattServer.BleConnectionState.DISCONNECTED,
+    val isOpenRouterEnabled: Boolean = false,
+    val openRouterApiKey: String = "",
+    val openRouterModel: String = com.sameerasw.airsync.ai.OpenRouterHealthCoach.DEFAULT_FREE_MODEL
 )

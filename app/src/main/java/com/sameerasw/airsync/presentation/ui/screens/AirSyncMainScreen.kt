@@ -749,7 +749,7 @@ fun AirSyncMainScreen(
 
             val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val statusBarHeightPx = with(density) { statusBarHeight.toPx() }
-            val topSpacing = (statusBarHeight - 24.dp).coerceAtLeast(0.dp)
+            val topSpacing = statusBarHeight + 12.dp
 
             // Track page changes for haptic feedback on swipe
             LaunchedEffect(pagerState.currentPage) {
@@ -1287,6 +1287,9 @@ fun AirSyncMainScreen(
 //                    .padding(bottom = 16.dp)
                         .zIndex(2f)
                 ) {
+                    val isMusicActive = macStatus?.music?.let { it.isPlaying == true || !it.title.isNullOrBlank() } ?: false
+                    val showMediaPlayer = uiState.isConnected && uiState.isMacMediaControlsEnabled && (!uiState.isHideEmptyMediaBarEnabled || isMusicActive)
+
                     if (isLandscape) {
                         Row(
                             modifier = Modifier
@@ -1299,7 +1302,7 @@ fun AirSyncMainScreen(
                             verticalAlignment = Alignment.Bottom
                         ) {
                             AnimatedVisibility(
-                                visible = uiState.isConnected,
+                                visible = showMediaPlayer,
                                 enter = fadeIn() + expandHorizontally(),
                                 exit = fadeOut() + shrinkHorizontally(),
                                 modifier = Modifier.weight(1f)
@@ -1365,7 +1368,7 @@ fun AirSyncMainScreen(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             AnimatedVisibility(
-                                visible = uiState.isConnected,
+                                visible = showMediaPlayer,
                                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
                                 exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
                             ) {

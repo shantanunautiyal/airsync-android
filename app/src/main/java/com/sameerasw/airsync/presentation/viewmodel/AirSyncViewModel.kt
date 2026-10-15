@@ -297,6 +297,23 @@ class AirSyncViewModel(
             }
         }
 
+        // Observe OpenRouter preferences
+        viewModelScope.launch {
+            repository.isOpenRouterEnabled().collect { enabled ->
+                _uiState.value = _uiState.value.copy(isOpenRouterEnabled = enabled)
+            }
+        }
+        viewModelScope.launch {
+            repository.getOpenRouterApiKey().collect { key ->
+                _uiState.value = _uiState.value.copy(openRouterApiKey = key)
+            }
+        }
+        viewModelScope.launch {
+            repository.getOpenRouterModel().collect { model ->
+                _uiState.value = _uiState.value.copy(openRouterModel = model)
+            }
+        }
+
         // Observe BLE connection status
         viewModelScope.launch {
             com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.connectionState?.collect { state ->
@@ -413,6 +430,7 @@ class AirSyncViewModel(
             val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
             val isMacMediaControlsEnabled = repository.getMacMediaControlsEnabled().first()
+            val isHideEmptyMediaBarEnabled = repository.isHideEmptyMediaBarEnabled().first()
             val isClipboardHistoryEnabled = repository.getClipboardHistoryEnabled().first()
             val defaultTab = repository.getDefaultTab().first()
             val isEssentialsConnectionEnabled = repository.getEssentialsConnectionEnabled().first()
@@ -426,6 +444,9 @@ class AirSyncViewModel(
             val isQuickShareEnabled = repository.isQuickShareEnabled().first()
             val isCellularSyncEnabled = repository.isCellularSyncEnabled().first()
             val isNotifyOnCrashEnabled = repository.getNotifyOnCrashEnabled().first()
+            val isOpenRouterEnabled = repository.isOpenRouterEnabled().first()
+            val openRouterApiKey = repository.getOpenRouterApiKey().first()
+            val openRouterModel = repository.getOpenRouterModel().first()
 
             // Replicate Essentials logic for initial state
             val isBlurEnabled = isBlurEnabledSetting && !isPowerSaveMode && !isBlurProblematic
@@ -479,6 +500,7 @@ class AirSyncViewModel(
                 isSendNowPlayingEnabled = isSendNowPlayingEnabled,
                 isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
                 isMacMediaControlsEnabled = isMacMediaControlsEnabled,
+                isHideEmptyMediaBarEnabled = isHideEmptyMediaBarEnabled,
                 isClipboardHistoryEnabled = isClipboardHistoryEnabled,
                 defaultTab = defaultTab,
                 isEssentialsConnectionEnabled = isEssentialsConnectionEnabled,
@@ -491,7 +513,10 @@ class AirSyncViewModel(
                 isOnboardingCompleted = !isFirstRun,
                 isQuickShareEnabled = isQuickShareEnabled,
                 isCellularSyncEnabled = isCellularSyncEnabled,
-                isNotifyOnCrashEnabled = isNotifyOnCrashEnabled
+                isNotifyOnCrashEnabled = isNotifyOnCrashEnabled,
+                isOpenRouterEnabled = isOpenRouterEnabled,
+                openRouterApiKey = openRouterApiKey,
+                openRouterModel = openRouterModel
             )
 
             updateRatingPromptDisplay()
@@ -862,6 +887,28 @@ class AirSyncViewModel(
         }
     }
 
+    fun setOpenRouterEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isOpenRouterEnabled = enabled)
+        viewModelScope.launch {
+            repository.setOpenRouterEnabled(enabled)
+        }
+    }
+
+    fun setOpenRouterApiKey(apiKey: String) {
+        _uiState.value = _uiState.value.copy(openRouterApiKey = apiKey.trim())
+        viewModelScope.launch {
+            repository.setOpenRouterApiKey(apiKey.trim())
+        }
+    }
+
+    fun setOpenRouterModel(model: String) {
+        val sanitized = com.sameerasw.airsync.ai.OpenRouterHealthCoach.sanitizeModelId(model)
+        _uiState.value = _uiState.value.copy(openRouterModel = sanitized)
+        viewModelScope.launch {
+            repository.setOpenRouterModel(sanitized)
+        }
+    }
+
     fun manualSyncAppIcons(context: Context) {
         _uiState.value = _uiState.value.copy(isIconSyncLoading = true, iconSyncMessage = "")
 
@@ -1126,6 +1173,13 @@ class AirSyncViewModel(
                     com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(ctx)
                 }
             }
+        }
+    }
+
+    fun setHideEmptyMediaBarEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isHideEmptyMediaBarEnabled = enabled)
+        viewModelScope.launch {
+            repository.setHideEmptyMediaBarEnabled(enabled)
         }
     }
 

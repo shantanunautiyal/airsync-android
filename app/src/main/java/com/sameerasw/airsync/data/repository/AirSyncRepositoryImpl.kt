@@ -224,6 +224,14 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getMacMediaControlsEnabled()
     }
 
+    override suspend fun setHideEmptyMediaBarEnabled(enabled: Boolean) {
+        dataStoreManager.setHideEmptyMediaBarEnabled(enabled)
+    }
+
+    override fun isHideEmptyMediaBarEnabled(): Flow<Boolean> {
+        return dataStoreManager.isHideEmptyMediaBarEnabled()
+    }
+
     override suspend fun setUseBlurEnabled(enabled: Boolean) {
         dataStoreManager.setUseBlurEnabled(enabled)
     }
@@ -344,5 +352,41 @@ class AirSyncRepositoryImpl(
 
     override fun getNotifyOnCrashEnabled(): Flow<Boolean> {
         return dataStoreManager.getNotifyOnCrashEnabled()
+    }
+
+    override suspend fun setOpenRouterEnabled(enabled: Boolean) {
+        dataStoreManager.setOpenRouterEnabled(enabled)
+    }
+
+    override fun isOpenRouterEnabled(): Flow<Boolean> {
+        return dataStoreManager.isOpenRouterEnabled()
+    }
+
+    override suspend fun setOpenRouterApiKey(apiKey: String) {
+        dataStoreManager.setOpenRouterApiKey(apiKey)
+    }
+
+    override fun getOpenRouterApiKey(): Flow<String> {
+        return dataStoreManager.getOpenRouterApiKey()
+    }
+
+    override suspend fun setOpenRouterModel(model: String) {
+        dataStoreManager.setOpenRouterModel(model)
+    }
+
+    override fun getOpenRouterModel(): Flow<String> {
+        return dataStoreManager.getOpenRouterModel()
+    }
+
+    override suspend fun saveLastAiHealthSuggestion(suggestion: String, date: String) {
+        dataStoreManager.saveLastAiHealthSuggestion(suggestion, date)
+    }
+
+    override fun getLastAiHealthSuggestion(): Flow<String> {
+        return dataStoreManager.getLastAiHealthSuggestion()
+    }
+
+    override fun getLastAiHealthSuggestionDate(): Flow<String> {
+        return dataStoreManager.getLastAiHealthSuggestionDate()
     }
 }

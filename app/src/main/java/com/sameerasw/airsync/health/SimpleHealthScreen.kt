@@ -36,6 +36,7 @@ import androidx.health.connect.client.PermissionController
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.sameerasw.airsync.ai.OpenRouterHealthCoach
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,6 +165,14 @@ fun SimpleHealthScreen(
 
                         // Metric cards in 2-column grid
                         MetricCardsGrid(healthStats)
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // AI Health Coach Insights Card
+                        AiHealthCoachCard(
+                            healthStats = healthStats,
+                            selectedDate = selectedDate
+                        )
 
                         Spacer(Modifier.height(100.dp))
                     }
@@ -669,3 +678,227 @@ private fun DatePickerDialog(
         DatePicker(state = datePickerState)
     }
 }
+
+// ──── AI Health Coach Insights Card ────
+
+@Composable
+private fun AiHealthCoachCard(
+    healthStats: HealthStats,
+    selectedDate: LocalDate
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val dataStore = remember { com.sameerasw.airsync.data.local.DataStoreManager(context) }
+
+    val isEnabled by dataStore.isOpenRouterEnabled().collectAsState(initial = false)
+    val apiKey by dataStore.getOpenRouterApiKey().collectAsState(initial = "")
+    val selectedModel by dataStore.getOpenRouterModel().collectAsState(initial = com.sameerasw.airsync.ai.OpenRouterHealthCoach.DEFAULT_FREE_MODEL)
+    val cachedSuggestion by dataStore.getLastAiHealthSuggestion().collectAsState(initial = "")
+    val cachedSuggestionDate by dataStore.getLastAiHealthSuggestionDate().collectAsState(initial = "")
+
+    var currentSuggestion by remember(selectedDate) { mutableStateOf<String?>(null) }
+    var isLoadingAi by remember { mutableStateOf(false) }
+    var aiError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(selectedDate, cachedSuggestion, cachedSuggestionDate) {
+        if (cachedSuggestionDate == selectedDate.toString() && cachedSuggestion.isNotBlank()) {
+            currentSuggestion = cachedSuggestion
+        } else {
+            currentSuggestion = null
+        }
+    }
+
+    val modelInfo = OpenRouterHealthCoach.CURATED_FREE_MODELS.find { it.id == selectedModel }
+    val displayModelName = modelInfo?.displayName ?: selectedModel
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF8E24AA), Color(0xFF1E88E5))
+                                ),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AutoAwesome,
+                            contentDescription = "AI Coach",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = "AI Health & Fitness Coach",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isEnabled) displayModelName else "OpenRouter AI Add-on",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                if (isEnabled && apiKey.isNotBlank()) {
+                    FilledTonalButton(
+                        onClick = {
+                            isLoadingAi = true
+                            aiError = null
+                            scope.launch {
+                                val result = com.sameerasw.airsync.ai.OpenRouterHealthCoach.generateHealthSuggestions(
+                                    context = context,
+                                    stats = healthStats,
+                                    date = selectedDate
+                                )
+                                isLoadingAi = false
+                                if (result.isSuccess) {
+                                    currentSuggestion = result.getOrNull()
+                                } else {
+                                    aiError = result.exceptionOrNull()?.localizedMessage ?: "Failed to generate suggestions"
+                                }
+                            }
+                        },
+                        enabled = !isLoadingAi,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        if (isLoadingAi) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (currentSuggestion != null) "Refresh" else "Analyze")
+                        }
+                    }
+                }
+            }
+
+            // Body content
+            when {
+                !isEnabled || apiKey.isBlank() -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Get personalized daily health summaries, workout advice, and recovery guidance powered by free AI models (Gemini 2.0 Flash, Llama 3.3, DeepSeek R1).",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "💡 Configure your free OpenRouter API key in Settings > Integrations to enable AI Health insights.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                isLoadingAi -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 20.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            text = "Analyzing health data with $displayModelName…",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                aiError != null -> {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Unable to get insights",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = aiError.orEmpty(),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+
+                currentSuggestion != null -> {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = currentSuggestion.orEmpty(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    Text(
+                        text = "Tap 'Analyze' above to have your AI coach review today's metrics and offer suggestions.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
